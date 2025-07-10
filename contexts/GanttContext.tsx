@@ -1,0 +1,352 @@
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useReleases } from './ReleaseContext';
+import { Task, Developer, ViewType } from '../types';
+import { v4 as uuidv4 } from 'uuid';
+import { 
+  addWeeks,
+  subWeeks,
+  addMonths,
+  subMonths,
+  addYears,
+  subYears,
+  startOfWeek, 
+  endOfWeek, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfYear, 
+  endOfYear, 
+  startOfDay,
+  eachDayOfInterval, 
+  eachWeekOfInterval, 
+  eachMonthOfInterval, 
+  eachYearOfInterval, 
+  isSameDay,
+  isSameMonth,
+  isSameYear
+} from 'date-fns';
+
+export interface Conflict {
+  id: string;
+  developerId: string;
+  conflictingTasks: Task[];
+  message: string;
+}
+
+interface GanttContextType {
+  tasks: Task[];
+  developers: Developer[];
+  selectedTask: Task | null;
+  setSelectedTask: (task: Task | null) => void;
+  conflicts: Conflict[];
+  
+  // Task management
+  addTask: (task: Omit<Task, 'id'>) => Promise<void>;
+  updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
+  deleteTask: (id: string) => Promise<void>;
+  
+  // Developer management
+  addDeveloper: (developer: Omit<Developer, 'id'>) => Promise<void>;
+  updateDeveloper: (id: string, updates: Partial<Developer>) => Promise<void>;
+  deleteDeveloper: (id: string) => Promise<void>;
+  
+  // Conflict detection
+  detectConflicts: () => void;
+  getDeveloperConflicts: (developerId: string) => Conflict[];
+  getTaskConflicts: (taskId: string) => Conflict | null;
+  
+  // View management
+  currentView: ViewType;
+  setCurrentView: (view: ViewType) => void;
+  selectedYear: number;
+  setSelectedYear: (year: number) => void;
+  viewConfig: {
+    unitWidth: number;
+    dateFormat: string;
+    label: string;
+  };
+  
+  // Date range calculation
+  getDateRange: () => {
+    start: Date;
+    end: Date;
+    units: Date[];
+    todayIndex: number; // Index of today in the units array (-1 if not found)
+  };
+
+  // Navigation helpers
+  scrollToToday: (() => void) | null;
+  setScrollToToday: (fn: (() => void) | null) => void;
+}
+
+const GanttContext = createContext<GanttContextType | undefined>(undefined);
+
+interface GanttProviderProps {
+  children: ReactNode;
+  initialTasks?: Task[];
+  initialDevelopers?: Developer[];
+  releaseId?: string;
+}
+
+export function GanttProvider({ children, initialTasks = [], initialDevelopers = [], releaseId }: GanttProviderProps) {
+  const releaseContext = useReleases();
+  
+  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [developers, setDevelopers] = useState<Developer[]>(initialDevelopers);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [conflicts, setConflicts] = useState<Conflict[]>([]);
+  const [currentView, setCurrentView] = useState<ViewType>('month');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [scrollToToday, setScrollToToday] = useState<(() => void) | null>(null);
+
+  // Sync with release context when available
+  useEffect(() => {
+    if (releaseId && releaseContext?.currentRelease) {
+      setTasks(releaseContext.currentRelease.tasks || []);
+      setDevelopers(releaseContext.currentRelease.team || []);
+    }
+  }, [releaseId, releaseContext?.currentRelease]);
+
+  // View configurations with DD/MM date format
+  const viewConfigs = {
+    day: { unitWidth: 80, dateFormat: 'dd/MM', label: 'Day' },
+    week: { unitWidth: 120, dateFormat: 'dd/MM', label: 'Week' },
+    month: { unitWidth: 160, dateFormat: 'MM/yyyy', label: 'Month' },
+    year: { unitWidth: 200, dateFormat: 'yyyy', label: 'Year' }
+  };
+
+  const viewConfig = viewConfigs[currentView];
+
+  // Date range calculation based on current view - designed to always include today
+  const getDateRange = () => {
+    const today = startOfDay(new Date());
+    let start: Date, end: Date, units: Date[];
+    let todayIndex = -1;
+
+    switch (currentView) {
+      case 'day':
+        // For day view: show the entire selected year
+        start = startOfYear(new Date(selectedYear, 0, 1));
+        end = endOfYear(new Date(selectedYear, 0, 1));
+        units = eachDayOfInterval({ start, end });
+        
+        // Find today's index in the current year
+        todayIndex = units.findIndex(date => isSameDay(date, today));
+        break;
+      
+      case 'week':
+        // Show 2 years: 6 months before today, 18 months after today
+        const weekStart = startOfWeek(subWeeks(today, 26), { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(addWeeks(today, 78), { weekStartsOn: 1 });
+        start = weekStart;
+        end = weekEnd;
+        units = eachWeekOfInterval({ start, end }, { weekStartsOn: 1 });
+        
+        // Find the week containing today
+        todayIndex = units.findIndex(weekDate => {
+          const thisWeekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
+          return today >= weekDate && today <= thisWeekEnd;
+        });
+        break;
+      
+      case 'month':
+        // Show 4 years: 1 year before today, 3 years after today
+        start = startOfMonth(subMonths(today, 12));
+        end = endOfMonth(addMonths(today, 36));
+        units = eachMonthOfInterval({ start, end });
+        
+        // Find current month
+        todayIndex = units.findIndex(monthDate => isSameMonth(monthDate, today));
+        break;
+      
+      case 'year':
+        // Show 12 years: 5 years before today, 6 years after today
+        start = startOfYear(subYears(today, 5));
+        end = endOfYear(addYears(today, 6));
+        units = eachYearOfInterval({ start, end });
+        
+        // Find current year
+        todayIndex = units.findIndex(yearDate => isSameYear(yearDate, today));
+        break;
+      
+      default:
+        // Default to month view
+        start = startOfMonth(subMonths(today, 12));
+        end = endOfMonth(addMonths(today, 36));
+        units = eachMonthOfInterval({ start, end });
+        todayIndex = units.findIndex(monthDate => isSameMonth(monthDate, today));
+    }
+
+    return { start, end, units, todayIndex };
+  };
+
+  // Task management functions
+  const addTask = async (task: Omit<Task, 'id'>): Promise<void> => {
+    const newTask: Task = {
+      ...task,
+      id: uuidv4()
+    };
+
+    if (releaseId && releaseContext) {
+      await releaseContext.addTaskToCurrentRelease(task);
+    } else {
+      setTasks(prev => [...prev, newTask]);
+    }
+  };
+
+  const updateTask = async (id: string, updates: Partial<Task>): Promise<void> => {
+    if (releaseId && releaseContext) {
+      await releaseContext.updateTaskInCurrentRelease(id, updates);
+    } else {
+      setTasks(prev => prev.map(task => 
+        task.id === id ? { ...task, ...updates } : task
+      ));
+    }
+  };
+
+  const deleteTask = async (id: string): Promise<void> => {
+    if (releaseId && releaseContext) {
+      await releaseContext.deleteTaskFromCurrentRelease(id);
+    } else {
+      setTasks(prev => prev.filter(task => task.id !== id));
+    }
+    
+    if (selectedTask?.id === id) {
+      setSelectedTask(null);
+    }
+  };
+
+  // Developer management functions
+  const addDeveloper = async (developer: Omit<Developer, 'id'>): Promise<void> => {
+    const newDeveloper: Developer = {
+      ...developer,
+      id: uuidv4()
+    };
+
+    if (releaseId && releaseContext) {
+      await releaseContext.addDeveloperToCurrentRelease(developer);
+    } else {
+      setDevelopers(prev => [...prev, newDeveloper]);
+    }
+  };
+
+  const updateDeveloper = async (id: string, updates: Partial<Developer>): Promise<void> => {
+    if (releaseId && releaseContext) {
+      await releaseContext.updateDeveloperInCurrentRelease(id, updates);
+    } else {
+      setDevelopers(prev => prev.map(dev => 
+        dev.id === id ? { ...dev, ...updates } : dev
+      ));
+    }
+  };
+
+  const deleteDeveloper = async (id: string): Promise<void> => {
+    if (releaseId && releaseContext) {
+      await releaseContext.deleteDeveloperFromCurrentRelease(id);
+    } else {
+      setDevelopers(prev => prev.filter(dev => dev.id !== id));
+    }
+  };
+
+  // Conflict detection
+  const detectConflicts = () => {
+    const newConflicts: Conflict[] = [];
+    const developerTasks: { [developerId: string]: Task[] } = {};
+
+    // Group tasks by developer
+    tasks.forEach(task => {
+      if (task.assignedDeveloperId && !developerTasks[task.assignedDeveloperId]) {
+        developerTasks[task.assignedDeveloperId] = [];
+      }
+      if (task.assignedDeveloperId) {
+        developerTasks[task.assignedDeveloperId].push(task);
+      }
+    });
+
+    // Check for overlapping tasks for each developer
+    Object.entries(developerTasks).forEach(([developerId, devTasks]) => {
+      const conflictingTasks: Task[] = [];
+
+      for (let i = 0; i < devTasks.length; i++) {
+        for (let j = i + 1; j < devTasks.length; j++) {
+          const task1 = devTasks[i];
+          const task2 = devTasks[j];
+
+          // Check if tasks overlap
+          if (
+            (task1.startDate <= task2.endDate && task1.endDate >= task2.startDate) ||
+            (task2.startDate <= task1.endDate && task2.endDate >= task1.startDate)
+          ) {
+            if (!conflictingTasks.includes(task1)) conflictingTasks.push(task1);
+            if (!conflictingTasks.includes(task2)) conflictingTasks.push(task2);
+          }
+        }
+      }
+
+      if (conflictingTasks.length > 0) {
+        const developer = developers.find(dev => dev.id === developerId);
+        newConflicts.push({
+          id: uuidv4(),
+          developerId,
+          conflictingTasks,
+          message: `${developer?.name || 'Unknown Developer'} has ${conflictingTasks.length} overlapping tasks`
+        });
+      }
+    });
+
+    setConflicts(newConflicts);
+  };
+
+  const getDeveloperConflicts = (developerId: string): Conflict[] => {
+    return conflicts.filter(conflict => conflict.developerId === developerId);
+  };
+
+  const getTaskConflicts = (taskId: string): Conflict | null => {
+    return conflicts.find(conflict => 
+      conflict.conflictingTasks.some(task => task.id === taskId)
+    ) || null;
+  };
+
+  // Run conflict detection when tasks change
+  useEffect(() => {
+    if (tasks.length > 0 && developers.length > 0) {
+      detectConflicts();
+    }
+  }, [tasks, developers]);
+
+  return (
+    <GanttContext.Provider value={{
+      tasks,
+      developers,
+      selectedTask,
+      setSelectedTask,
+      conflicts,
+      addTask,
+      updateTask,
+      deleteTask,
+      addDeveloper,
+      updateDeveloper,
+      deleteDeveloper,
+      detectConflicts,
+      getDeveloperConflicts,
+      getTaskConflicts,
+      currentView,
+      setCurrentView,
+      selectedYear,
+      setSelectedYear,
+      viewConfig,
+      getDateRange,
+      scrollToToday,
+      setScrollToToday
+    }}>
+      {children}
+    </GanttContext.Provider>
+  );
+}
+
+export function useGantt() {
+  const context = useContext(GanttContext);
+  if (context === undefined) {
+    throw new Error('useGantt must be used within a GanttProvider');
+  }
+  return context;
+}
