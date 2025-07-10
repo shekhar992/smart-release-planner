@@ -7,8 +7,7 @@ import { ViewToggle } from './ViewToggle';
 import { ScrollControls } from './ScrollControls';
 import { TimelineEnhancements } from './TimelineEnhancements';
 import { format, isToday, isWeekend, isSameMonth, isSameYear } from 'date-fns';
-import { AlertTriangle, Clock, Move, CalendarDays, Minimize2, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Badge } from './ui/badge';
+import { AlertTriangle, Clock, Move, CalendarDays, Minimize2, Maximize2, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import { useEffect, useRef, useCallback, useState } from 'react';
@@ -143,51 +142,91 @@ export function GanttChart() {
     return getDeveloperConflicts(developerId).length;
   };
 
-  const getHeaderFormat = (date: Date, index: number) => {
+  // Helper function to group consecutive dates by month
+  const getMonthGroups = () => {
+    const groups: { month: string; startIndex: number; count: number; year: number }[] = [];
+    let currentMonth = '';
+    let currentStartIndex = 0;
+    let currentCount = 0;
+    let currentYear = 0;
+
+    units.forEach((date, index) => {
+      const monthYear = format(date, 'MMMM yyyy');
+      const year = date.getFullYear();
+      
+      if (monthYear !== currentMonth) {
+        if (currentCount > 0) {
+          groups.push({ 
+            month: currentMonth, 
+            startIndex: currentStartIndex, 
+            count: currentCount,
+            year: currentYear
+          });
+        }
+        currentMonth = monthYear;
+        currentStartIndex = index;
+        currentCount = 1;
+        currentYear = year;
+      } else {
+        currentCount++;
+      }
+    });
+
+    // Don't forget the last group
+    if (currentCount > 0) {
+      groups.push({ 
+        month: currentMonth, 
+        startIndex: currentStartIndex, 
+        count: currentCount,
+        year: currentYear
+      });
+    }
+
+    return groups;
+  };
+
+  const getHeaderFormat = (date: Date, _index: number) => {
     switch (currentView) {
       case 'day':
         const isCurrentDay = isToday(date);
         const isWeekendDay = isWeekend(date);
         return (
-          <div className={`text-center p-2 rounded transition-colors ${
-            isCurrentDay ? 'bg-red-100 border-red-300 text-red-800 ring-1 ring-red-300' : 
-            isWeekendDay ? 'bg-gray-100 text-gray-600' : 'hover:bg-blue-50'
+          <div className={`text-center py-3 px-1 border-r border-border/30 transition-all duration-200 ${
+            isCurrentDay ? 'bg-primary/15 border-primary/30 text-primary shadow-sm' : 
+            isWeekendDay ? 'bg-muted/40 text-muted-foreground' : 'hover:bg-accent/50'
           }`}>
-            <div className={`text-sm ${isCurrentDay ? 'font-semibold' : ''}`}>
-              {format(date, 'dd/MM')}
+            <div className={`text-base font-semibold ${isCurrentDay ? 'font-bold text-primary' : ''}`}>
+              {format(date, 'dd')}
             </div>
-            <div className={`text-xs ${isCurrentDay ? 'text-red-600' : isWeekendDay ? 'text-gray-600' : 'text-gray-500'}`}>
+            <div className={`text-xs mt-1 tracking-wide uppercase ${
+              isCurrentDay ? 'text-primary font-medium' : 
+              isWeekendDay ? 'text-muted-foreground' : 'text-muted-foreground'
+            }`}>
               {format(date, 'EEE')}
             </div>
-            {(index === 0 || date.getDate() === 1) && (
-              <div className="text-xs text-blue-600 mt-1 border-t pt-1">
-                {format(date, 'MMM')}
-              </div>
-            )}
           </div>
         );
       case 'week':
         return (
           <div className="text-center p-2">
             <div className="text-sm">{format(date, 'dd/MM')}</div>
-            <div className="text-xs text-gray-500">{format(date, 'yyyy')}</div>
           </div>
         );
       case 'month':
         const isCurrentMonth = isSameMonth(date, today);
         return (
           <div className={`text-center p-2 rounded transition-colors ${
-            isCurrentMonth ? 'bg-blue-100 border-blue-300 text-blue-800 ring-1 ring-blue-300' : 'hover:bg-blue-50'
+            isCurrentMonth ? 'bg-primary/10 border-primary/20 text-primary' : 'hover:bg-accent/30'
           }`}>
             <div className={`text-sm ${isCurrentMonth ? 'font-semibold' : ''}`}>{format(date, 'MM')}</div>
-            <div className={`text-xs ${isCurrentMonth ? 'text-blue-600' : 'text-gray-500'}`}>{format(date, 'yyyy')}</div>
+            <div className={`text-xs ${isCurrentMonth ? 'text-primary' : 'text-muted-foreground'}`}>{format(date, 'yyyy')}</div>
           </div>
         );
       case 'year':
         const isCurrentYear = isSameYear(date, today);
         return (
           <div className={`text-center p-2 rounded transition-colors ${
-            isCurrentYear ? 'bg-blue-100 border-blue-300 text-blue-800 ring-1 ring-blue-300' : 'hover:bg-blue-50'
+            isCurrentYear ? 'bg-primary/10 border-primary/20 text-primary' : 'hover:bg-accent/30'
           }`}>
             <div className={`text-sm ${isCurrentYear ? 'font-semibold' : ''}`}>{format(date, 'yyyy')}</div>
           </div>
@@ -201,88 +240,96 @@ export function GanttChart() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="h-full flex flex-col bg-white">
-        {/* Enhanced View Controls */}
-        <div className="border-b bg-gradient-to-r from-gray-50 to-blue-50/30 p-4 shrink-0">
+      <div className="h-full flex flex-col bg-gradient-to-br from-background to-muted/20">
+        {/* Enhanced Header with Modern Design */}
+        <div className="border-b bg-card/80 backdrop-blur-sm p-4 shrink-0">
           <div className="flex justify-between items-start gap-4">
             <div className="flex-1">
-              <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
-                <CalendarDays className="w-5 h-5 text-blue-600" />
+              <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <CalendarDays className="w-5 h-5 text-primary" />
+                </div>
                 Project Timeline
               </h3>
-              <div className="flex items-center gap-1 text-sm text-gray-600">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Move className="w-4 h-4" />
                 <span>
                   {isTodayInRange 
-                    ? `Timeline centered on current ${currentView} • ${units.length} ${currentView}s visible • Today at ${Math.round(todayPosition)}px`
+                    ? `Timeline centered on current ${currentView} • ${units.length} ${currentView}s visible`
                     : `Viewing ${units.length} ${currentView}s • Today is outside current view`
                   }
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <ScrollControls scrollAreaRef={scrollAreaRef} className="bg-white rounded-lg shadow-sm border p-2" />
+              <ScrollControls scrollAreaRef={scrollAreaRef} className="bg-background/50 backdrop-blur-sm rounded-lg shadow-sm border p-2" />
               <ViewToggle />
             </div>
           </div>
         </div>
 
-        {/* Today Status */}
+        {/* Today Status with Modern Design */}
         {isTodayInRange && (
-          <div className="border-b bg-blue-50 p-3">
-            <div className="flex items-center gap-2 text-blue-800">
-              <CalendarDays className="w-4 h-4" />
-              <span className="text-sm">
-                Today is {format(today, 'EEEE, dd/MM/yyyy')} • 
-                Timeline is positioned on current {currentView} • 
-                Press 'T' or use navigation controls to center on today
+          <div className="border-b bg-gradient-to-r from-primary/10 to-primary/5 p-3">
+            <div className="flex items-center gap-2 text-primary">
+              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                <CalendarDays className="w-4 h-4" />
+              </div>
+              <span className="text-sm font-medium">
+                Today is {format(today, 'EEEE, MMM dd, yyyy')} • 
+                Press 'T' to center on today
               </span>
             </div>
           </div>
         )}
 
         {!isTodayInRange && (
-          <div className="border-b bg-yellow-50 p-3">
-            <div className="flex items-center gap-2 text-yellow-800">
-              <AlertTriangle className="w-4 h-4" />
-              <span className="text-sm">
-                Today ({format(today, 'dd/MM/yyyy')}) is outside the current {currentView} view range • 
-                {currentView === 'day' ? `Switch to ${new Date().getFullYear()} or` : ''} Change view to see current date
+          <div className="border-b bg-gradient-to-r from-orange-50 to-yellow-50 p-3">
+            <div className="flex items-center gap-2 text-orange-800">
+              <div className="w-6 h-6 rounded-full bg-orange-200 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4" />
+              </div>
+              <span className="text-sm font-medium">
+                Today ({format(today, 'MMM dd, yyyy')}) is outside the current view • 
+                {currentView === 'day' ? `Switch to ${new Date().getFullYear()} or ` : ''}Change view to see current date
               </span>
             </div>
           </div>
         )}
 
-        {/* Conflicts Summary */}
+        {/* Conflicts Summary with Modern Design */}
         {conflicts.length > 0 && (
-          <div className="border-b bg-red-50 p-4">
-            <div className="flex items-center gap-2 text-red-800">
-              <AlertTriangle className="w-4 h-4" />
-              <h4 className="text-sm">Scheduling Conflicts Detected</h4>
+          <div className="border-b bg-gradient-to-r from-red-50 to-pink-50 p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
+              </div>
+              <div>
+                <h4 className="text-sm font-semibold text-red-800">Scheduling Conflicts Detected</h4>
+                <p className="text-xs text-red-600 mt-1">
+                  {conflicts.length} task{conflicts.length !== 1 ? 's have' : ' has'} overlapping dates. 
+                  Tasks with conflicts are highlighted with red borders.
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-red-600 mt-1">
-              {conflicts.length} task{conflicts.length !== 1 ? 's have' : ' has'} overlapping dates. 
-              Tasks with conflicts are highlighted with red borders and warning icons.
-            </p>
           </div>
         )}
 
-        {/* Main Content with Enhanced Horizontal Scroll */}
+        {/* Main Content with Modern Task List */}
         <div className="flex flex-1 min-h-0">
-          {/* Collapsible Task Names Column */}
+          {/* Enhanced Task Names Column */}
           {!isTaskListCollapsed && (
-            <div className={`${isSuperCompact ? 'w-48' : isCompactMode ? 'w-64' : 'w-72'} shrink-0 border-r bg-gray-50 flex flex-col`}>
-              {/* Compact Header */}
-              <div className="px-3 py-2 border-b bg-white shrink-0">
+            <div className={`${isSuperCompact ? 'w-48' : isCompactMode ? 'w-64' : 'w-72'} shrink-0 border-r bg-card/30 backdrop-blur-sm flex flex-col`}>
+              {/* Modern Header */}
+              <div className="px-4 py-3 border-b bg-card/50 backdrop-blur-sm shrink-0">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-semibold text-sm">Tasks & Assignments</h4>
-                    <p className="text-xs text-gray-500">
-                      {tasks.length} task{tasks.length !== 1 ? 's' : ''} • {currentView} view
-                      {currentView === 'day' && ` • ${selectedYear}`}
-                      {isSuperCompact && ' • Ultra-compact'}
-                      {isCompactMode && !isSuperCompact && ' • Compact'}
-                    </p>
+                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-md bg-primary/10 flex items-center justify-center">
+                        <Users className="w-4 h-4 text-primary" />
+                      </div>
+                      Tasks & Assignments
+                    </h4>
                   </div>
                   <div className="flex items-center gap-1">
                     <Button
@@ -299,7 +346,7 @@ export function GanttChart() {
                           setIsCompactMode(false);
                         }
                       }}
-                      className="h-7 w-7 p-0"
+                      className="h-8 w-8 p-0 hover:bg-primary/10"
                       title={
                         isSuperCompact ? "Expand to normal view" :
                         isCompactMode ? "Switch to ultra-compact view" : 
@@ -312,7 +359,7 @@ export function GanttChart() {
                       variant="ghost"
                       size="sm"
                       onClick={() => setIsTaskListCollapsed(true)}
-                      className="h-7 w-7 p-0"
+                      className="h-8 w-8 p-0 hover:bg-primary/10"
                       title="Hide task list"
                     >
                       <ChevronLeft className="w-3 h-3" />
@@ -321,139 +368,126 @@ export function GanttChart() {
                 </div>
               </div>
             
-            {/* Compact Task List with Full Height Scroll */}
+            {/* Enhanced Task List with Modern Cards */}
             <div className="flex-1 overflow-y-auto">
-              <div className="divide-y divide-gray-200">
+              <div className="p-2 space-y-2">
                 {tasks.map((task) => {
                   const conflictCount = getDeveloperConflictCount(task.assignedDeveloperId);
                   
                   return (
                     <div 
                       key={task.id} 
-                      className={`hover:bg-gray-100 cursor-pointer transition-colors group border-l-2 border-transparent hover:border-blue-400 ${
-                        isSuperCompact ? 'px-1.5 py-0.5' :
-                        isCompactMode ? 'px-2 py-1' : 'px-3 py-2'
+                      className={`hover:bg-card/50 cursor-pointer transition-all duration-200 group border border-border/20 rounded-lg p-3 backdrop-blur-sm hover:border-primary/20 hover:shadow-sm ${
+                        conflictCount > 0 ? 'border-l-4 border-l-destructive' : ''
                       }`} 
                       onClick={() => setSelectedTask(task)}
                     >
                       {isSuperCompact ? (
                         // Super-compact mode - minimal single line
-                        <div className="flex items-center gap-1 text-xs">
-                          {/* Multi-indicator dot (status + priority combined) */}
-                          <div className="relative w-2 h-2 shrink-0">
-                            <div className={`absolute inset-0 rounded-full ${
-                              task.status === 'completed' ? 'bg-green-500' :
-                              task.status === 'in-progress' ? 'bg-blue-500' :
-                              task.status === 'blocked' ? 'bg-red-500' : 'bg-gray-400'
-                            }`} />
-                            {(task.priority === 'critical' || task.priority === 'high') && (
-                              <div className={`absolute -top-0.5 -right-0.5 w-1 h-1 rounded-full ${
-                                task.priority === 'critical' ? 'bg-red-600' : 'bg-orange-500'
-                              }`} />
-                            )}
-                          </div>
-                          
-                          {/* Abbreviated task title */}
-                          <span className="font-medium truncate flex-1 group-hover:text-blue-700 min-w-0 text-xs" title={task.title}>
-                            {task.title.length > 20 ? task.title.substring(0, 17) + '...' : task.title}
-                          </span>
-                          
-                          {/* Developer initial in circle */}
-                          <div className="w-4 h-4 bg-gray-200 rounded-full flex items-center justify-center text-xs font-mono text-gray-600 shrink-0" title={getDeveloperName(task.assignedDeveloperId)}>
-                            {getDeveloperName(task.assignedDeveloperId).charAt(0).toUpperCase()}
-                          </div>
-                          
-                          {/* Conflict warning if present */}
-                          {conflictCount > 0 && (
-                            <div className="w-1 h-1 bg-red-500 rounded-full shrink-0" title={`${conflictCount} conflicts`} />
-                          )}
-                        </div>
-                      ) : isCompactMode ? (
-                        // Ultra-compact mode - single line with maximum info density
-                        <div className="flex items-center gap-1.5 text-xs">
-                          {/* Status indicator dot */}
+                        <div className="flex items-center gap-2 text-xs">
+                          {/* Status indicator */}
                           <div className={`w-2 h-2 rounded-full shrink-0 ${
                             task.status === 'completed' ? 'bg-green-500' :
                             task.status === 'in-progress' ? 'bg-blue-500' :
                             task.status === 'blocked' ? 'bg-red-500' : 'bg-gray-400'
-                          }`} title={task.status} />
+                          }`} />
                           
-                          {/* Task title - truncated */}
-                          <span className="font-medium truncate flex-1 group-hover:text-blue-700 min-w-0" title={task.title}>
+                          {/* Task title */}
+                          <span className="font-medium truncate flex-1 group-hover:text-primary min-w-0 text-xs" title={task.title}>
+                            {task.title.length > 20 ? task.title.substring(0, 17) + '...' : task.title}
+                          </span>
+                          
+                          {/* Developer initial */}
+                          <div className="w-4 h-4 bg-primary/10 rounded-full flex items-center justify-center text-xs font-medium text-primary shrink-0" title={getDeveloperName(task.assignedDeveloperId)}>
+                            {getDeveloperName(task.assignedDeveloperId).charAt(0).toUpperCase()}
+                          </div>
+                          
+                          {/* Priority indicator */}
+                          {(task.priority === 'critical' || task.priority === 'high') && (
+                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                              task.priority === 'critical' ? 'bg-red-500' : 'bg-orange-500'
+                            }`} />
+                          )}
+                        </div>
+                      ) : isCompactMode ? (
+                        // Compact mode - single line with info
+                        <div className="flex items-center gap-2 text-xs">
+                          {/* Status indicator */}
+                          <div className={`w-2 h-2 rounded-full shrink-0 ${
+                            task.status === 'completed' ? 'bg-green-500' :
+                            task.status === 'in-progress' ? 'bg-blue-500' :
+                            task.status === 'blocked' ? 'bg-red-500' : 'bg-gray-400'
+                          }`} />
+                          
+                          {/* Task title */}
+                          <span className="font-medium truncate flex-1 group-hover:text-primary min-w-0" title={task.title}>
                             {task.title}
                           </span>
                           
                           {/* Priority indicator */}
                           <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                            task.priority === 'critical' ? 'bg-red-600' :
+                            task.priority === 'critical' ? 'bg-red-500' :
                             task.priority === 'high' ? 'bg-orange-500' :
-                            task.priority === 'medium' ? 'bg-yellow-500' : 'bg-gray-300'
+                            task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
                           }`} title={`${task.priority} priority`} />
                           
-                          {/* Conflict indicator */}
-                          {conflictCount > 0 && (
-                            <div className="w-1.5 h-1.5 bg-red-500 rounded-full shrink-0" title={`${conflictCount} conflicts`} />
-                          )}
-                          
                           {/* Developer initial */}
-                          <div className="text-xs text-gray-500 font-mono w-6 text-center shrink-0" title={getDeveloperName(task.assignedDeveloperId)}>
+                          <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center text-xs font-medium text-primary shrink-0" title={getDeveloperName(task.assignedDeveloperId)}>
                             {getDeveloperName(task.assignedDeveloperId).charAt(0).toUpperCase()}
                           </div>
                         </div>
                       ) : (
-                        // Enhanced compact mode with better layout
-                        <div className="space-y-1.5">
-                          {/* Title and Conflict Badge */}
+                        // Full mode with enhanced layout
+                        <div className="space-y-2">
+                          {/* Title and Priority */}
                           <div className="flex items-center gap-2">
-                            <h5 className="text-sm font-medium truncate flex-1 group-hover:text-blue-700">{task.title}</h5>
-                            {conflictCount > 0 && (
-                              <Badge variant="destructive" className="text-xs px-1.5 py-0.5 h-5">
-                                <AlertTriangle className="w-3 h-3" />
-                              </Badge>
-                            )}
+                            <div className={`w-3 h-3 rounded-full shrink-0 ${
+                              task.status === 'completed' ? 'bg-green-500' :
+                              task.status === 'in-progress' ? 'bg-blue-500' :
+                              task.status === 'blocked' ? 'bg-red-500' : 'bg-gray-400'
+                            }`} />
+                            <h5 className="text-sm font-medium truncate flex-1 group-hover:text-primary">{task.title}</h5>
+                            <div className={`w-2 h-2 rounded-full shrink-0 ${
+                              task.priority === 'critical' ? 'bg-red-500' :
+                              task.priority === 'high' ? 'bg-orange-500' :
+                              task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                            }`} title={`${task.priority} priority`} />
                           </div>
                           
-                          {/* Developer and Date Row */}
+                          {/* Developer and Date */}
                           <div className="flex items-center justify-between text-xs">
-                            <span className="text-gray-600 truncate max-w-[120px]" title={getDeveloperName(task.assignedDeveloperId)}>
-                              {getDeveloperName(task.assignedDeveloperId)}
-                            </span>
-                            <div className="flex items-center gap-1 text-gray-500 shrink-0">
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 bg-primary/10 rounded-full flex items-center justify-center text-xs font-medium text-primary" title={getDeveloperName(task.assignedDeveloperId)}>
+                                {getDeveloperName(task.assignedDeveloperId).charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-muted-foreground truncate max-w-[100px]">
+                                {getDeveloperName(task.assignedDeveloperId)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1 text-muted-foreground shrink-0">
                               <Clock className="w-3 h-3" />
-                              <span className="text-xs">{format(task.startDate, viewConfig.dateFormat)}</span>
+                              <span>{format(task.startDate, 'MMM d')}</span>
                             </div>
                           </div>
                           
-                          {/* Status and Priority Row */}
-                          <div className="flex items-center gap-1.5">
-                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium leading-none flex-1 text-center ${
-                              task.status === 'completed' ? 'bg-green-100 text-green-700' :
-                              task.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                              task.status === 'blocked' ? 'bg-red-100 text-red-700' :
-                              'bg-gray-100 text-gray-700'
+                          {/* Status */}
+                          <div className="flex items-center gap-2">
+                            <div className={`px-2 py-1 rounded-md text-xs font-medium flex-1 text-center ${
+                              task.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
+                              task.status === 'in-progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
+                              task.status === 'blocked' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
+                              'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
                             }`}>
-                              {task.status === 'in-progress' ? 'Progress' : 
-                               task.status === 'not-started' ? 'Pending' :
+                              {task.status === 'in-progress' ? 'In Progress' : 
+                               task.status === 'not-started' ? 'Not Started' :
                                task.status.charAt(0).toUpperCase() + task.status.slice(1)}
-                            </span>
-                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium leading-none w-12 text-center ${
-                              task.priority === 'critical' ? 'bg-red-100 text-red-700' :
-                              task.priority === 'high' ? 'bg-orange-100 text-orange-700' :
-                              task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
-                              {task.priority === 'critical' ? 'CRIT' :
-                               task.priority === 'high' ? 'HIGH' :
-                               task.priority === 'medium' ? 'MED' : 'LOW'}
-                            </span>
+                            </div>
+                            {conflictCount > 0 && (
+                              <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+                                <AlertTriangle className="w-3 h-3 text-red-600" />
+                              </div>
+                            )}
                           </div>
-                          
-                          {/* Description - only show if exists and not in compact mode */}
-                          {task.description && task.description.length > 0 && (
-                            <p className="text-xs text-gray-500 truncate" title={task.description}>
-                              {task.description}
-                            </p>
-                          )}
                         </div>
                       )}
                     </div>
@@ -461,8 +495,11 @@ export function GanttChart() {
                 })}
                 
                 {tasks.length === 0 && (
-                  <div className="p-6 text-center text-gray-500">
-                    <div className="mb-1 font-medium text-sm">No tasks added yet</div>
+                  <div className="p-8 text-center text-muted-foreground">
+                    <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                      <Users className="w-6 h-6" />
+                    </div>
+                    <div className="font-medium text-sm mb-1">No tasks added yet</div>
                     <div className="text-xs">Create your first task to get started.</div>
                   </div>
                 )}
@@ -471,52 +508,47 @@ export function GanttChart() {
           </div>
           )}
 
-          {/* Collapsed Task List Toggle */}
+          {/* Modern Collapsed Task List Toggle */}
           {isTaskListCollapsed && (
-            <div className="w-8 border-r bg-gray-50 flex flex-col">
-              <div className="p-2 border-b bg-white">
+            <div className="w-12 border-r bg-card/30 backdrop-blur-sm flex flex-col">
+              <div className="p-3 border-b bg-card/50">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setIsTaskListCollapsed(false)}
-                  className="h-7 w-7 p-0"
+                  className="h-8 w-8 p-0 hover:bg-primary/10"
                   title="Show task list"
                 >
-                  <ChevronRight className="w-3 h-3" />
+                  <ChevronRight className="w-4 h-4" />
                 </Button>
-              </div>
-              <div className="flex-1 flex items-center justify-center">
-                <div className="transform -rotate-90 text-xs text-gray-500 whitespace-nowrap">
-                  {tasks.length} task{tasks.length !== 1 ? 's' : ''}
-                </div>
               </div>
             </div>
           )}
 
-          {/* Enhanced Scrollable Timeline */}
+          {/* Modern Timeline Container */}
           <div className="flex-1 relative flex flex-col min-w-0">
-            {/* Timeline Status Bar */}
+            {/* Timeline Status Indicator */}
             <div className="absolute top-4 left-4 z-30 pointer-events-none">
-              <div className="bg-white/95 backdrop-blur-sm rounded-lg px-4 py-2 text-sm text-gray-700 shadow-lg border border-gray-200/50">
+              <div className="glass rounded-xl px-4 py-2 text-sm shadow-lg">
                 <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
                   <span className="font-medium">
                     Timeline: {timelineWidth.toLocaleString()}px wide
                   </span>
                   {isTodayInRange && (
                     <>
-                      <span className="text-gray-400">•</span>
+                      <span className="text-muted-foreground">•</span>
                       <span>Today at {Math.round(todayPosition)}px</span>
                     </>
                   )}
-                  <span className="text-gray-400">•</span>
-                  <span className="text-xs bg-gray-100 px-2 py-1 rounded">Press 'T' for today</span>
+                  <span className="text-muted-foreground">•</span>
+                  <span className="text-xs bg-primary/10 px-2 py-1 rounded-md">Press 'T' for today</span>
                 </div>
               </div>
             </div>
 
             <ScrollArea 
-              className="flex-1 focus-within:ring-2 focus-within:ring-blue-500/30 transition-all" 
+              className="flex-1 focus-within:ring-2 focus-within:ring-primary/20 transition-all" 
               ref={scrollAreaRef}
               tabIndex={0}
               role="region"
@@ -524,66 +556,115 @@ export function GanttChart() {
             >
               <TimelineEnhancements scrollAreaRef={scrollAreaRef} viewConfig={viewConfig} />
               <div style={{ width: `${timelineWidth}px`, minWidth: '100%' }}>
-                {/* Timeline Header */}
-                <div className="border-b bg-white p-4 sticky top-0 z-20">
-                  <div className="flex">
-                    {units.map((unit, index) => (
-                      <div
-                        key={unit.toISOString()}
-                        className={`border-r border-gray-200 transition-colors ${
-                          currentView === 'day' && isWeekend(unit) ? 'bg-gray-50' : ''
-                        }`}
-                        style={{ width: `${viewConfig.unitWidth}px` }}
-                      >
-                        {getHeaderFormat(unit, index)}
+                {/* Enhanced Timeline Header with Excel-like Month/Date Structure */}
+                <div className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-20">
+                  {currentView === 'day' ? (
+                    /* Excel-like two-row header for day view */
+                    <div>
+                      {/* Month Header Row */}
+                      <div className="flex border-b border-border/30 bg-gradient-to-r from-muted/30 to-muted/20">
+                        {getMonthGroups().map((group, groupIndex) => {
+                          const isCurrentMonth = isSameMonth(
+                            new Date(group.year, units[group.startIndex].getMonth()), 
+                            today
+                          );
+                          return (
+                            <div
+                              key={`month-${groupIndex}`}
+                              className={`flex items-center justify-center py-4 px-3 border-r border-border/30 font-bold text-base transition-all duration-200 ${
+                                isCurrentMonth 
+                                  ? 'bg-primary/20 text-primary border-primary/40 shadow-sm' 
+                                  : 'bg-muted/30 text-foreground hover:bg-muted/40'
+                              }`}
+                              style={{ width: `${group.count * viewConfig.unitWidth}px` }}
+                            >
+                              <div className="text-center">
+                                <div className={`${isCurrentMonth ? 'font-extrabold' : 'font-bold'} tracking-wide`}>
+                                  {format(units[group.startIndex], 'MMMM yyyy')}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-1 font-medium">
+                                  {group.count} day{group.count > 1 ? 's' : ''}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
+                      
+                      {/* Date and Day Header Row */}
+                      <div className="flex">
+                        {units.map((unit, index) => (
+                          <div
+                            key={unit.toISOString()}
+                            className={`border-r border-border/30 transition-colors ${
+                              currentView === 'day' && isWeekend(unit) ? 'bg-muted/20' : ''
+                            }`}
+                            style={{ width: `${viewConfig.unitWidth}px` }}
+                          >
+                            {getHeaderFormat(unit, index)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    /* Single row header for other views */
+                    <div className="flex p-4">
+                      {units.map((unit, index) => (
+                        <div
+                          key={unit.toISOString()}
+                          className="border-r border-border/30 transition-colors"
+                          style={{ width: `${viewConfig.unitWidth}px` }}
+                        >
+                          {getHeaderFormat(unit, index)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   
-                  {/* Today indicator line in header */}
+                  {/* Modern Today indicator line in header */}
                   {isTodayInRange && (
                     <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-30 pointer-events-none"
+                      className="absolute top-0 bottom-0 w-0.5 bg-primary z-30 pointer-events-none"
                       style={{ left: `${todayPosition}px` }}
                     >
-                      <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 bg-red-500 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg">
+                      <div className={`absolute ${currentView === 'day' ? '-top-2' : '-top-1'} left-1/2 transform -translate-x-1/2 bg-primary text-primary-foreground text-xs px-3 py-1 rounded-md whitespace-nowrap shadow-lg`}>
                         <div className="flex items-center gap-1">
                           <CalendarDays className="w-3 h-3" />
                           <span>Today</span>
                         </div>
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-red-500"></div>
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-2 border-r-2 border-t-2 border-transparent border-t-primary"></div>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Task Timeline Rows */}
+                {/* Task Timeline Rows with Enhanced Design */}
                 <div className="relative">
-                  {/* Today indicator line spanning all tasks */}
+                  {/* Modern Today indicator line */}
                   {isTodayInRange && (
                     <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none"
+                      className="absolute top-0 bottom-0 w-0.5 bg-primary z-10 pointer-events-none"
                       style={{ left: `${todayPosition}px` }}
                     >
-                      {/* Indicator dots every 100px down */}
+                      {/* Animated indicator dots */}
                       {Array.from({ length: Math.ceil(600 / 100) }).map((_, i) => (
                         <div 
                           key={i}
-                          className="absolute left-1/2 transform -translate-x-1/2 w-2 h-2 bg-red-500 rounded-full opacity-80"
-                          style={{ top: `${i * 100 + 20}px` }}
+                          className="absolute left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary rounded-full opacity-80 animate-pulse"
+                          style={{ top: `${i * 100 + 20}px`, animationDelay: `${i * 0.1}s` }}
                         />
                       ))}
                     </div>
                   )}
 
-                  {/* Weekend columns for day view */}
+                  {/* Enhanced Weekend columns */}
                   {currentView === 'day' && (
                     <div className="absolute inset-0 pointer-events-none">
                       {units.map((unit, index) => 
                         isWeekend(unit) ? (
                           <div
                             key={`weekend-${index}`}
-                            className="absolute top-0 bottom-0 bg-gray-100 opacity-40"
+                            className="absolute top-0 bottom-0 bg-muted/20 opacity-60"
                             style={{
                               left: `${index * viewConfig.unitWidth}px`,
                               width: `${viewConfig.unitWidth}px`,
@@ -594,21 +675,21 @@ export function GanttChart() {
                     </div>
                   )}
 
-                  {/* Grid lines for better visual separation */}
+                  {/* Modern Grid lines */}
                   <div className="absolute inset-0 pointer-events-none">
                     {units.map((_, index) => (
                       <div
                         key={`grid-${index}`}
-                        className="absolute top-0 bottom-0 border-r border-gray-200 opacity-30"
+                        className="absolute top-0 bottom-0 border-r border-border/20 opacity-40"
                         style={{ left: `${index * viewConfig.unitWidth}px` }}
                       />
                     ))}
                   </div>
 
                   {tasks.map((task) => (
-                    <TimelineDropZone key={task.id} className="border-b last:border-b-0">
+                    <TimelineDropZone key={task.id} className="border-b border-border/30 last:border-b-0">
                       <div 
-                        className="p-4 hover:bg-gray-50 min-h-[96px] relative transition-colors"
+                        className="p-4 hover:bg-muted/30 min-h-[96px] relative transition-colors duration-200"
                         style={{ width: `${timelineWidth}px` }}
                       >
                         <DraggableTaskBar
@@ -620,24 +701,21 @@ export function GanttChart() {
                   ))}
 
                   {tasks.length === 0 && (
-                    <div className="p-8 text-center text-gray-500 relative min-h-[200px] flex items-center justify-center" style={{ width: `${timelineWidth}px` }}>
-                      <div>
-                        <div className="mb-2">Timeline is ready</div>
-                        <div className="text-xs">
-                          {isTodayInRange 
-                            ? `Timeline spans ${units.length} ${currentView}s. Add tasks to see them positioned relative to today.`
-                            : `Add tasks to see them on the timeline.`
-                          }
+                    <div className="p-8 text-center text-muted-foreground relative min-h-[200px] flex items-center justify-center" style={{ width: `${timelineWidth}px` }}>
+                      <div className="space-y-2">
+                        <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                          <CalendarDays className="w-6 h-6" />
                         </div>
+                        <div className="font-medium">Timeline is ready</div>
                       </div>
                       
                       {/* Today indicator even when no tasks */}
                       {isTodayInRange && (
                         <div
-                          className="absolute top-0 bottom-0 w-0.5 bg-red-500 z-10 pointer-events-none"
+                          className="absolute top-0 bottom-0 w-0.5 bg-primary z-10 pointer-events-none"
                           style={{ left: `${todayPosition}px` }}
                         >
-                          <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-red-500 rounded-full"></div>
+                          <div className="absolute top-8 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary rounded-full animate-pulse"></div>
                         </div>
                       )}
                     </div>
@@ -648,37 +726,37 @@ export function GanttChart() {
           </div>
         </div>
 
-        {/* Enhanced Instructions Footer */}
-        <div className="border-t bg-gradient-to-r from-gray-50 to-blue-50/30 p-4 shrink-0">
-          <div className="flex items-center justify-center gap-6 flex-wrap text-sm text-gray-600">
+        {/* Modern Footer Instructions */}
+        <div className="border-t bg-gradient-to-r from-card/50 to-muted/20 p-4 shrink-0">
+          <div className="flex items-center justify-center gap-6 flex-wrap text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
-              <Move className="w-4 h-4 text-blue-500" />
-              <span>Drag &amp; drop to reschedule</span>
+              <Move className="w-4 h-4 text-primary" />
+              <span>Drag & drop to reschedule</span>
             </div>
             <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-500" />
+              <AlertTriangle className="w-4 h-4 text-destructive" />
               <span>Red borders show conflicts</span>
             </div>
             {isTodayInRange && (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-0.5 bg-red-500 rounded"></div>
-                <span>Red line: Today ({format(today, 'dd/MM')})</span>
+                <div className="w-4 h-0.5 bg-primary rounded"></div>
+                <span>Blue line: Today ({format(today, 'MMM dd')})</span>
               </div>
             )}
             {currentView === 'day' && (
               <div className="flex items-center gap-2">
-                <div className="w-4 h-3 bg-gray-100 border rounded-sm"></div>
+                <div className="w-4 h-3 bg-muted border rounded-sm"></div>
                 <span>Gray columns: Weekends</span>
               </div>
             )}
-            <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border shadow-sm">
-              <CalendarDays className="w-4 h-4 text-purple-500" />
+            <div className="flex items-center gap-2 bg-card px-3 py-2 rounded-lg border shadow-sm">
+              <CalendarDays className="w-4 h-4 text-accent-foreground" />
               <span className="font-medium">
                 Navigation: Arrow keys, scroll wheel, or use controls above
               </span>
             </div>
-            <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-lg border border-blue-200">
-              <span className="text-blue-700 font-medium">
+            <div className="flex items-center gap-2 bg-primary/10 px-3 py-2 rounded-lg border border-primary/20">
+              <span className="text-primary font-medium">
                 Current: {viewConfig.label} view
                 {currentView === 'day' && ` (${selectedYear})`}
                 {!isTodayInRange && ' • Today not in view'}

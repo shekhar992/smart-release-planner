@@ -24,7 +24,8 @@ import {
   CheckCircle,
   AlertTriangle,
   Target,
-  Settings2
+  Settings2,
+  TrendingUp
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -58,34 +59,35 @@ export function ReleaseView() {
       releaseId={currentRelease.id}
     >
       <div className="min-h-screen bg-background">
-        {/* Header */}
-        <div className="border-b bg-card">
-          <div className="container mx-auto px-6 py-6">
+        {/* Modern Header with Glass Effect */}
+        <div className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-40">
+          <div className="container mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setCurrentRelease(null)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 hover:bg-primary/10"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   Back
                 </Button>
                 <div 
-                  className="w-1 h-8 rounded-full"
+                  className="w-1 h-12 rounded-full flex-shrink-0"
                   style={{ backgroundColor: currentRelease.color }}
                 />
                 <div>
-                  <h1 className="text-2xl">{currentRelease.name}</h1>
-                  <p className="text-sm text-muted-foreground">
+                  <h1 className="text-2xl font-bold tracking-tight">{currentRelease.name}</h1>
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
                     {format(currentRelease.startDate, 'MMM d')} - {format(currentRelease.targetDate, 'MMM d, yyyy')}
                   </p>
                 </div>
                 <Badge variant="secondary" className={getStatusColor(currentRelease.status)}>
                   {currentRelease.status.replace('-', ' ').toUpperCase()}
                 </Badge>
-                <Badge variant="outline">v{currentRelease.version}</Badge>
+                <Badge variant="outline" className="font-medium">v{currentRelease.version}</Badge>
               </div>
               
               <div className="flex items-center gap-2">
@@ -94,6 +96,7 @@ export function ReleaseView() {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowReleaseSettings(true)}
+                  className="hover:bg-primary/10"
                 >
                   <Settings className="w-4 h-4 mr-2" />
                   Settings
@@ -103,67 +106,80 @@ export function ReleaseView() {
           </div>
         </div>
 
-        {/* Metrics */}
-        <div className="border-b bg-card">
-          <div className="container mx-auto px-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <Card className="border-0">
-                <CardContent className="p-4">
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Progress</span>
-                      <span>{progress}%</span>
+        {/* Enhanced Metrics Dashboard */}
+        <div className="border-b bg-gradient-to-r from-primary/5 to-accent/5">
+          <div className="container mx-auto px-6 py-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+              <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200">
+                <CardContent className="p-6">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <TrendingUp className="w-4 h-4 text-primary" />
+                        </div>
+                        <span className="text-sm font-medium text-muted-foreground">Progress</span>
+                      </div>
+                      <span className="text-2xl font-bold">{progress}%</span>
                     </div>
                     <Progress value={progress} className="h-2" />
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-600" />
+              <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Tasks</p>
-                      <p className="font-semibold">{metrics.completedTasks}/{metrics.totalTasks}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Tasks</p>
+                      <p className="text-2xl font-bold">{metrics.completedTasks}<span className="text-lg text-muted-foreground">/{metrics.totalTasks}</span></p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-4 h-4 text-blue-600" />
+              <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                      <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Team</p>
-                      <p className="font-semibold">{metrics.teamSize}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Team</p>
+                      <p className="text-2xl font-bold">{metrics.teamSize}</p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               {metrics.overdueTasks > 0 && (
-                <Card className="border-0">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-red-600" />
+                <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 border-l-4 border-l-destructive">
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Overdue</p>
-                        <p className="font-semibold text-red-600">{metrics.overdueTasks}</p>
+                        <p className="text-sm font-medium text-muted-foreground">Overdue</p>
+                        <p className="text-2xl font-bold text-destructive">{metrics.overdueTasks}</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
               )}
 
-              <Card className="border-0">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-4 h-4 text-purple-600" />
+              <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                      <Target className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Days Left</p>
-                      <p className="font-semibold">{metrics.daysRemaining}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Days Left</p>
+                      <p className="text-2xl font-bold">{metrics.daysRemaining}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -172,32 +188,32 @@ export function ReleaseView() {
           </div>
         </div>
 
-        {/* Main Content with Full-Width Timeline */}
+        {/* Main Content with Enhanced Tab Design */}
         <div className="h-screen flex flex-col">
           <Tabs defaultValue="gantt" className="flex-1 flex flex-col">
-            <div className="border-b bg-card">
+            <div className="border-b bg-card/50 backdrop-blur-sm">
               <div className="container mx-auto px-6 py-4">
                 <div className="flex justify-between items-center">
-                  <TabsList className="grid w-full grid-cols-4 max-w-[500px]">
-                    <TabsTrigger value="gantt" className="flex items-center gap-2">
+                  <TabsList className="grid w-full grid-cols-4 max-w-[600px] bg-muted/50 p-1 rounded-lg">
+                    <TabsTrigger value="gantt" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Calendar className="w-4 h-4" />
                       Timeline
                     </TabsTrigger>
-                    <TabsTrigger value="team" className="flex items-center gap-2">
+                    <TabsTrigger value="team" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Users className="w-4 h-4" />
                       Team
                     </TabsTrigger>
-                    <TabsTrigger value="import" className="flex items-center gap-2">
+                    <TabsTrigger value="import" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Upload className="w-4 h-4" />
                       Import
                     </TabsTrigger>
-                    <TabsTrigger value="statuses" className="flex items-center gap-2">
+                    <TabsTrigger value="statuses" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Settings2 className="w-4 h-4" />
                       Statuses
                     </TabsTrigger>
                   </TabsList>
 
-                  <Button onClick={() => setShowTaskForm(true)}>
+                  <Button onClick={() => setShowTaskForm(true)} className="shadow-sm">
                     <Plus className="w-4 h-4 mr-2" />
                     Add Task
                   </Button>
@@ -212,9 +228,18 @@ export function ReleaseView() {
             </TabsContent>
 
             <TabsContent value="team" className="flex-1 p-6">
-              <div className="container mx-auto">
-                <Card className="card-shadow border-0">
-                  <CardContent className="p-6">
+              <div className="container mx-auto max-w-4xl">
+                <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 bg-card">
+                  <CardContent className="p-8">
+                    <div className="mb-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="w-4 h-4 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-semibold">Team Management</h3>
+                      </div>
+                      <p className="text-muted-foreground">Manage your team members and their roles in this release.</p>
+                    </div>
                     <DeveloperManager />
                   </CardContent>
                 </Card>
@@ -222,9 +247,18 @@ export function ReleaseView() {
             </TabsContent>
 
             <TabsContent value="import" className="flex-1 p-6">
-              <div className="container mx-auto">
-                <Card className="card-shadow border-0">
-                  <CardContent className="p-6">
+              <div className="container mx-auto max-w-4xl">
+                <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 bg-card">
+                  <CardContent className="p-8">
+                    <div className="mb-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Upload className="w-4 h-4 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-semibold">Bulk Import</h3>
+                      </div>
+                      <p className="text-muted-foreground">Import multiple tasks from CSV files or other sources to quickly populate your timeline.</p>
+                    </div>
                     <BulkImport />
                   </CardContent>
                 </Card>
@@ -232,9 +266,18 @@ export function ReleaseView() {
             </TabsContent>
 
             <TabsContent value="statuses" className="flex-1 p-6">
-              <div className="container mx-auto">
-                <Card className="card-shadow border-0">
-                  <CardContent className="p-6">
+              <div className="container mx-auto max-w-4xl">
+                <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 bg-card">
+                  <CardContent className="p-8">
+                    <div className="mb-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Settings2 className="w-4 h-4 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-semibold">Status Management</h3>
+                      </div>
+                      <p className="text-muted-foreground">Customize task statuses and their workflow to match your team's process.</p>
+                    </div>
                     <StatusManager />
                   </CardContent>
                 </Card>

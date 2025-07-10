@@ -186,7 +186,7 @@ export function ScrollControls({ scrollAreaRef, className }: ScrollControlsProps
             size="sm"
             onClick={handleScrollToToday}
             disabled={isScrolling}
-            className="h-9 px-3 bg-gradient-to-r from-red-50 to-rose-50 border-red-200 text-red-700 hover:from-red-100 hover:to-rose-100 hover:border-red-300 shadow-sm"
+            className="h-9 px-3 bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-950/50 dark:to-rose-950/50 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:from-red-100 hover:to-rose-100 dark:hover:from-red-900/50 dark:hover:to-rose-900/50 hover:border-red-300 dark:hover:border-red-700 card-shadow"
             aria-label="Go to today"
             title={`Go to today (${format(today, 'dd/MM/yyyy')}) - Press T key`}
           >
@@ -199,7 +199,7 @@ export function ScrollControls({ scrollAreaRef, className }: ScrollControlsProps
             size="sm"
             onClick={scrollToEnd}
             disabled={isScrolling || !canScrollRight}
-            className="h-9 px-3 bg-white hover:bg-gray-50"
+            className="h-9 px-3 bg-card hover:bg-accent"
             aria-label="Go to end"
             title="Go to end of timeline"
           >
@@ -210,8 +210,8 @@ export function ScrollControls({ scrollAreaRef, className }: ScrollControlsProps
       </div>
 
       {/* Enhanced status indicator */}
-      <div className="text-sm text-gray-600 bg-white px-3 py-2 rounded-lg border ml-2 min-w-[120px]">
-        <div className="font-medium">
+      <div className="text-sm text-muted-foreground bg-card px-3 py-2 rounded-lg border ml-2 min-w-[120px] shadow-sm">
+        <div className="font-medium text-foreground">
           {isTodayInRange 
             ? `Today: ${format(today, 'dd/MM')}`
             : currentView === 'day' && selectedYear !== today.getFullYear()
@@ -219,7 +219,7 @@ export function ScrollControls({ scrollAreaRef, className }: ScrollControlsProps
             : 'Navigate Timeline'
           }
         </div>
-        <div className="text-xs text-gray-500 mt-0.5">
+        <div className="text-xs text-muted-foreground mt-0.5">
           {canScrollLeft || canScrollRight ? 'Use controls or arrow keys' : 'Timeline fits in view'}
         </div>
       </div>

@@ -109,9 +109,9 @@ export function DeveloperManager() {
 
       {/* Conflicts Overview */}
       {getTotalConflicts() > 0 && (
-        <Alert className="border-red-200 bg-red-50">
-          <AlertTriangle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">
+        <Alert className="border-destructive/20 bg-destructive/5">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <AlertDescription className="text-destructive">
             <strong>Team Scheduling Issues</strong>
             <p className="text-sm mt-1">
               Some developers have overlapping task assignments. Review the highlighted developers below and adjust task schedules to resolve conflicts.
@@ -126,21 +126,20 @@ export function DeveloperManager() {
           const hasConflicts = conflictCount > 0;
           
           return (
-            <Card key={developer.id} className={hasConflicts ? 'border-red-200 bg-red-50' : ''}>
+            <Card key={developer.id} className={`card-shadow hover:card-shadow-hover transition-all duration-200 ${hasConflicts ? 'border-l-4 border-l-destructive bg-destructive/5' : 'border-0'}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <Avatar>
-                      <AvatarFallback>
+                      <AvatarFallback className="bg-primary/10 text-primary font-medium">
                         {developer.name.split(' ').map(n => n[0]).join('')}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-2">
                         <CardTitle className="text-sm">{developer.name}</CardTitle>
-                        {hasConflicts && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                        {hasConflicts && <AlertTriangle className="w-3 h-3 text-destructive" />}
                       </div>
-                      <p className="text-xs text-muted-foreground">{developer.role}</p>
                     </div>
                   </div>
                   <div className="flex space-x-1">
@@ -148,6 +147,7 @@ export function DeveloperManager() {
                       variant="ghost"
                       size="sm"
                       onClick={() => openForm(developer)}
+                      className="h-8 w-8 p-0 hover:bg-primary/10"
                     >
                       <Edit2 className="w-3 h-3" />
                     </Button>
@@ -155,6 +155,7 @@ export function DeveloperManager() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDelete(developer)}
+                      className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive"
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
@@ -163,21 +164,20 @@ export function DeveloperManager() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">{developer.email}</p>
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div>
                       <p className="text-lg">{getTaskCount(developer.id)}</p>
-                      <p className="text-xs text-muted-foreground">Total</p>
+                      <p className="text-xs">Total</p>
                     </div>
                     <div>
                       <p className="text-lg">{getActiveTaskCount(developer.id)}</p>
-                      <p className="text-xs text-muted-foreground">Active</p>
+                      <p className="text-xs">Active</p>
                     </div>
                     <div>
                       <p className={`text-lg ${hasConflicts ? 'text-red-600' : ''}`}>
                         {conflictCount}
                       </p>
-                      <p className="text-xs text-muted-foreground">Conflicts</p>
+                      <p className="text-xs">Conflicts</p>
                     </div>
                   </div>
                   
