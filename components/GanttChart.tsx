@@ -9,7 +9,6 @@ import { TimelineEnhancements } from './TimelineEnhancements';
 import { DeveloperFilter } from './DeveloperFilter';
 import { TaskTypeFilter } from './TaskTypeFilter';
 import { DragPreview } from './DragPreview';
-import { DragTest } from './DragTest';
 import { format, isToday, isWeekend, isSameMonth } from 'date-fns';
 import { AlertTriangle, Clock, Move, CalendarDays, Minimize2, Maximize2, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -225,12 +224,6 @@ export function GanttChart() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      {/* Temporary drag test */}
-      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded mb-4">
-        <h3 className="text-sm font-medium mb-2">Drag & Drop Test</h3>
-        <DragTest />
-      </div>
-      
       <div className="h-full flex flex-col bg-gradient-to-br from-background to-muted/20">
         {/* Enhanced Header with Modern Design */}
         <div className="border-b bg-card/80 backdrop-blur-sm p-4 shrink-0">
