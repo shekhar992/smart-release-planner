@@ -562,9 +562,57 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
               </div>
               
               {formData.startDate && formData.endDate && (
-                <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
-                  <strong>Duration:</strong> {formData.duration} day{formData.duration !== 1 ? 's' : ''} 
-                  ({format(new Date(formData.startDate), 'MMM d')} - {format(new Date(formData.endDate), 'MMM d, yyyy')})
+                <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <strong>Duration:</strong> {formData.duration} day{formData.duration !== 1 ? 's' : ''} 
+                      <span className="text-xs block">
+                        {format(new Date(formData.startDate), 'MMM d')} - {format(new Date(formData.endDate), 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            originalEstimate: formData.duration,
+                            remainingEstimate: Math.max(0, formData.duration - formData.timeSpent)
+                          }));
+                        }}
+                        className="text-xs h-7"
+                        title="Set estimate to match duration"
+                      >
+                        📊 Set Estimate
+                      </Button>
+                      {formData.originalEstimate > 0 && formData.originalEstimate !== formData.duration && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newEndDate = updateEndDateFromDuration(formData.startDate, formData.originalEstimate);
+                            setFormData(prev => ({ 
+                              ...prev, 
+                              duration: formData.originalEstimate,
+                              endDate: newEndDate
+                            }));
+                          }}
+                          className="text-xs h-7"
+                          title="Update duration to match estimate"
+                        >
+                          📅 Use Estimate
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {formData.originalEstimate > 0 && formData.originalEstimate !== formData.duration && (
+                    <div className="text-xs text-amber-600 flex items-center gap-1">
+                      ⚠️ Duration ({formData.duration} days) differs from estimate ({formData.originalEstimate} days)
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -647,6 +695,63 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
                 </div>
               </div>
               
+              {/* Auto-Calculation Helper */}
+              <div className="bg-blue-50/50 border border-blue-200/50 rounded-lg p-3">
+                <div className="text-xs font-medium text-blue-700 mb-2 flex items-center gap-1">
+                  🤖 Auto-Calculate
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (formData.startDate && formData.endDate) {
+                          const calculatedDays = calculateDuration(formData.startDate, formData.endDate);
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            originalEstimate: calculatedDays,
+                            remainingEstimate: Math.max(0, calculatedDays - formData.timeSpent)
+                          }));
+                        }
+                      }}
+                      disabled={!formData.startDate || !formData.endDate}
+                      className="h-8 w-full justify-start text-xs"
+                    >
+                      📆 Dates → Estimate
+                    </Button>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      Use date range as estimate
+                    </p>
+                  </div>
+                  <div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (formData.originalEstimate > 0 && formData.startDate) {
+                          const newEndDate = updateEndDateFromDuration(formData.startDate, formData.originalEstimate);
+                          setFormData(prev => ({ 
+                            ...prev, 
+                            duration: formData.originalEstimate,
+                            endDate: newEndDate
+                          }));
+                        }
+                      }}
+                      disabled={!formData.originalEstimate || !formData.startDate}
+                      className="h-8 w-full justify-start text-xs"
+                    >
+                      📊 Estimate → Dates
+                    </Button>
+                    <p className="text-muted-foreground text-xs mt-1">
+                      Set end date from estimate
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-2 flex-wrap">
                 <Button
                   type="button"
@@ -710,9 +815,20 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
                     <div><strong>Progress:</strong> {formData.originalEstimate > 0 ? Math.round((formData.timeSpent / formData.originalEstimate) * 100) : 0}%</div>
                     <div><strong>Efficiency:</strong> {formData.duration > 0 && formData.originalEstimate > 0 ? Math.round((formData.duration / formData.originalEstimate) * 100) : 100}%</div>
                   </div>
-                  {formData.originalEstimate > 0 && formData.timeSpent + formData.remainingEstimate !== formData.originalEstimate && (
-                    <div className="text-amber-600 text-xs mt-1">
-                      ⚠️ Time spent + remaining ≠ original estimate
+                  {formData.originalEstimate > 0 && Math.abs(formData.timeSpent + formData.remainingEstimate - formData.originalEstimate) > 0.1 && (
+                    <div className="text-amber-600 text-xs mt-1 flex items-center gap-1">
+                      ⚠️ Time spent ({formData.timeSpent}) + remaining ({formData.remainingEstimate}) ≠ original estimate ({formData.originalEstimate})
+                    </div>
+                  )}
+                  {formData.startDate && formData.endDate && formData.originalEstimate > 0 && (
+                    <div className="mt-2 text-xs">
+                      <strong>📊 Calculation Summary:</strong>
+                      <div className="mt-1 space-y-1 text-muted-foreground">
+                        <div>• Date Range: {format(new Date(formData.startDate), 'MMM d')} - {format(new Date(formData.endDate), 'MMM d')} = {formData.duration} days</div>
+                        <div>• Original Estimate: {formData.originalEstimate} days</div>
+                        <div>• Time Spent: {formData.timeSpent} days ({formData.originalEstimate > 0 ? Math.round((formData.timeSpent / formData.originalEstimate) * 100) : 0}%)</div>
+                        <div>• Remaining: {formData.remainingEstimate} days ({formData.originalEstimate > 0 ? Math.round((formData.remainingEstimate / formData.originalEstimate) * 100) : 0}%)</div>
+                      </div>
                     </div>
                   )}
                 </div>
