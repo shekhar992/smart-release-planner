@@ -645,7 +645,7 @@ export function GanttChart() {
                 </div>
 
                 {/* Task Timeline Rows with Enhanced Design */}
-                <div className="relative">
+                <TimelineDropZone className="relative">
                   {/* Modern Today indicator line */}
                   {isTodayInRange && (
                     <div
@@ -693,7 +693,7 @@ export function GanttChart() {
                   </div>
 
                   {tasks.map((task) => (
-                    <TimelineDropZone key={task.id} className="border-b border-border/30 last:border-b-0">
+                    <div key={task.id} className="border-b border-border/30 last:border-b-0">
                       <div 
                         className="p-4 hover:bg-muted/30 min-h-[96px] relative transition-colors duration-200"
                         style={{ width: `${timelineWidth}px` }}
@@ -704,7 +704,7 @@ export function GanttChart() {
                           onTaskDoubleClick={setEditingTask}
                         />
                       </div>
-                    </TimelineDropZone>
+                    </div>
                   ))}
 
                   {tasks.length === 0 && (
@@ -727,7 +727,7 @@ export function GanttChart() {
                       )}
                     </div>
                   )}
-                </div>
+                </TimelineDropZone>
               </div>
             </ScrollArea>
           </div>

@@ -74,7 +74,7 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
   const [{ isDragging }, drag] = useDrag({
     type: 'TASK',
     item: (): DragItem => {
-      console.log('Starting drag for task:', task.title, 'in', currentView, 'view');
+      console.log('🚀 Starting drag for task:', task.title, 'in', currentView, 'view');
       return {
         id: task.id,
         type: 'TASK',
@@ -84,22 +84,29 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
-    canDrag: () => true, // Allow all tasks to be dragged
+    canDrag: () => {
+      console.log('✓ Can drag task:', task.title);
+      return true;
+    },
     end: (item, monitor) => {
       const dropResult = monitor.getDropResult();
-      console.log('Drag ended:', { item: item?.task.title, dropResult });
+      console.log('🏁 Drag ended:', { 
+        taskTitle: item?.task.title, 
+        dropResult,
+        didDrop: monitor.didDrop()
+      });
       
       // If dropped successfully, provide feedback
-      if (dropResult) {
+      if (dropResult && monitor.didDrop()) {
         console.log(`✅ Task "${item?.task.title}" moved successfully!`);
+      } else {
+        console.log(`❌ Task "${item?.task.title}" drop was cancelled or failed`);
       }
     },
   });
 
-  // Apply drag to the ref
-  if (ref.current) {
-    drag(ref);
-  }
+  // Apply drag to the ref properly
+  drag(ref);
 
   const conflict = getTaskConflicts(task.id);
   const hasConflict = !!conflict;

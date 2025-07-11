@@ -45,6 +45,10 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
 
   const [{ isOver, canDrop }, drop] = useDrop({
     accept: 'TASK',
+    canDrop: (item: DragItem) => {
+      console.log('🎯 Can drop check for task:', item.task.title);
+      return true;
+    },
     hover: (item: DragItem, monitor) => {
       const clientOffset = monitor.getClientOffset();
       const targetRect = ref.current?.getBoundingClientRect();
@@ -79,9 +83,19 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
       
       setDragPreview(prev => ({ ...prev, visible: false }));
       
-      if (!clientOffset || !targetRect) return;
+      if (!clientOffset || !targetRect) {
+        console.log('❌ Drop failed: no client offset or target rect');
+        return;
+      }
 
       console.log(`📅 Dropping task "${item.task.title}" - calculating new dates...`);
+      console.log('Drop details:', {
+        clientOffset,
+        targetRect,
+        currentView,
+        unitsLength: units.length,
+        chartStartDate: chartStartDate.toDateString()
+      });
 
       // Calculate the drop position relative to the timeline with better precision
       const dropX = clientOffset.x - targetRect.left;
@@ -105,17 +119,25 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
         from: `${item.task.startDate?.toDateString()} - ${item.task.endDate?.toDateString()}`,
         to: `${finalStartDate.toDateString()} - ${finalEndDate.toDateString()}`,
         duration: `${originalDuration} ${currentView === 'day' ? 'days' : 'weeks'}`,
-        offset: finalOffset
+        offset: finalOffset,
+        dropPercentage,
+        unitsOffset
       });
 
       // Update the task dates
-      updateTaskDates(item.id, finalStartDate, finalEndDate);
-      
-      // Show success toast with date information
-      toast.success(`📅 Task "${item.task.title}" rescheduled`, {
-        description: `New dates: ${format(finalStartDate, 'MMM d')} - ${format(finalEndDate, 'MMM d, yyyy')}`,
-        duration: 3000,
-      });
+      try {
+        updateTaskDates(item.id, finalStartDate, finalEndDate);
+        console.log('✅ Task dates updated successfully');
+        
+        // Show success toast with date information
+        toast.success(`📅 Task "${item.task.title}" rescheduled`, {
+          description: `New dates: ${format(finalStartDate, 'MMM d')} - ${format(finalEndDate, 'MMM d, yyyy')}`,
+          duration: 3000,
+        });
+      } catch (error) {
+        console.error('❌ Error updating task dates:', error);
+        toast.error(`Failed to reschedule task "${item.task.title}"`);
+      }
       
       return { success: true, newStartDate: finalStartDate, newEndDate: finalEndDate };
     },
@@ -132,8 +154,9 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
     <div
       ref={ref}
       className={`relative ${className} ${
-        isOver && canDrop ? 'bg-blue-50' : ''
+        isOver && canDrop ? 'bg-blue-50 ring-2 ring-blue-300' : ''
       }`}
+      style={{ minHeight: '100px' }} // Ensure there's always a drop area
     >
       {children}
       
@@ -160,9 +183,18 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
       {/* Enhanced drop zone indicator */}
       {isOver && canDrop && (
         <div className="absolute inset-0 border-2 border-blue-400 border-dashed rounded-lg bg-blue-50 opacity-40 pointer-events-none">
-          <div className="absolute top-2 left-2 text-blue-600 text-sm font-medium">
+          <div className="absolute top-2 left-2 text-blue-600 text-sm font-medium bg-white px-2 py-1 rounded shadow">
             📍 Drop here to move task
           </div>
+        </div>
+      )}
+      
+      {/* Debug info when dragging */}
+      {isOver && (
+        <div className="absolute top-0 right-0 bg-yellow-100 border border-yellow-400 p-2 text-xs text-yellow-800 rounded z-30">
+          <div>Drop Zone Active</div>
+          <div>Can Drop: {canDrop ? 'Yes' : 'No'}</div>
+          <div>Is Over: {isOver ? 'Yes' : 'No'}</div>
         </div>
       )}
     </div>
