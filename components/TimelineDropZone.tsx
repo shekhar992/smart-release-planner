@@ -43,13 +43,14 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
     }
   };
 
-  const [{ isOver, canDrop }, drop] = useDrop({
+  const [{ isOver, canDrop }, drop] = useDrop<DragItem, unknown, { isOver: boolean; canDrop: boolean }>({
     accept: 'TASK',
     canDrop: (item: DragItem) => {
-      console.log('🎯 Can drop check for task:', item.task.title);
+      console.log('🎯 Can drop check for task:', item.task.title, '- Result: true');
       return true;
     },
     hover: (item: DragItem, monitor) => {
+      console.log('🌊 Hovering over drop zone with task:', item.task.title);
       const clientOffset = monitor.getClientOffset();
       const targetRect = ref.current?.getBoundingClientRect();
       

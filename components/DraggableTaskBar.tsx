@@ -71,36 +71,41 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
     };
   };
 
-  const [{ isDragging }, drag] = useDrag({
+  const [{ isDragging }, drag] = useDrag<DragItem, unknown, { isDragging: boolean }>({
     type: 'TASK',
     item: (): DragItem => {
-      console.log('🚀 Starting drag for task:', task.title, 'in', currentView, 'view');
+      console.log('🚀 DRAG STARTED for task:', task.title);
       return {
         id: task.id,
         type: 'TASK',
         task,
       };
     },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
+    collect: (monitor) => {
+      const isDrag = monitor.isDragging();
+      if (isDrag) {
+        console.log('📊 Dragging state changed:', isDrag, 'for task:', task.title);
+      }
+      return {
+        isDragging: isDrag,
+      };
+    },
     canDrag: () => {
-      console.log('✓ Can drag task:', task.title);
+      console.log('🔍 Can drag check for task:', task.title, '- Result: true');
       return true;
     },
     end: (item, monitor) => {
       const dropResult = monitor.getDropResult();
-      console.log('🏁 Drag ended:', { 
-        taskTitle: item?.task.title, 
+      const didDrop = monitor.didDrop();
+      console.log('🏁 Drag END for task:', item?.task.title, {
         dropResult,
-        didDrop: monitor.didDrop()
+        didDrop
       });
       
-      // If dropped successfully, provide feedback
-      if (dropResult && monitor.didDrop()) {
-        console.log(`✅ Task "${item?.task.title}" moved successfully!`);
+      if (dropResult && didDrop) {
+        console.log(`✅ Task "${item?.task.title}" dropped successfully!`);
       } else {
-        console.log(`❌ Task "${item?.task.title}" drop was cancelled or failed`);
+        console.log(`❌ Task "${item?.task.title}" drop failed or was cancelled`);
       }
     },
   });
@@ -158,10 +163,13 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
   };
 
   return (
-    <div className="relative h-8 w-full">
+    <div className="relative h-8 w-full bg-gray-100 border border-gray-300 rounded">
+      {/* Debug background to make the container visible */}
+      <div className="absolute inset-0 bg-blue-50 opacity-50 pointer-events-none"></div>
+      
       <div
         ref={ref}
-        className={`absolute top-0 h-full rounded transition-all duration-200 select-none ${
+        className={`absolute top-0 h-full rounded transition-all duration-200 border-2 border-purple-500 ${
           isDragging 
             ? 'opacity-30 scale-105 z-50 cursor-grabbing transform rotate-2 shadow-lg' 
             : 'opacity-90 hover:opacity-100 cursor-grab hover:shadow-md'
@@ -174,11 +182,28 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
           backgroundColor: taskStyle.backgroundColor,
           color: taskStyle.color,
           borderLeft: `${taskStyle.borderLeftWidth} solid ${taskStyle.borderLeftColor}`,
+          userSelect: 'none', // Prevent text selection during drag
+          WebkitUserSelect: 'none', // Safari support
+          touchAction: 'none', // Prevent scrolling on touch devices
         }}
+        draggable={false} // Disable native HTML5 drag to avoid conflicts
         onClick={(e) => {
-          e.stopPropagation();
+          // Only handle click if we're not in the middle of a drag operation
           if (!isDragging) {
+            e.stopPropagation();
             onTaskClick(task);
+          }
+        }}
+        onMouseDown={(e) => {
+          console.log('🖱️ Mouse down on task:', task.title, {
+            button: e.button,
+            target: e.target,
+            currentTarget: e.currentTarget
+          });
+        }}
+        onMouseMove={(e) => {
+          if (e.buttons === 1) { // Left mouse button is pressed
+            console.log('🖱️ Mouse move with button pressed on task:', task.title);
           }
         }}
         onDoubleClick={(e) => {
@@ -198,6 +223,11 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
           <span className="text-xs opacity-70 ml-1 flex-shrink-0">
             {calculateDifference(task.startDate, task.endDate)}
             {currentView === 'day' ? 'd' : 'w'}
+          </span>
+          
+          {/* Debug indicator */}
+          <span className="text-xs bg-red-500 text-white px-1 rounded ml-1 flex-shrink-0">
+            DRAG
           </span>
         </div>
         
