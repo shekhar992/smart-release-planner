@@ -2,7 +2,8 @@ import { useRef, useState } from 'react';
 import { useDrop } from 'react-dnd';
 import { useGantt } from '../contexts/GanttContext';
 import { DragItem } from '../types';
-import { differenceInDays, differenceInWeeks, addDays, addWeeks } from 'date-fns';
+import { differenceInDays, differenceInWeeks, addDays, addWeeks, format } from 'date-fns';
+import { toast } from 'sonner';
 
 interface TimelineDropZoneProps {
   children: React.ReactNode;
@@ -31,17 +32,6 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
     }
   };
 
-  const calculateOffset = (date: Date, startDate: Date) => {
-    switch (currentView) {
-      case 'day':
-        return differenceInDays(date, startDate);
-      case 'week':
-        return differenceInWeeks(date, startDate);
-      default:
-        return differenceInDays(date, startDate);
-    }
-  };
-
   const addTimeUnit = (date: Date, amount: number) => {
     switch (currentView) {
       case 'day':
@@ -64,16 +54,21 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
         return;
       }
 
-      // Calculate preview position
+      // Calculate preview position with better precision
       const dropX = clientOffset.x - targetRect.left;
       const timelineWidth = targetRect.width;
       const dropPercentage = Math.max(0, Math.min(100, (dropX / timelineWidth) * 100));
       
+      // Calculate task duration and preview width more accurately
       const taskDuration = calculateDifference(item.task.startDate, item.task.endDate);
-      const previewWidth = Math.min(100 - dropPercentage, (taskDuration / units.length) * 100);
+      const unitWidth = 100 / units.length; // Percentage width per unit
+      const previewWidth = Math.min(100 - dropPercentage, taskDuration * unitWidth);
+      
+      // Snap to grid for better alignment
+      const snappedPercentage = Math.round(dropPercentage / unitWidth) * unitWidth;
       
       setDragPreview({
-        left: `${dropPercentage}%`,
+        left: `${snappedPercentage}%`,
         width: `${previewWidth}%`,
         visible: true,
       });
@@ -86,25 +81,43 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
       
       if (!clientOffset || !targetRect) return;
 
-      // Calculate the drop position relative to the timeline
+      console.log(`📅 Dropping task "${item.task.title}" - calculating new dates...`);
+
+      // Calculate the drop position relative to the timeline with better precision
       const dropX = clientOffset.x - targetRect.left;
       const timelineWidth = targetRect.width;
       const dropPercentage = (dropX / timelineWidth) * 100;
       
-      // Convert percentage to units offset from chart start
-      const unitsOffset = Math.max(0, Math.round((dropPercentage / 100) * units.length));
-      const taskDuration = calculateDifference(item.task.startDate, item.task.endDate) - 1;
+      // Convert percentage to units offset from chart start with snapping
+      const unitWidth = 100 / units.length;
+      const unitsOffset = Math.max(0, Math.round(dropPercentage / unitWidth));
       
-      // Calculate new dates
-      const newStartDate = addTimeUnit(chartStartDate, unitsOffset);
+      // Calculate task duration (preserve original duration)
+      const originalDuration = calculateDifference(item.task.startDate, item.task.endDate);
+      
+      // Calculate new dates with boundary checking
+      const maxAllowedOffset = units.length - originalDuration;
+      const finalOffset = Math.min(unitsOffset, maxAllowedOffset);
+      const finalStartDate = addTimeUnit(chartStartDate, finalOffset);
+      const finalEndDate = addTimeUnit(finalStartDate, originalDuration - 1);
 
-      // Ensure we don't go beyond the chart end
-      const maxAllowedStart = addTimeUnit(chartStartDate, units.length - taskDuration - 1);
-      const finalStartDate = calculateOffset(newStartDate, chartStartDate) > calculateOffset(maxAllowedStart, chartStartDate) ? maxAllowedStart : newStartDate;
-      const finalEndDate = addTimeUnit(finalStartDate, taskDuration);
+      console.log(`📅 Task "${item.task.title}" moved:`, {
+        from: `${item.task.startDate?.toDateString()} - ${item.task.endDate?.toDateString()}`,
+        to: `${finalStartDate.toDateString()} - ${finalEndDate.toDateString()}`,
+        duration: `${originalDuration} ${currentView === 'day' ? 'days' : 'weeks'}`,
+        offset: finalOffset
+      });
 
       // Update the task dates
       updateTaskDates(item.id, finalStartDate, finalEndDate);
+      
+      // Show success toast with date information
+      toast.success(`📅 Task "${item.task.title}" rescheduled`, {
+        description: `New dates: ${format(finalStartDate, 'MMM d')} - ${format(finalEndDate, 'MMM d, yyyy')}`,
+        duration: 3000,
+      });
+      
+      return { success: true, newStartDate: finalStartDate, newEndDate: finalEndDate };
     },
     collect: (monitor) => ({
       isOver: monitor.isOver(),
@@ -124,24 +137,33 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
     >
       {children}
       
-      {/* Drop preview */}
+      {/* Enhanced drop preview */}
       {dragPreview.visible && isOver && (
         <div
-          className="absolute top-4 h-8 bg-blue-200 border-2 border-blue-400 border-dashed rounded opacity-60 pointer-events-none z-10"
+          className="absolute top-1 h-10 bg-gradient-to-r from-blue-200 to-blue-300 border-2 border-blue-500 border-dashed rounded-lg opacity-80 pointer-events-none z-20 shadow-lg"
           style={{
             left: dragPreview.left,
             width: dragPreview.width,
           }}
         >
-          <div className="text-xs text-blue-800 px-1 py-1 truncate">
-            Drop here
+          <div className="flex items-center justify-center h-full text-xs text-blue-800 font-medium px-2">
+            <div className="flex items-center gap-1">
+              <span>📅</span>
+              <span className="truncate">Drop to reschedule</span>
+            </div>
           </div>
+          {/* Animated pulse effect */}
+          <div className="absolute inset-0 bg-blue-400 rounded-lg opacity-20 animate-pulse"></div>
         </div>
       )}
       
-      {/* Drop zone indicator */}
+      {/* Enhanced drop zone indicator */}
       {isOver && canDrop && (
-        <div className="absolute inset-0 border-2 border-blue-300 border-dashed rounded bg-blue-50 opacity-30 pointer-events-none" />
+        <div className="absolute inset-0 border-2 border-blue-400 border-dashed rounded-lg bg-blue-50 opacity-40 pointer-events-none">
+          <div className="absolute top-2 left-2 text-blue-600 text-sm font-medium">
+            📍 Drop here to move task
+          </div>
+        </div>
       )}
     </div>
   );

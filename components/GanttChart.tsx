@@ -8,6 +8,7 @@ import { ScrollControls } from './ScrollControls';
 import { TimelineEnhancements } from './TimelineEnhancements';
 import { DeveloperFilter } from './DeveloperFilter';
 import { TaskTypeFilter } from './TaskTypeFilter';
+import { DragPreview } from './DragPreview';
 import { format, isToday, isWeekend, isSameMonth } from 'date-fns';
 import { AlertTriangle, Clock, Move, CalendarDays, Minimize2, Maximize2, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -771,6 +772,7 @@ export function GanttChart() {
           </div>
         </div>
       </div>
+      <DragPreview />
     </DndProvider>
   );
 }

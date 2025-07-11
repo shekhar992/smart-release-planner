@@ -84,9 +84,15 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
+    canDrag: () => true, // Allow all tasks to be dragged
     end: (item, monitor) => {
       const dropResult = monitor.getDropResult();
       console.log('Drag ended:', { item: item?.task.title, dropResult });
+      
+      // If dropped successfully, provide feedback
+      if (dropResult) {
+        console.log(`✅ Task "${item?.task.title}" moved successfully!`);
+      }
     },
   });
 
@@ -176,11 +182,24 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
         }}
         title={`${task.title} (${task.startDate ? format(task.startDate, getDateFormatForView()) : 'No start'} - ${task.endDate ? format(task.endDate, getDateFormatForView()) : 'No end'}) - Status: ${statusConfig?.label || task.status} - Priority: ${priorityConfig?.label || task.priority} - Click to edit • Drag to reschedule`}
       >
-        <div className="px-2 py-1 text-xs truncate flex items-center gap-1 h-full">
+        <div className="px-2 py-1 text-xs truncate flex items-center gap-1 h-full relative">
           <GripVertical className="w-3 h-3 opacity-60 flex-shrink-0" />
           {hasConflict && <AlertTriangle className="w-3 h-3 text-yellow-300 flex-shrink-0" />}
           <span className="truncate flex-1">{task.title || 'Untitled Task'}</span>
+          
+          {/* Duration indicator */}
+          <span className="text-xs opacity-70 ml-1 flex-shrink-0">
+            {calculateDifference(task.startDate, task.endDate)}
+            {currentView === 'day' ? 'd' : 'w'}
+          </span>
         </div>
+        
+        {/* Resize handles (for future enhancement) */}
+        <div className="absolute left-0 top-0 w-1 h-full bg-transparent hover:bg-blue-400 cursor-ew-resize opacity-0 hover:opacity-100 transition-opacity" 
+             title="Drag to change start date" />
+        <div className="absolute right-0 top-0 w-1 h-full bg-transparent hover:bg-blue-400 cursor-ew-resize opacity-0 hover:opacity-100 transition-opacity" 
+             title="Drag to change end date" />
+        
         {hasConflict && (
           <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-white flex items-center justify-center">
             <span className="text-white text-xs">!</span>

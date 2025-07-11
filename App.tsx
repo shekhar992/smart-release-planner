@@ -5,6 +5,7 @@ import { useReleases } from './contexts/ReleaseContext';
 import { ReleasesDashboard } from './components/ReleasesDashboard';
 import { ReleaseView } from './components/ReleaseView';
 import { DemoDataLoader } from './components/DemoDataLoader';
+import { Toaster } from './components/ui/sonner';
 
 function AppContent() {
   const { currentRelease } = useReleases();
@@ -31,6 +32,7 @@ export default function App() {
         <ReleaseProvider>
           <DemoDataLoader>
             <AppContent />
+            <Toaster />
           </DemoDataLoader>
         </ReleaseProvider>
       </StatusProvider>
