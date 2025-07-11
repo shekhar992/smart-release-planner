@@ -109,7 +109,6 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
       
       // Calculate new dates
       const newStartDate = addTimeUnit(chartStartDate, unitsOffset);
-      const newEndDate = addTimeUnit(newStartDate, taskDuration);
 
       // Ensure we don't go beyond the chart end
       const maxAllowedStart = addTimeUnit(chartStartDate, units.length - taskDuration - 1);

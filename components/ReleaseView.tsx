@@ -2,10 +2,10 @@ import { useState } from 'react';
 import { useReleases } from '../contexts/ReleaseContext';
 import { GanttProvider } from '../contexts/GanttContext';
 import { GanttChart } from './GanttChart';
-import { TaskForm } from './TaskForm';
+import { EpicManager } from './EpicManager';
+import { NewTaskForm } from './NewTaskForm';
 import { DeveloperManager } from './DeveloperManager';
-import { TaskDetailsSidebar } from './TaskDetailsSidebar';
-import { BulkImport } from './BulkImport';
+import { TaskEditManager } from './TaskEditManager';
 import { StatusManager } from './StatusManager';
 import { CreateReleaseDialog } from './CreateReleaseDialog';
 import { ThemeToggle } from './ThemeToggle';
@@ -15,10 +15,9 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Card, CardContent } from './ui/card';
 import { 
-  Plus, 
+  Plus,
   Calendar, 
   Users, 
-  Upload, 
   ArrowLeft,
   Settings,
   CheckCircle,
@@ -34,6 +33,9 @@ export function ReleaseView() {
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showReleaseSettings, setShowReleaseSettings] = useState(false);
 
+  console.log('ReleaseView: Current release:', currentRelease);
+  console.log('ReleaseView: Team size:', currentRelease?.team?.length || 0);
+
   if (!currentRelease) {
     return null;
   }
@@ -41,14 +43,14 @@ export function ReleaseView() {
   const progress = calculateReleaseProgress(currentRelease.id);
   const metrics = getReleaseMetrics(currentRelease.id);
 
-  const getStatusColor = (status: string) => {
+  const getStatusBadgeClass = (status: string) => {
     switch (status) {
-      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300';
-      case 'in-progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300';
-      case 'delayed': return 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300';
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300';
-      case 'cancelled': return 'bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-300';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-300';
+      case 'planning': return 'bg-blue-50 text-blue-700 border border-blue-200';
+      case 'in-progress': return 'bg-amber-50 text-amber-700 border border-amber-200';
+      case 'delayed': return 'bg-red-50 text-red-700 border border-red-200';
+      case 'completed': return 'bg-green-50 text-green-700 border border-green-200';
+      case 'cancelled': return 'bg-gray-50 text-gray-700 border border-gray-200';
+      default: return 'bg-gray-50 text-gray-700 border border-gray-200';
     }
   };
 
@@ -58,7 +60,8 @@ export function ReleaseView() {
       initialDevelopers={currentRelease.team}
       releaseId={currentRelease.id}
     >
-      <div className="min-h-screen bg-background">
+      <TaskEditManager>
+        <div className="min-h-screen bg-background">
         {/* Modern Header with Glass Effect */}
         <div className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-40">
           <div className="container mx-auto px-6 py-4">
@@ -84,7 +87,7 @@ export function ReleaseView() {
                     {format(currentRelease.startDate, 'MMM d')} - {format(currentRelease.targetDate, 'MMM d, yyyy')}
                   </p>
                 </div>
-                <Badge variant="secondary" className={getStatusColor(currentRelease.status)}>
+                <Badge variant="secondary" className={getStatusBadgeClass(currentRelease.status)}>
                   {currentRelease.status.replace('-', ' ').toUpperCase()}
                 </Badge>
                 <Badge variant="outline" className="font-medium">v{currentRelease.version}</Badge>
@@ -130,8 +133,8 @@ export function ReleaseView() {
               <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                      <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                    <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Tasks</p>
@@ -144,8 +147,8 @@ export function ReleaseView() {
               <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                      <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
+                      <Users className="w-4 h-4 text-blue-600" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Team</p>
@@ -159,8 +162,8 @@ export function ReleaseView() {
                 <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 border-l-4 border-l-destructive">
                   <CardContent className="p-6">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                        <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                      <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">Overdue</p>
@@ -174,8 +177,8 @@ export function ReleaseView() {
               <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                      <Target className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                    <div className="w-8 h-8 rounded-full bg-purple-50 flex items-center justify-center">
+                      <Target className="w-4 h-4 text-purple-600" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Days Left</p>
@@ -199,13 +202,13 @@ export function ReleaseView() {
                       <Calendar className="w-4 h-4" />
                       Timeline
                     </TabsTrigger>
+                    <TabsTrigger value="epics" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                      <Target className="w-4 h-4" />
+                      Epics
+                    </TabsTrigger>
                     <TabsTrigger value="team" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Users className="w-4 h-4" />
                       Team
-                    </TabsTrigger>
-                    <TabsTrigger value="import" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-                      <Upload className="w-4 h-4" />
-                      Import
                     </TabsTrigger>
                     <TabsTrigger value="statuses" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Settings2 className="w-4 h-4" />
@@ -213,10 +216,15 @@ export function ReleaseView() {
                     </TabsTrigger>
                   </TabsList>
 
-                  <Button onClick={() => setShowTaskForm(true)} className="shadow-sm">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Task
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      onClick={() => setShowTaskForm(true)}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Task
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -224,6 +232,16 @@ export function ReleaseView() {
             <TabsContent value="gantt" className="flex-1 p-0 m-0">
               <div className="h-full">
                 <GanttChart />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="epics" className="flex-1 p-6">
+              <div className="container mx-auto max-w-6xl">
+                <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 bg-card">
+                  <CardContent className="p-8">
+                    <EpicManager />
+                  </CardContent>
+                </Card>
               </div>
             </TabsContent>
 
@@ -241,25 +259,6 @@ export function ReleaseView() {
                       <p className="text-muted-foreground">Manage your team members and their roles in this release.</p>
                     </div>
                     <DeveloperManager />
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="import" className="flex-1 p-6">
-              <div className="container mx-auto max-w-4xl">
-                <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 bg-card">
-                  <CardContent className="p-8">
-                    <div className="mb-6">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Upload className="w-4 h-4 text-primary" />
-                        </div>
-                        <h3 className="text-xl font-semibold">Bulk Import</h3>
-                      </div>
-                      <p className="text-muted-foreground">Import multiple tasks from CSV files or other sources to quickly populate your timeline.</p>
-                    </div>
-                    <BulkImport />
                   </CardContent>
                 </Card>
               </div>
@@ -286,12 +285,10 @@ export function ReleaseView() {
           </Tabs>
         </div>
 
-        <TaskForm
-          open={showTaskForm}
-          onClose={() => setShowTaskForm(false)}
+        <NewTaskForm 
+          open={showTaskForm} 
+          onOpenChange={setShowTaskForm} 
         />
-
-        <TaskDetailsSidebar />
 
         <CreateReleaseDialog
           open={showReleaseSettings}
@@ -299,6 +296,7 @@ export function ReleaseView() {
           editingRelease={currentRelease}
         />
       </div>
+      </TaskEditManager>
     </GanttProvider>
   );
 }

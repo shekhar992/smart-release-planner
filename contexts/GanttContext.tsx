@@ -35,8 +35,8 @@ export interface Conflict {
 interface GanttContextType {
   tasks: Task[];
   developers: Developer[];
-  selectedTask: Task | null;
-  setSelectedTask: (task: Task | null) => void;
+  editingTask: Task | null;
+  setEditingTask: (task: Task | null) => void;
   conflicts: Conflict[];
   
   // Task management
@@ -53,6 +53,19 @@ interface GanttContextType {
   detectConflicts: () => void;
   getDeveloperConflicts: (developerId: string) => Conflict[];
   getTaskConflicts: (taskId: string) => Conflict | null;
+  
+  // EPIC management
+  getEpics: () => Task[];
+  getTasksByEpic: (epicId: string) => Task[];
+  getEpicProgress: (epicId: string) => { completed: number; total: number; percentage: number };
+  
+  // Filtering
+  selectedDevelopers: string[]; // Array of developer IDs
+  setSelectedDevelopers: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedTaskTypes: string[]; // Array of task types
+  setSelectedTaskTypes: React.Dispatch<React.SetStateAction<string[]>>;
+  filteredTasks: Task[]; // Tasks filtered by selected developers and task types
+  clearFilters: () => void;
   
   // View management
   currentView: ViewType;
@@ -76,6 +89,8 @@ interface GanttContextType {
   // Navigation helpers
   scrollToToday: (() => void) | null;
   setScrollToToday: (fn: (() => void) | null) => void;
+  goToToday: () => void;
+  updateTaskDates: (taskId: string, startDate: Date, endDate: Date) => void;
 }
 
 const GanttContext = createContext<GanttContextType | undefined>(undefined);
@@ -92,11 +107,28 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
   
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [developers, setDevelopers] = useState<Developer[]>(initialDevelopers);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
   const [currentView, setCurrentView] = useState<ViewType>('month');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [scrollToToday, setScrollToToday] = useState<(() => void) | null>(null);
+  
+  // Developer filtering state
+  const [selectedDevelopers, setSelectedDevelopers] = useState<string[]>([]);
+  const [selectedTaskTypes, setSelectedTaskTypes] = useState<string[]>([]);
+  
+  // Filtered tasks based on selected developers and task types
+  const filteredTasks = tasks.filter(task => {
+    const developerMatch = selectedDevelopers.length === 0 || selectedDevelopers.includes(task.assignedDeveloperId);
+    const taskTypeMatch = selectedTaskTypes.length === 0 || selectedTaskTypes.includes(task.taskType);
+    return developerMatch && taskTypeMatch;
+  });
+  
+  // Clear all filters
+  const clearFilters = () => {
+    setSelectedDevelopers([]);
+    setSelectedTaskTypes([]);
+  };
 
   // Sync with release context when available
   useEffect(() => {
@@ -181,16 +213,25 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
 
   // Task management functions
   const addTask = async (task: Omit<Task, 'id'>): Promise<void> => {
+    console.log('GanttContext: addTask called');
+    console.log('GanttContext: releaseId:', releaseId);
+    console.log('GanttContext: releaseContext exists:', !!releaseContext);
+    console.log('GanttContext: task data:', task);
+    
     const newTask: Task = {
       ...task,
       id: uuidv4()
     };
 
     if (releaseId && releaseContext) {
+      console.log('GanttContext: Using release context to add task');
       await releaseContext.addTaskToCurrentRelease(task);
     } else {
+      console.log('GanttContext: Adding task to local state');
       setTasks(prev => [...prev, newTask]);
     }
+    
+    console.log('GanttContext: Task addition completed');
   };
 
   const updateTask = async (id: string, updates: Partial<Task>): Promise<void> => {
@@ -210,8 +251,9 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
       setTasks(prev => prev.filter(task => task.id !== id));
     }
     
-    if (selectedTask?.id === id) {
-      setSelectedTask(null);
+    // Clear editing task if it's the one being deleted
+    if (editingTask?.id === id) {
+      setEditingTask(null);
     }
   };
 
@@ -306,6 +348,40 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
     ) || null;
   };
 
+  // EPIC management functions
+  const getEpics = (): Task[] => {
+    return tasks.filter(task => task.taskType === 'epic');
+  };
+
+  const getTasksByEpic = (epicId: string): Task[] => {
+    return tasks.filter(task => task.epicId === epicId);
+  };
+
+  const getEpicProgress = (epicId: string): { completed: number; total: number; percentage: number } => {
+    const epicTasks = getTasksByEpic(epicId);
+    const completedTasks = epicTasks.filter(task => 
+      task.status.toLowerCase().includes('completed') || 
+      task.status.toLowerCase().includes('done')
+    );
+    
+    const total = epicTasks.length;
+    const completed = completedTasks.length;
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+    
+    return { completed, total, percentage };
+  };
+
+  // Navigation helper methods
+  const goToToday = () => {
+    if (scrollToToday) {
+      scrollToToday();
+    }
+  };
+
+  const updateTaskDates = (taskId: string, startDate: Date, endDate: Date) => {
+    updateTask(taskId, { startDate, endDate });
+  };
+
   // Run conflict detection when tasks change
   useEffect(() => {
     if (tasks.length > 0 && developers.length > 0) {
@@ -317,8 +393,8 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
     <GanttContext.Provider value={{
       tasks,
       developers,
-      selectedTask,
-      setSelectedTask,
+      editingTask,
+      setEditingTask,
       conflicts,
       addTask,
       updateTask,
@@ -329,6 +405,12 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
       detectConflicts,
       getDeveloperConflicts,
       getTaskConflicts,
+      selectedDevelopers,
+      setSelectedDevelopers,
+      selectedTaskTypes,
+      setSelectedTaskTypes,
+      filteredTasks,
+      clearFilters,
       currentView,
       setCurrentView,
       selectedYear,
@@ -336,7 +418,12 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
       viewConfig,
       getDateRange,
       scrollToToday,
-      setScrollToToday
+      setScrollToToday,
+      goToToday,
+      updateTaskDates,
+      getEpics,
+      getTasksByEpic,
+      getEpicProgress
     }}>
       {children}
     </GanttContext.Provider>

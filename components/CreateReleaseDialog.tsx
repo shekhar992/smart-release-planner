@@ -30,7 +30,8 @@ export function CreateReleaseDialog({ open, onClose, editingRelease }: CreateRel
     startDate: new Date(),
     targetDate: new Date(),
     status: 'planning' as const,
-    priority: 'medium' as const
+    priority: 'medium' as const,
+    color: '#3b82f6'
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -44,7 +45,8 @@ export function CreateReleaseDialog({ open, onClose, editingRelease }: CreateRel
         startDate: editingRelease.startDate,
         targetDate: editingRelease.targetDate,
         status: editingRelease.status,
-        priority: editingRelease.priority
+        priority: editingRelease.priority,
+        color: editingRelease.color
       });
     } else {
       // Reset form for new release
@@ -59,7 +61,8 @@ export function CreateReleaseDialog({ open, onClose, editingRelease }: CreateRel
         startDate: today,
         targetDate: nextMonth,
         status: 'planning',
-        priority: 'medium'
+        priority: 'medium',
+        color: '#3b82f6'
       });
     }
     setErrors({});

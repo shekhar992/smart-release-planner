@@ -186,7 +186,7 @@ export function ScrollControls({ scrollAreaRef, className }: ScrollControlsProps
             size="sm"
             onClick={handleScrollToToday}
             disabled={isScrolling}
-            className="h-9 px-3 bg-gradient-to-r from-red-50 to-rose-50 dark:from-red-950/50 dark:to-rose-950/50 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:from-red-100 hover:to-rose-100 dark:hover:from-red-900/50 dark:hover:to-rose-900/50 hover:border-red-300 dark:hover:border-red-700 card-shadow"
+            className="h-9 px-3 bg-gradient-to-r from-red-50 to-rose-50 border-red-200 text-red-700 hover:from-red-100 hover:to-rose-100 hover:border-red-300 card-shadow"
             aria-label="Go to today"
             title={`Go to today (${format(today, 'dd/MM/yyyy')}) - Press T key`}
           >

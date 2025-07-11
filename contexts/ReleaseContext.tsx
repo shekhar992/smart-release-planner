@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Task, Developer, TaskStatus, TaskPriority } from '../types';
+import { Task, Developer, TaskStatus } from '../types';
 
 export interface Release {
   id: string;
@@ -164,18 +164,31 @@ export function ReleaseProvider({ children }: { children: ReactNode }) {
   };
 
   const addTaskToCurrentRelease = async (task: Omit<Task, 'id'>): Promise<void> => {
-    if (!currentRelease) return;
+    console.log('ReleaseContext: addTaskToCurrentRelease called');
+    console.log('ReleaseContext: currentRelease exists:', !!currentRelease);
+    console.log('ReleaseContext: task data:', task);
+    
+    if (!currentRelease) {
+      console.error('ReleaseContext: No current release found!');
+      return;
+    }
 
     const newTask: Task = {
       ...task,
       id: uuidv4()
     };
 
+    console.log('ReleaseContext: newTask created:', newTask);
+
     const updatedTasks = [...currentRelease.tasks, newTask];
     const updatedRelease = { ...currentRelease, tasks: updatedTasks };
     
+    console.log('ReleaseContext: Updating release with', updatedTasks.length, 'tasks');
+    
     setCurrentRelease(updatedRelease);
     await updateRelease(currentRelease.id, { tasks: updatedTasks });
+    
+    console.log('ReleaseContext: Task added successfully');
   };
 
   const updateTaskInCurrentRelease = async (id: string, updates: Partial<Task>): Promise<void> => {

@@ -17,6 +17,15 @@ export interface Task {
   status: string; // Now accepts any string from StatusContext
   priority: string; // Now accepts any string from StatusContext
   dependencies?: string[];
+  epicId?: string; // Reference to parent epic
+  parentTaskId?: string; // For sub-tasks
+  taskType: 'epic' | 'story' | 'task' | 'subtask' | 'bug';
+  storyPoints?: number;
+  originalEstimate?: number; // in hours
+  remainingEstimate?: number; // in hours
+  timeSpent?: number; // in hours
+  labels?: string[];
+  jiraKey?: string; // External JIRA key if synced
 }
 
 // Legacy types for backwards compatibility
@@ -69,4 +78,42 @@ export interface PriorityType {
   order: number;
   isDefault: boolean;
   isActive: boolean;
+}
+
+// Epic and grouping types
+export interface Epic {
+  id: string;
+  title: string;
+  description: string;
+  startDate: Date;
+  endDate: Date;
+  status: string;
+  priority: string;
+  color: string;
+  progress: number; // calculated from child tasks
+  totalStoryPoints?: number;
+  completedStoryPoints?: number;
+  jiraKey?: string;
+  labels?: string[];
+}
+
+export interface TaskGroup {
+  epic?: Epic;
+  tasks: Task[];
+  subtasks: Record<string, Task[]>; // Parent task ID -> subtasks
+}
+
+export interface GroupedTasks {
+  ungrouped: Task[];
+  groups: Record<string, TaskGroup>; // Epic ID -> TaskGroup
+}
+
+// Gantt view configuration for JIRA-like experience
+export interface GanttViewConfig {
+  showEpics: boolean;
+  showSubtasks: boolean;
+  groupByEpic: boolean;
+  compactMode: boolean;
+  showDependencies: boolean;
+  showCriticalPath: boolean;
 }

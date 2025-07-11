@@ -6,6 +6,8 @@ import { TimelineDropZone } from './TimelineDropZone';
 import { ViewToggle } from './ViewToggle';
 import { ScrollControls } from './ScrollControls';
 import { TimelineEnhancements } from './TimelineEnhancements';
+import { DeveloperFilter } from './DeveloperFilter';
+import { TaskTypeFilter } from './TaskTypeFilter';
 import { format, isToday, isWeekend, isSameMonth, isSameYear } from 'date-fns';
 import { AlertTriangle, Clock, Move, CalendarDays, Minimize2, Maximize2, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
@@ -14,9 +16,9 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 
 export function GanttChart() {
   const { 
-    tasks, 
+    filteredTasks: tasks, 
     developers, 
-    setSelectedTask, 
+    setEditingTask,
     conflicts, 
     getDeveloperConflicts, 
     currentView, 
@@ -255,13 +257,15 @@ export function GanttChart() {
                 <Move className="w-4 h-4" />
                 <span>
                   {isTodayInRange 
-                    ? `Timeline centered on current ${currentView} • ${units.length} ${currentView}s visible`
-                    : `Viewing ${units.length} ${currentView}s • Today is outside current view`
+                    ? `Timeline centered on current ${currentView} • ${units.length} ${currentView}s visible • Click any task to edit`
+                    : `Viewing ${units.length} ${currentView}s • Today is outside current view • Click any task to edit`
                   }
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <DeveloperFilter />
+              <TaskTypeFilter />
               <ScrollControls scrollAreaRef={scrollAreaRef} className="bg-background/50 backdrop-blur-sm rounded-lg shadow-sm border p-2" />
               <ViewToggle />
             </div>
@@ -271,28 +275,38 @@ export function GanttChart() {
         {/* Today Status with Modern Design */}
         {isTodayInRange && (
           <div className="border-b bg-gradient-to-r from-primary/10 to-primary/5 p-3">
-            <div className="flex items-center gap-2 text-primary">
-              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                <CalendarDays className="w-4 h-4" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-primary">
+                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                  <CalendarDays className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-medium">
+                  Today is {format(today, 'EEEE, MMM dd, yyyy')} • 
+                  Press 'T' to center on today
+                </span>
               </div>
-              <span className="text-sm font-medium">
-                Today is {format(today, 'EEEE, MMM dd, yyyy')} • 
-                Press 'T' to center on today
-              </span>
+              <div className="text-xs text-primary/70">
+                💡 Click to edit • Drag to reschedule
+              </div>
             </div>
           </div>
         )}
 
         {!isTodayInRange && (
           <div className="border-b bg-gradient-to-r from-orange-50 to-yellow-50 p-3">
-            <div className="flex items-center gap-2 text-orange-800">
-              <div className="w-6 h-6 rounded-full bg-orange-200 flex items-center justify-center">
-                <AlertTriangle className="w-4 h-4" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-orange-800">
+                <div className="w-6 h-6 rounded-full bg-orange-200 flex items-center justify-center">
+                  <AlertTriangle className="w-4 h-4" />
+                </div>
+                <span className="text-sm font-medium">
+                  Today ({format(today, 'MMM dd, yyyy')}) is outside the current view • 
+                  {currentView === 'day' ? `Switch to ${new Date().getFullYear()} or ` : ''}Change view to see current date
+                </span>
               </div>
-              <span className="text-sm font-medium">
-                Today ({format(today, 'MMM dd, yyyy')}) is outside the current view • 
-                {currentView === 'day' ? `Switch to ${new Date().getFullYear()} or ` : ''}Change view to see current date
-              </span>
+              <div className="text-xs text-orange-600">
+                💡 Click to edit • Drag to reschedule
+              </div>
             </div>
           </div>
         )}
@@ -374,13 +388,23 @@ export function GanttChart() {
                 {tasks.map((task) => {
                   const conflictCount = getDeveloperConflictCount(task.assignedDeveloperId);
                   
+                  const handleTaskClick = () => {
+                    setEditingTask(task);
+                  };
+
+                  const handleTaskDoubleClick = () => {
+                    setEditingTask(task);
+                  };
+                  
                   return (
                     <div 
                       key={task.id} 
                       className={`hover:bg-card/50 cursor-pointer transition-all duration-200 group border border-border/20 rounded-lg p-3 backdrop-blur-sm hover:border-primary/20 hover:shadow-sm ${
                         conflictCount > 0 ? 'border-l-4 border-l-destructive' : ''
                       }`} 
-                      onClick={() => setSelectedTask(task)}
+                      onClick={handleTaskClick}
+                      onDoubleClick={handleTaskDoubleClick}
+                      title="Click to edit task"
                     >
                       {isSuperCompact ? (
                         // Super-compact mode - minimal single line
@@ -473,10 +497,10 @@ export function GanttChart() {
                           {/* Status */}
                           <div className="flex items-center gap-2">
                             <div className={`px-2 py-1 rounded-md text-xs font-medium flex-1 text-center ${
-                              task.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' :
-                              task.status === 'in-progress' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' :
-                              task.status === 'blocked' ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' :
-                              'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
+                              task.status === 'completed' ? 'bg-green-50 text-green-700' :
+                              task.status === 'in-progress' ? 'bg-blue-50 text-blue-700' :
+                              task.status === 'blocked' ? 'bg-red-50 text-red-700' :
+                              'bg-gray-50 text-gray-700'
                             }`}>
                               {task.status === 'in-progress' ? 'In Progress' : 
                                task.status === 'not-started' ? 'Not Started' :
@@ -694,7 +718,8 @@ export function GanttChart() {
                       >
                         <DraggableTaskBar
                           task={task}
-                          onTaskClick={setSelectedTask}
+                          onTaskClick={setEditingTask}
+                          onTaskDoubleClick={setEditingTask}
                         />
                       </div>
                     </TimelineDropZone>

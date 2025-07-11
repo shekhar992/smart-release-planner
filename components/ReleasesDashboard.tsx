@@ -12,7 +12,6 @@ import {
   Users, 
   CheckCircle, 
   AlertTriangle, 
-  Clock,
   MoreHorizontal,
   Eye,
   Edit,
@@ -20,10 +19,9 @@ import {
   Trash2,
   Rocket,
   TrendingUp,
-  Target,
-  Calendar
+  Target
 } from 'lucide-react';
-import { format, isPast, isFuture } from 'date-fns';
+import { format, isPast } from 'date-fns';
 
 interface ReleaseCardProps {
   release: any;
@@ -39,16 +37,15 @@ function ReleaseCard({ release, onSelect, onEdit, onDuplicate, onDelete }: Relea
   const progress = calculateReleaseProgress(release.id);
   const metrics = getReleaseMetrics(release.id);
   const isOverdue = isPast(release.targetDate) && release.status !== 'completed';
-  const isUpcoming = isFuture(release.startDate);
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'planning': return 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300';
-      case 'in-progress': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300';
-      case 'delayed': return 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300';
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300';
-      case 'cancelled': return 'bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-300';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-950 dark:text-gray-300';
+      case 'planning': return 'bg-blue-50 text-blue-700 border border-blue-200';
+      case 'in-progress': return 'bg-amber-50 text-amber-700 border border-amber-200';
+      case 'delayed': return 'bg-red-50 text-red-700 border border-red-200';
+      case 'completed': return 'bg-green-50 text-green-700 border border-green-200';
+      case 'cancelled': return 'bg-gray-50 text-gray-700 border border-gray-200';
+      default: return 'bg-gray-50 text-gray-700 border border-gray-200';
     }
   };
 
@@ -229,7 +226,7 @@ export function ReleasesDashboard() {
         <Card className="card-shadow border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-950 rounded-lg">
+              <div className="p-2 bg-blue-50 rounded-lg">
                 <Rocket className="w-5 h-5 text-blue-600" />
               </div>
               <div>
@@ -243,7 +240,7 @@ export function ReleasesDashboard() {
         <Card className="card-shadow border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 dark:bg-yellow-950 rounded-lg">
+              <div className="p-2 bg-amber-50 rounded-lg">
                 <TrendingUp className="w-5 h-5 text-yellow-600" />
               </div>
               <div>
@@ -257,7 +254,7 @@ export function ReleasesDashboard() {
         <Card className="card-shadow border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 dark:bg-green-950 rounded-lg">
+              <div className="p-2 bg-green-50 rounded-lg">
                 <CheckCircle className="w-5 h-5 text-green-600" />
               </div>
               <div>
@@ -271,7 +268,7 @@ export function ReleasesDashboard() {
         <Card className="card-shadow border-0">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 dark:bg-red-950 rounded-lg">
+              <div className="p-2 bg-red-50 rounded-lg">
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               </div>
               <div>

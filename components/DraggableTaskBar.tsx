@@ -9,9 +9,10 @@ import { AlertTriangle, GripVertical } from 'lucide-react';
 interface DraggableTaskBarProps {
   task: Task;
   onTaskClick: (task: Task) => void;
+  onTaskDoubleClick?: (task: Task) => void;
 }
 
-export function DraggableTaskBar({ task, onTaskClick }: DraggableTaskBarProps) {
+export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: DraggableTaskBarProps) {
   const { getTaskConflicts, currentView, getDateRange } = useGantt();
   const { getStatusById, getPriorityById } = useStatus();
   const ref = useRef<HTMLDivElement>(null);
@@ -179,7 +180,13 @@ export function DraggableTaskBar({ task, onTaskClick }: DraggableTaskBarProps) {
             onTaskClick(task);
           }
         }}
-        title={`${task.title} (${task.startDate ? format(task.startDate, getDateFormatForView()) : 'No start'} - ${task.endDate ? format(task.endDate, getDateFormatForView()) : 'No end'}) - Status: ${statusConfig?.label || task.status} - Priority: ${priorityConfig?.label || task.priority} - Drag to reschedule`}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (!isDragging && onTaskDoubleClick) {
+            onTaskDoubleClick(task);
+          }
+        }}
+        title={`${task.title} (${task.startDate ? format(task.startDate, getDateFormatForView()) : 'No start'} - ${task.endDate ? format(task.endDate, getDateFormatForView()) : 'No end'}) - Status: ${statusConfig?.label || task.status} - Priority: ${priorityConfig?.label || task.priority} - Click to edit • Drag to reschedule`}
       >
         <div className="px-2 py-1 text-xs truncate flex items-center gap-1 h-full">
           <GripVertical className="w-3 h-3 opacity-60 flex-shrink-0" />
@@ -195,7 +202,7 @@ export function DraggableTaskBar({ task, onTaskClick }: DraggableTaskBarProps) {
       
       {/* Visual feedback when dragging */}
       {isDragging && (
-        <div className="absolute inset-0 border-2 border-dashed border-blue-400 rounded bg-blue-100 dark:bg-blue-900 opacity-50" />
+        <div className="absolute inset-0 border-2 border-dashed border-blue-400 rounded bg-blue-50 opacity-50" />
       )}
     </div>
   );

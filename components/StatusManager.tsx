@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
 import { 
   Plus, 
@@ -19,10 +18,8 @@ import {
   MoreHorizontal, 
   GripVertical, 
   RotateCcw,
-  Palette,
   Eye,
   EyeOff,
-  Settings2,
   Tag,
   Flag
 } from 'lucide-react';
