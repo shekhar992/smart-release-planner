@@ -7,8 +7,6 @@ import {
   subWeeks,
   addMonths,
   subMonths,
-  addYears,
-  subYears,
   startOfWeek, 
   endOfWeek, 
   startOfMonth, 
@@ -19,10 +17,8 @@ import {
   eachDayOfInterval, 
   eachWeekOfInterval, 
   eachMonthOfInterval, 
-  eachYearOfInterval, 
   isSameDay,
   isSameMonth,
-  isSameYear
 } from 'date-fns';
 
 export interface Conflict {
@@ -109,7 +105,7 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
   const [developers, setDevelopers] = useState<Developer[]>(initialDevelopers);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
-  const [currentView, setCurrentView] = useState<ViewType>('month');
+  const [currentView, setCurrentView] = useState<ViewType>('week');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [scrollToToday, setScrollToToday] = useState<(() => void) | null>(null);
   
@@ -142,8 +138,6 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
   const viewConfigs = {
     day: { unitWidth: 80, dateFormat: 'dd/MM', label: 'Day' },
     week: { unitWidth: 120, dateFormat: 'dd/MM', label: 'Week' },
-    month: { unitWidth: 160, dateFormat: 'MM/yyyy', label: 'Month' },
-    year: { unitWidth: 200, dateFormat: 'yyyy', label: 'Year' }
   };
 
   const viewConfig = viewConfigs[currentView];
@@ -178,26 +172,6 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
           const thisWeekEnd = endOfWeek(weekDate, { weekStartsOn: 1 });
           return today >= weekDate && today <= thisWeekEnd;
         });
-        break;
-      
-      case 'month':
-        // Show 4 years: 1 year before today, 3 years after today
-        start = startOfMonth(subMonths(today, 12));
-        end = endOfMonth(addMonths(today, 36));
-        units = eachMonthOfInterval({ start, end });
-        
-        // Find current month
-        todayIndex = units.findIndex(monthDate => isSameMonth(monthDate, today));
-        break;
-      
-      case 'year':
-        // Show 12 years: 5 years before today, 6 years after today
-        start = startOfYear(subYears(today, 5));
-        end = endOfYear(addYears(today, 6));
-        units = eachYearOfInterval({ start, end });
-        
-        // Find current year
-        todayIndex = units.findIndex(yearDate => isSameYear(yearDate, today));
         break;
       
       default:

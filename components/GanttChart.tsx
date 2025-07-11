@@ -8,7 +8,7 @@ import { ScrollControls } from './ScrollControls';
 import { TimelineEnhancements } from './TimelineEnhancements';
 import { DeveloperFilter } from './DeveloperFilter';
 import { TaskTypeFilter } from './TaskTypeFilter';
-import { format, isToday, isWeekend, isSameMonth, isSameYear } from 'date-fns';
+import { format, isToday, isWeekend, isSameMonth } from 'date-fns';
 import { AlertTriangle, Clock, Move, CalendarDays, Minimize2, Maximize2, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
@@ -212,25 +212,6 @@ export function GanttChart() {
         return (
           <div className="text-center p-2">
             <div className="text-sm">{format(date, 'dd/MM')}</div>
-          </div>
-        );
-      case 'month':
-        const isCurrentMonth = isSameMonth(date, today);
-        return (
-          <div className={`text-center p-2 rounded transition-colors ${
-            isCurrentMonth ? 'bg-primary/10 border-primary/20 text-primary' : 'hover:bg-accent/30'
-          }`}>
-            <div className={`text-sm ${isCurrentMonth ? 'font-semibold' : ''}`}>{format(date, 'MM')}</div>
-            <div className={`text-xs ${isCurrentMonth ? 'text-primary' : 'text-muted-foreground'}`}>{format(date, 'yyyy')}</div>
-          </div>
-        );
-      case 'year':
-        const isCurrentYear = isSameYear(date, today);
-        return (
-          <div className={`text-center p-2 rounded transition-colors ${
-            isCurrentYear ? 'bg-primary/10 border-primary/20 text-primary' : 'hover:bg-accent/30'
-          }`}>
-            <div className={`text-sm ${isCurrentYear ? 'font-semibold' : ''}`}>{format(date, 'yyyy')}</div>
           </div>
         );
       default:

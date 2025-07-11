@@ -3,7 +3,7 @@ import { useDrag } from 'react-dnd';
 import { useGantt } from '../contexts/GanttContext';
 import { useStatus } from '../contexts/StatusContext';
 import { Task, DragItem } from '../types';
-import { format, differenceInDays, differenceInWeeks, differenceInMonths, differenceInYears } from 'date-fns';
+import { format, differenceInDays, differenceInWeeks } from 'date-fns';
 import { AlertTriangle, GripVertical } from 'lucide-react';
 
 interface DraggableTaskBarProps {
@@ -38,10 +38,6 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
         return Math.max(1, differenceInDays(endDate, startDate) + 1);
       case 'week':
         return Math.max(1, differenceInWeeks(endDate, startDate) + 1);
-      case 'month':
-        return Math.max(1, differenceInMonths(endDate, startDate) + 1);
-      case 'year':
-        return Math.max(1, differenceInYears(endDate, startDate) + 1);
       default:
         return Math.max(1, differenceInDays(endDate, startDate) + 1);
     }
@@ -55,10 +51,6 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
         return Math.max(0, differenceInDays(date, startDate));
       case 'week':
         return Math.max(0, differenceInWeeks(date, startDate));
-      case 'month':
-        return Math.max(0, differenceInMonths(date, startDate));
-      case 'year':
-        return Math.max(0, differenceInYears(date, startDate));
       default:
         return Math.max(0, differenceInDays(date, startDate));
     }
@@ -112,10 +104,6 @@ export function DraggableTaskBar({ task, onTaskClick, onTaskDoubleClick }: Dragg
         return 'dd/MM';
       case 'week':
         return 'dd/MM';
-      case 'month':
-        return 'MM/yyyy';
-      case 'year':
-        return 'yyyy';
       default:
         return 'dd/MM';
     }

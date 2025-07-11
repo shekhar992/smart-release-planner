@@ -43,6 +43,9 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
     epicId: '',
     parentTaskId: '',
     storyPoints: 0,
+    originalEstimate: 0, // in days
+    remainingEstimate: 0, // in days
+    timeSpent: 0, // in days
     jiraKey: '',
     labels: '',
   });
@@ -66,6 +69,20 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
       return format(end, 'yyyy-MM-dd');
     }
     return '';
+  };
+
+  // Auto-sync estimates with duration when appropriate
+  const syncEstimatesWithDuration = (newDuration: number) => {
+    return {
+      // If original estimate is 0 or very close to current duration, sync it
+      ...(formData.originalEstimate === 0 || Math.abs(formData.originalEstimate - formData.duration) <= 1 ? {
+        originalEstimate: newDuration
+      } : {}),
+      // Auto-calculate remaining estimate if original was synced or user hasn't manually set it
+      ...(formData.remainingEstimate === 0 || formData.remainingEstimate === formData.originalEstimate - formData.timeSpent ? {
+        remainingEstimate: Math.max(0, (formData.originalEstimate === 0 ? newDuration : formData.originalEstimate) - formData.timeSpent)
+      } : {})
+    };
   };
 
   // Get active statuses and priorities
@@ -98,6 +115,9 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
         epicId: task.epicId || '',
         parentTaskId: task.parentTaskId || '',
         storyPoints: task.storyPoints || 0,
+        originalEstimate: Math.round((task.originalEstimate || 0) / 8), // Convert hours to days (8 hours/day)
+        remainingEstimate: Math.round((task.remainingEstimate || 0) / 8), // Convert hours to days
+        timeSpent: Math.round((task.timeSpent || 0) / 8), // Convert hours to days
         jiraKey: task.jiraKey || '',
         labels: task.labels?.join(', ') || '',
       });
@@ -119,6 +139,9 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
         epicId: '',
         parentTaskId: '',
         storyPoints: 0,
+        originalEstimate: 0,
+        remainingEstimate: 0,
+        timeSpent: 0,
         jiraKey: '',
         labels: '',
       });
@@ -154,6 +177,9 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
       epicId: formData.epicId || undefined,
       parentTaskId: formData.parentTaskId || undefined,
       storyPoints: formData.storyPoints,
+      originalEstimate: formData.originalEstimate * 8, // Convert days to hours for storage
+      remainingEstimate: formData.remainingEstimate * 8, // Convert days to hours for storage
+      timeSpent: formData.timeSpent * 8, // Convert days to hours for storage
       jiraKey: formData.jiraKey || undefined,
       labels: formData.labels ? formData.labels.split(',').map(l => l.trim()).filter(Boolean) : undefined,
     };
@@ -506,7 +532,8 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
                       setFormData(prev => ({ 
                         ...prev, 
                         duration: newDuration,
-                        endDate: newEndDate
+                        endDate: newEndDate,
+                        ...syncEstimatesWithDuration(newDuration) // Sync estimates when duration changes
                       }));
                     }}
                     required
@@ -525,7 +552,8 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
                       setFormData(prev => ({ 
                         ...prev, 
                         endDate: newEndDate,
-                        duration: newDuration
+                        duration: newDuration,
+                        ...syncEstimatesWithDuration(newDuration) // Sync estimates when duration changes via end date
                       }));
                     }}
                     required
@@ -537,6 +565,156 @@ export function TaskForm({ open, onClose, task }: TaskFormProps) {
                 <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
                   <strong>Duration:</strong> {formData.duration} day{formData.duration !== 1 ? 's' : ''} 
                   ({format(new Date(formData.startDate), 'MMM d')} - {format(new Date(formData.endDate), 'MMM d, yyyy')})
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Estimates */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Estimates (Days)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label htmlFor="originalEstimate">Original Estimate</Label>
+                  <Input
+                    id="originalEstimate"
+                    type="number"
+                    min="0"
+                    max="365"
+                    step="0.5"
+                    value={formData.originalEstimate}
+                    onChange={(e) => {
+                      const newEstimate = Math.max(0, parseFloat(e.target.value) || 0);
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        originalEstimate: newEstimate,
+                        // Auto-calculate remaining estimate
+                        remainingEstimate: Math.max(0, newEstimate - formData.timeSpent),
+                        // If start date exists and estimate is different from current duration, update duration and end date
+                        ...(newEstimate > 0 && formData.startDate ? {
+                          duration: newEstimate,
+                          endDate: updateEndDateFromDuration(formData.startDate, newEstimate)
+                        } : {})
+                      }));
+                    }}
+                    placeholder="0"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="remainingEstimate">Remaining</Label>
+                  <Input
+                    id="remainingEstimate"
+                    type="number"
+                    min="0"
+                    max="365"
+                    step="0.5"
+                    value={formData.remainingEstimate}
+                    onChange={(e) => {
+                      const newRemaining = Math.max(0, parseFloat(e.target.value) || 0);
+                      setFormData(prev => ({ ...prev, remainingEstimate: newRemaining }));
+                    }}
+                    placeholder="0"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="timeSpent">Time Spent</Label>
+                  <Input
+                    id="timeSpent"
+                    type="number"
+                    min="0"
+                    max="365"
+                    step="0.5"
+                    value={formData.timeSpent}
+                    onChange={(e) => {
+                      const newTimeSpent = Math.max(0, parseFloat(e.target.value) || 0);
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        timeSpent: newTimeSpent,
+                        // Auto-update remaining estimate when time spent changes
+                        remainingEstimate: Math.max(0, formData.originalEstimate - newTimeSpent)
+                      }));
+                    }}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (formData.duration > 0) {
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        originalEstimate: formData.duration,
+                        remainingEstimate: Math.max(0, formData.duration - formData.timeSpent)
+                      }));
+                    }
+                  }}
+                  className="text-xs"
+                >
+                  📅 Set to Duration ({formData.duration} days)
+                </Button>
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (formData.originalEstimate > 0 && formData.startDate) {
+                      const newEndDate = updateEndDateFromDuration(formData.startDate, formData.originalEstimate);
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        duration: formData.originalEstimate,
+                        endDate: newEndDate
+                      }));
+                    }
+                  }}
+                  className="text-xs"
+                  disabled={!formData.originalEstimate || !formData.startDate}
+                >
+                  📈 Update Duration to Estimate
+                </Button>
+                
+                {formData.originalEstimate > 0 && formData.timeSpent > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        remainingEstimate: Math.max(0, formData.originalEstimate - formData.timeSpent)
+                      }));
+                    }}
+                    className="text-xs"
+                  >
+                    🔄 Auto-calc Remaining
+                  </Button>
+                )}
+              </div>
+              
+              {(formData.originalEstimate > 0 || formData.remainingEstimate > 0 || formData.timeSpent > 0) && (
+                <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div><strong>Progress:</strong> {formData.originalEstimate > 0 ? Math.round((formData.timeSpent / formData.originalEstimate) * 100) : 0}%</div>
+                    <div><strong>Efficiency:</strong> {formData.duration > 0 && formData.originalEstimate > 0 ? Math.round((formData.duration / formData.originalEstimate) * 100) : 100}%</div>
+                  </div>
+                  {formData.originalEstimate > 0 && formData.timeSpent + formData.remainingEstimate !== formData.originalEstimate && (
+                    <div className="text-amber-600 text-xs mt-1">
+                      ⚠️ Time spent + remaining ≠ original estimate
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

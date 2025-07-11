@@ -32,7 +32,7 @@ export interface Task {
 export type TaskStatus = 'not-started' | 'in-progress' | 'completed' | 'blocked';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 export type Priority = TaskPriority;
-export type ViewType = 'day' | 'week' | 'month' | 'year';
+export type ViewType = 'day' | 'week';
 
 export interface TaskConflict {
   taskId: string;

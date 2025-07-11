@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useDrop } from 'react-dnd';
 import { useGantt } from '../contexts/GanttContext';
 import { DragItem } from '../types';
-import { differenceInDays, differenceInWeeks, differenceInMonths, differenceInYears, addDays, addWeeks, addMonths, addYears } from 'date-fns';
+import { differenceInDays, differenceInWeeks, addDays, addWeeks } from 'date-fns';
 
 interface TimelineDropZoneProps {
   children: React.ReactNode;
@@ -26,10 +26,6 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
         return differenceInDays(endDate, startDate) + 1;
       case 'week':
         return differenceInWeeks(endDate, startDate) + 1;
-      case 'month':
-        return differenceInMonths(endDate, startDate) + 1;
-      case 'year':
-        return differenceInYears(endDate, startDate) + 1;
       default:
         return differenceInDays(endDate, startDate) + 1;
     }
@@ -41,10 +37,6 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
         return differenceInDays(date, startDate);
       case 'week':
         return differenceInWeeks(date, startDate);
-      case 'month':
-        return differenceInMonths(date, startDate);
-      case 'year':
-        return differenceInYears(date, startDate);
       default:
         return differenceInDays(date, startDate);
     }
@@ -56,10 +48,6 @@ export function TimelineDropZone({ children, className }: TimelineDropZoneProps)
         return addDays(date, amount);
       case 'week':
         return addWeeks(date, amount);
-      case 'month':
-        return addMonths(date, amount);
-      case 'year':
-        return addYears(date, amount);
       default:
         return addDays(date, amount);
     }
