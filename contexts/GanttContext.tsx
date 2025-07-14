@@ -105,7 +105,7 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
   const [developers, setDevelopers] = useState<Developer[]>(initialDevelopers);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [conflicts, setConflicts] = useState<Conflict[]>([]);
-  const [currentView, setCurrentView] = useState<ViewType>('week');
+  const [currentView, setCurrentView] = useState<ViewType>('day');
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [scrollToToday, setScrollToToday] = useState<(() => void) | null>(null);
   
@@ -134,10 +134,10 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
     }
   }, [releaseId, releaseContext?.currentRelease]);
 
-  // View configurations with DD/MM date format
+  // View configurations with enhanced week view
   const viewConfigs = {
     day: { unitWidth: 80, dateFormat: 'dd/MM', label: 'Day' },
-    week: { unitWidth: 120, dateFormat: 'dd/MM', label: 'Week' },
+    week: { unitWidth: 180, dateFormat: 'dd/MM', label: 'Week' }, // Wider for better visibility
   };
 
   const viewConfig = viewConfigs[currentView];
@@ -160,9 +160,10 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
         break;
       
       case 'week':
-        // Show 2 years: 6 months before today, 18 months after today
-        const weekStart = startOfWeek(subWeeks(today, 26), { weekStartsOn: 1 });
-        const weekEnd = endOfWeek(addWeeks(today, 78), { weekStartsOn: 1 });
+        // Enhanced week view: Show 1 year span with 3 months before today, 9 months after
+        // This provides a more focused and manageable view
+        const weekStart = startOfWeek(subWeeks(today, 12), { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(addWeeks(today, 40), { weekStartsOn: 1 });
         start = weekStart;
         end = weekEnd;
         units = eachWeekOfInterval({ start, end }, { weekStartsOn: 1 });

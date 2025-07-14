@@ -1,3 +1,5 @@
+import { LeaveProvider } from '../contexts/LeaveContext';
+import { LeaveManager } from './LeaveManagerSimple';
 import { useState } from 'react';
 import { useReleases } from '../contexts/ReleaseContext';
 import { GanttProvider } from '../contexts/GanttContext';
@@ -24,7 +26,8 @@ import {
   AlertTriangle,
   Target,
   Settings2,
-  TrendingUp
+  TrendingUp,
+  CalendarDays
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -60,7 +63,8 @@ export function ReleaseView() {
       initialDevelopers={currentRelease.team}
       releaseId={currentRelease.id}
     >
-      <TaskEditManager>
+      <LeaveProvider releaseId={currentRelease.id}>
+        <TaskEditManager>
         <div className="min-h-screen bg-background">
         {/* Modern Header with Glass Effect */}
         <div className="border-b bg-card/80 backdrop-blur-sm sticky top-0 z-40">
@@ -197,7 +201,7 @@ export function ReleaseView() {
             <div className="border-b bg-card/50 backdrop-blur-sm">
               <div className="container mx-auto px-6 py-4">
                 <div className="flex justify-between items-center">
-                  <TabsList className="grid w-full grid-cols-4 max-w-[600px] bg-muted/50 p-1 rounded-lg">
+                  <TabsList className="grid w-full grid-cols-5 max-w-[750px] bg-muted/50 p-1 rounded-lg">
                     <TabsTrigger value="gantt" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Calendar className="w-4 h-4" />
                       Timeline
@@ -209,6 +213,10 @@ export function ReleaseView() {
                     <TabsTrigger value="team" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Users className="w-4 h-4" />
                       Team
+                    </TabsTrigger>
+                    <TabsTrigger value="leaves" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                      <CalendarDays className="w-4 h-4" />
+                      Leaves
                     </TabsTrigger>
                     <TabsTrigger value="statuses" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Settings2 className="w-4 h-4" />
@@ -264,6 +272,25 @@ export function ReleaseView() {
               </div>
             </TabsContent>
 
+            <TabsContent value="leaves" className="flex-1 p-6">
+              <div className="container mx-auto max-w-6xl">
+                <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 bg-card">
+                  <CardContent className="p-8">
+                    <div className="mb-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <CalendarDays className="w-4 h-4 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-semibold">Leave Management</h3>
+                      </div>
+                      <p className="text-muted-foreground">Track team availability, manage leave requests, and adjust tasks automatically based on team member schedules.</p>
+                    </div>
+                    <LeaveManager />
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
             <TabsContent value="statuses" className="flex-1 p-6">
               <div className="container mx-auto max-w-4xl">
                 <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 bg-card">
@@ -297,6 +324,7 @@ export function ReleaseView() {
         />
       </div>
       </TaskEditManager>
+      </LeaveProvider>
     </GanttProvider>
   );
 }

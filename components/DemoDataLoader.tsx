@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useReleases } from '../contexts/ReleaseContext';
 import { Task, Developer } from '../types';
 import { v4 as uuidv4 } from 'uuid';
-import { addDays, addWeeks, subDays } from 'date-fns';
+import { addDays, subDays } from 'date-fns';
+import { Button } from './ui/button';
+import { Trash2 } from 'lucide-react';
 
 interface DemoDataLoaderProps {
   children: React.ReactNode;
@@ -11,6 +13,17 @@ interface DemoDataLoaderProps {
 export function DemoDataLoader({ children }: DemoDataLoaderProps) {
   const { releases, createRelease, updateRelease } = useReleases();
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [showClearButton, setShowClearButton] = useState(false);
+
+  const clearAllData = () => {
+    localStorage.clear();
+    window.location.reload();
+  };
+
+  // Show clear button if there are releases
+  useEffect(() => {
+    setShowClearButton(releases.length > 0);
+  }, [releases.length]);
 
   useEffect(() => {
     const initializeDemoData = async () => {
@@ -20,135 +33,68 @@ export function DemoDataLoader({ children }: DemoDataLoaderProps) {
       const today = new Date();
       
       try {
-        // Create core team members
-        const coreTeam: Developer[] = [
-          { id: uuidv4(), name: 'Sarah Chen', role: 'Full Stack Developer', email: 'sarah@company.com' },
-          { id: uuidv4(), name: 'Marcus Rodriguez', role: 'Frontend Developer', email: 'marcus@company.com' },
-          { id: uuidv4(), name: 'Emily Watson', role: 'Backend Engineer', email: 'emily@company.com' },
-          { id: uuidv4(), name: 'David Kim', role: 'DevOps Engineer', email: 'david@company.com' }
+        // Create minimal team for testing
+        const testTeam: Developer[] = [
+          { id: uuidv4(), name: 'Alice Johnson', role: 'Lead Developer', email: 'alice@company.com' },
+          { id: uuidv4(), name: 'Bob Smith', role: 'Backend Engineer', email: 'bob@company.com' }
         ];
 
-        // Release 1: Current Sprint - Web App v2.1
-        const webAppRelease = await createRelease({
-          name: 'Web App v2.1',
-          description: 'New dashboard and user management features',
-          version: '2.1.0',
-          startDate: subDays(today, 14),
-          targetDate: addDays(today, 7),
+        // Single test release with minimal data
+        const testRelease = await createRelease({
+          name: 'Sample Project v1.0',
+          description: 'A minimal sample project for testing',
+          version: '1.0.0',
+          startDate: subDays(today, 7),
+          targetDate: addDays(today, 14),
           status: 'in-progress',
           priority: 'high',
           color: '#3b82f6'
         });
 
-        const webAppTasks: Task[] = [
+        // Minimal set of tasks with different priorities to test the priority dashboard
+        const testTasks: Task[] = [
           {
             id: uuidv4(),
-            title: 'User Dashboard Redesign',
-            description: 'Implement new dashboard with improved UX',
-            taskType: 'story',
-            startDate: subDays(today, 12),
-            endDate: addDays(today, 2),
-            assignedDeveloperId: coreTeam[1].id, // Marcus
-            status: 'in-progress',
-            priority: 'high'
-          },
-          {
-            id: uuidv4(),
-            title: 'Authentication System',
-            description: 'Implement secure user authentication',
-            taskType: 'task',
-            startDate: subDays(today, 10),
+            title: 'Critical Bug Fix',
+            description: 'Fix security vulnerability in authentication',
+            taskType: 'bug',
+            startDate: subDays(today, 2),
             endDate: today,
-            assignedDeveloperId: coreTeam[0].id, // Sarah
-            status: 'completed',
+            assignedDeveloperId: testTeam[0].id, // Alice
+            status: 'in-progress',
             priority: 'critical'
           },
           {
             id: uuidv4(),
-            title: 'API Integration',
-            description: 'Connect frontend with new backend APIs',
-            taskType: 'task',
-            startDate: subDays(today, 5),
-            endDate: addDays(today, 3),
-            assignedDeveloperId: coreTeam[2].id, // Emily
-            status: 'in-progress',
-            priority: 'high'
-          },
-          {
-            id: uuidv4(),
-            title: 'Deployment Pipeline',
-            description: 'Set up automated deployment process',
-            taskType: 'task',
+            title: 'Feature Implementation',
+            description: 'Implement new user dashboard',
+            taskType: 'story',
             startDate: today,
             endDate: addDays(today, 5),
-            assignedDeveloperId: coreTeam[3].id, // David
-            status: 'not-started',
-            priority: 'medium'
-          }
-        ];
-
-        await updateRelease(webAppRelease.id, { 
-          team: coreTeam,
-          tasks: webAppTasks
-        });
-
-        // Release 2: Mobile App v1.0
-        const mobileAppRelease = await createRelease({
-          name: 'Mobile App v1.0',
-          description: 'First mobile application release',
-          version: '1.0.0',
-          startDate: addDays(today, 7),
-          targetDate: addWeeks(today, 6),
-          status: 'planning',
-          priority: 'medium',
-          color: '#10b981'
-        });
-
-        const mobileTeam = [coreTeam[0], coreTeam[1], coreTeam[2]]; // Sarah, Marcus, Emily
-
-        const mobileAppTasks: Task[] = [
-          {
-            id: uuidv4(),
-            title: 'Mobile UI Framework',
-            description: 'Set up React Native framework and basic components',
-            taskType: 'story',
-            startDate: addDays(today, 10),
-            endDate: addWeeks(today, 3),
-            assignedDeveloperId: mobileTeam[1].id, // Marcus
+            assignedDeveloperId: testTeam[1].id, // Bob
             status: 'not-started',
             priority: 'high'
           },
           {
             id: uuidv4(),
-            title: 'Mobile API Services',
-            description: 'Implement mobile-specific API endpoints',
+            title: 'Documentation Update',
+            description: 'Update API documentation',
             taskType: 'task',
-            startDate: addDays(today, 14),
-            endDate: addWeeks(today, 4),
-            assignedDeveloperId: mobileTeam[2].id, // Emily
+            startDate: addDays(today, 3),
+            endDate: addDays(today, 7),
+            assignedDeveloperId: testTeam[0].id, // Alice
             status: 'not-started',
-            priority: 'high'
-          },
-          {
-            id: uuidv4(),
-            title: 'App Store Preparation',
-            description: 'Prepare app for iOS and Android stores',
-            taskType: 'task',
-            startDate: addWeeks(today, 4),
-            endDate: addWeeks(today, 6),
-            assignedDeveloperId: mobileTeam[0].id, // Sarah
-            status: 'not-started',
-            priority: 'medium'
+            priority: 'low'
           }
         ];
 
-        await updateRelease(mobileAppRelease.id, { 
-          team: mobileTeam,
-          tasks: mobileAppTasks
+        await updateRelease(testRelease.id, { 
+          team: testTeam,
+          tasks: testTasks
         });
 
         setHasInitialized(true);
-        console.log('Clean demo data initialized successfully!');
+        console.log('Minimal demo data initialized successfully!');
         
       } catch (error) {
         console.error('Error initializing demo data:', error);
@@ -158,5 +104,22 @@ export function DemoDataLoader({ children }: DemoDataLoaderProps) {
     initializeDemoData();
   }, [releases.length, hasInitialized, createRelease, updateRelease]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {showClearButton && (
+        <div className="fixed top-4 right-4 z-50">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={clearAllData}
+            className="flex items-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Clear Demo Data
+          </Button>
+        </div>
+      )}
+      {children}
+    </>
+  );
 }

@@ -5,6 +5,9 @@ export interface Developer {
   email: string;
   avatar?: string;
   skills?: string[];
+  leaves?: LeaveRequest[];
+  leaveBalance?: LeaveBalance;
+  workingCalendar?: WorkingCalendar;
 }
 
 export interface Task {
@@ -106,6 +109,81 @@ export interface TaskGroup {
 export interface GroupedTasks {
   ungrouped: Task[];
   groups: Record<string, TaskGroup>; // Epic ID -> TaskGroup
+}
+
+// Leave Management Types
+export interface LeaveRequest {
+  id: string;
+  developerId: string;
+  startDate: Date;
+  endDate: Date;
+  leaveType: LeaveType;
+  status: LeaveStatus;
+  reason?: string;
+  approvedBy?: string;
+  approvedDate?: Date;
+  createdDate: Date;
+  isPartialDay?: boolean; // For half-day leaves
+  hoursPerDay?: number; // For flexible working hours
+}
+
+export type LeaveType = 
+  | 'annual' 
+  | 'sick' 
+  | 'personal' 
+  | 'maternity' 
+  | 'paternity' 
+  | 'bereavement' 
+  | 'training' 
+  | 'conference' 
+  | 'public-holiday'
+  | 'other';
+
+export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface LeaveBalance {
+  developerId: string;
+  year: number;
+  totalDays: number;
+  usedDays: number;
+  pendingDays: number;
+  remainingDays: number;
+  carryOverDays?: number;
+}
+
+export interface WorkingCalendar {
+  developerId: string;
+  workingDays: number[]; // 0-6 (Sunday-Saturday), e.g., [1,2,3,4,5] for Mon-Fri
+  workingHours: {
+    start: string; // "09:00"
+    end: string;   // "17:00"
+  };
+  timeZone: string;
+  publicHolidays: Date[];
+  customNonWorkingDays: Date[];
+}
+
+export interface TaskAdjustment {
+  taskId: string;
+  originalStartDate: Date;
+  originalEndDate: Date;
+  adjustedStartDate: Date;
+  adjustedEndDate: Date;
+  reason: 'leave' | 'dependency' | 'manual';
+  affectedBy?: string; // Developer ID if affected by leave
+  adjustmentDate: Date;
+}
+
+// Enhanced Developer with leave information
+export interface DeveloperWithLeave extends Developer {
+  leaves: LeaveRequest[];
+  leaveBalance: LeaveBalance;
+  workingCalendar: WorkingCalendar;
+  currentAvailability?: {
+    isAvailable: boolean;
+    availableFrom?: Date;
+    reason?: string;
+  };
 }
 
 // Gantt view configuration for JIRA-like experience

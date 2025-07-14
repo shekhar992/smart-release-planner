@@ -9,7 +9,7 @@ import { TimelineEnhancements } from './TimelineEnhancements';
 import { DeveloperFilter } from './DeveloperFilter';
 import { TaskTypeFilter } from './TaskTypeFilter';
 import { DragPreview } from './DragPreview';
-import { format, isToday, isWeekend, isSameMonth } from 'date-fns';
+import { format, isToday, isWeekend, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { AlertTriangle, Clock, Move, CalendarDays, Minimize2, Maximize2, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
@@ -188,6 +188,51 @@ export function GanttChart() {
     return groups;
   };
 
+  // Helper function to group consecutive weeks by month for week view
+  const getWeekMonthGroups = () => {
+    const groups: { month: string; startIndex: number; count: number; year: number }[] = [];
+    let currentMonth = '';
+    let currentStartIndex = 0;
+    let currentCount = 0;
+    let currentYear = 0;
+
+    units.forEach((date, index) => {
+      // For week view, use the start of the week to determine the month
+      const weekStart = startOfWeek(date, { weekStartsOn: 1 });
+      const monthYear = format(weekStart, 'MMMM yyyy');
+      const year = weekStart.getFullYear();
+      
+      if (monthYear !== currentMonth) {
+        if (currentCount > 0) {
+          groups.push({ 
+            month: currentMonth, 
+            startIndex: currentStartIndex, 
+            count: currentCount,
+            year: currentYear
+          });
+        }
+        currentMonth = monthYear;
+        currentStartIndex = index;
+        currentCount = 1;
+        currentYear = year;
+      } else {
+        currentCount++;
+      }
+    });
+
+    // Don't forget the last group
+    if (currentCount > 0) {
+      groups.push({ 
+        month: currentMonth, 
+        startIndex: currentStartIndex, 
+        count: currentCount,
+        year: currentYear
+      });
+    }
+
+    return groups;
+  };
+
   const getHeaderFormat = (date: Date, _index: number) => {
     switch (currentView) {
       case 'day':
@@ -210,9 +255,39 @@ export function GanttChart() {
           </div>
         );
       case 'week':
+        const weekStart = startOfWeek(date, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(date, { weekStartsOn: 1 });
+        const isCurrentWeek = units.findIndex(unit => {
+          const thisWeekStart = startOfWeek(unit, { weekStartsOn: 1 });
+          const thisWeekEnd = endOfWeek(unit, { weekStartsOn: 1 });
+          const today = new Date();
+          return today >= thisWeekStart && today <= thisWeekEnd;
+        }) === _index;
+        
         return (
-          <div className="text-center p-2">
-            <div className="text-sm">{format(date, 'dd/MM')}</div>
+          <div className={`text-center py-4 px-3 border-r border-border/30 transition-all duration-200 ${
+            isCurrentWeek 
+              ? 'bg-primary/15 border-primary/30 text-primary shadow-sm' 
+              : 'bg-muted/20 text-foreground hover:bg-muted/30'
+          }`}>
+            <div className={`text-lg font-bold tracking-wide mb-1 ${
+              isCurrentWeek ? 'text-primary' : 'text-foreground'
+            }`}>
+              Week {format(date, 'ww')}
+            </div>
+            <div className={`text-xs font-medium ${
+              isCurrentWeek ? 'text-primary/80' : 'text-muted-foreground'
+            }`}>
+              {format(weekStart, 'MMM dd')} - {format(weekEnd, 'MMM dd')}
+            </div>
+            <div className={`text-xs mt-1 ${
+              isCurrentWeek ? 'text-primary/70' : 'text-muted-foreground/70'
+            }`}>
+              {format(date, 'yyyy')}
+            </div>
+            {isCurrentWeek && (
+              <div className="w-12 h-0.5 bg-primary rounded-full mx-auto mt-2"></div>
+            )}
           </div>
         );
       default:
@@ -612,6 +687,52 @@ export function GanttChart() {
                         ))}
                       </div>
                     </div>
+                  ) : currentView === 'week' ? (
+                    /* Enhanced two-row header for week view */
+                    <div>
+                      {/* Month Header Row for Week View */}
+                      <div className="flex border-b border-border/30 bg-gradient-to-r from-blue-50 to-indigo-50">
+                        {getWeekMonthGroups().map((group, groupIndex) => {
+                          const isCurrentMonth = isSameMonth(
+                            units[group.startIndex], 
+                            today
+                          );
+                          return (
+                            <div
+                              key={`week-month-${groupIndex}`}
+                              className={`flex items-center justify-center py-3 px-2 border-r border-border/30 font-bold text-sm transition-all duration-200 ${
+                                isCurrentMonth 
+                                  ? 'bg-primary/15 text-primary border-primary/30 shadow-sm' 
+                                  : 'bg-blue-50/50 text-foreground hover:bg-blue-100/50'
+                              }`}
+                              style={{ width: `${group.count * viewConfig.unitWidth}px` }}
+                            >
+                              <div className="text-center">
+                                <div className={`${isCurrentMonth ? 'font-extrabold' : 'font-bold'} tracking-wide`}>
+                                  {format(units[group.startIndex], 'MMMM yyyy')}
+                                </div>
+                                <div className="text-xs text-muted-foreground mt-0.5 font-medium">
+                                  {group.count} week{group.count > 1 ? 's' : ''}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      {/* Week Header Row */}
+                      <div className="flex">
+                        {units.map((unit, index) => (
+                          <div
+                            key={unit.toISOString()}
+                            className="border-r border-border/30 transition-colors"
+                            style={{ width: `${viewConfig.unitWidth}px` }}
+                          >
+                            {getHeaderFormat(unit, index)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ) : (
                     /* Single row header for other views */
                     <div className="flex p-4">
@@ -681,12 +802,16 @@ export function GanttChart() {
                     </div>
                   )}
 
-                  {/* Modern Grid lines */}
+                  {/* Enhanced Grid lines with view-specific styling */}
                   <div className="absolute inset-0 pointer-events-none">
                     {units.map((_, index) => (
                       <div
                         key={`grid-${index}`}
-                        className="absolute top-0 bottom-0 border-r border-border/20 opacity-40"
+                        className={`absolute top-0 bottom-0 border-r transition-opacity ${
+                          currentView === 'week' 
+                            ? 'border-border/30 opacity-50' 
+                            : 'border-border/20 opacity-40'
+                        }`}
                         style={{ left: `${index * viewConfig.unitWidth}px` }}
                       />
                     ))}
@@ -695,7 +820,11 @@ export function GanttChart() {
                   {tasks.map((task) => (
                     <div key={task.id} className="border-b border-border/30 last:border-b-0">
                       <div 
-                        className="p-4 hover:bg-muted/30 min-h-[96px] relative transition-colors duration-200"
+                        className={`p-4 hover:bg-muted/30 relative transition-colors duration-200 ${
+                          currentView === 'week' 
+                            ? 'min-h-[80px] bg-gradient-to-r from-background/50 to-card/30' 
+                            : 'min-h-[96px]'
+                        }`}
                         style={{ width: `${timelineWidth}px` }}
                       >
                         <DraggableTaskBar

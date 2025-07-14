@@ -19,7 +19,8 @@ import {
   Trash2,
   Rocket,
   TrendingUp,
-  Target
+  Target,
+  ArrowLeft
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 
@@ -165,7 +166,7 @@ function ReleaseCard({ release, onSelect, onEdit, onDuplicate, onDelete }: Relea
   );
 }
 
-export function ReleasesDashboard() {
+export function ReleasesDashboard({ onBackToPriority }: { onBackToPriority?: () => void }) {
   const { releases, setCurrentRelease } = useReleases();
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editingRelease, setEditingRelease] = useState<any>(null);
@@ -213,6 +214,12 @@ export function ReleasesDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {onBackToPriority && (
+            <Button variant="outline" onClick={onBackToPriority}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Priority Dashboard
+            </Button>
+          )}
           <ThemeToggle />
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />

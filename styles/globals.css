@@ -33,6 +33,36 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
+
+  .dark {
+    /* Subtle dark mode - warm and low contrast */
+    --background: 224 12% 8%;
+    --foreground: 213 20% 85%;
+    --card: 224 10% 10%;
+    --card-foreground: 213 20% 85%;
+    --popover: 224 10% 10%;
+    --popover-foreground: 213 20% 85%;
+    --primary: 213 15% 25%;
+    --primary-foreground: 213 20% 85%;
+    --secondary: 215 15% 18%;
+    --secondary-foreground: 213 20% 85%;
+    --muted: 215 15% 18%;
+    --muted-foreground: 217.9 10.6% 55%;
+    --accent: 215 15% 20%;
+    --accent-foreground: 213 20% 85%;
+    --destructive: 0 60% 55%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 215 20% 20%;
+    --input: 215 20% 20%;
+    --ring: 213 15% 40%;
+
+    /* Subtle chart colors for dark mode */
+    --chart-1: 220 70% 70%;
+    --chart-2: 160 60% 65%;
+    --chart-3: 30 80% 65%;
+    --chart-4: 280 65% 70%;
+    --chart-5: 340 75% 65%;
+  }
 }
 
 @layer base {
@@ -96,22 +126,71 @@
     @apply bg-muted-foreground/30;
   }
   
-  /* Subtle shadows and borders */
+  /* Subtle shadows and borders with smooth transitions */
   .card-shadow {
     box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    border: 1px solid hsl(var(--border));
+    transition: all 0.3s ease;
+  }
+  
+  .dark .card-shadow {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.2);
     border: 1px solid hsl(var(--border));
   }
   
   .card-shadow-hover {
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    transition: all 0.2s ease-in-out;
+    transition: all 0.3s ease;
   }
   
-  /* Clean glass effect for light mode */
+  .dark .card-shadow-hover {
+    box-shadow: 0 4px 8px -2px rgb(0 0 0 / 0.3), 0 2px 6px -1px rgb(0 0 0 / 0.2);
+  }
+  
+  /* Glass effect that adapts to theme */
   .glass {
-    backdrop-filter: blur(8px) saturate(110%);
-    background-color: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px) saturate(120%);
+    background-color: rgba(255, 255, 255, 0.85);
     border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+  }
+  
+  .dark .glass {
+    backdrop-filter: blur(16px) saturate(130%);
+    background-color: rgba(34, 37, 51, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  
+  /* Smooth color transitions for all elements */
+  :root {
+    transition: color-scheme 0.3s ease;
+  }
+  
+  * {
+    transition: background-color 0.3s ease, 
+                color 0.3s ease, 
+                border-color 0.3s ease,
+                box-shadow 0.3s ease,
+                opacity 0.3s ease;
+  }
+  
+  /* Theme transition animation */
+  html {
+    transition: background-color 0.3s ease;
+  }
+  
+  /* Smooth theme toggle animations */
+  .theme-transition {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Enhanced scrollbar for dark mode */
+  .dark ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+  }
+  
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.4);
   }
   
   /* Subtle focus styles */
@@ -125,6 +204,77 @@
   }
   
   /* Enhanced button hover states */
+  .btn-subtle {
+    transition: all 0.3s ease;
+  }
+  
+  /* Dark mode button improvements */
+  .dark button[data-variant="default"] {
+    background-color: hsl(215 15% 22%);
+    border: 1px solid hsl(215 20% 25%);
+    color: hsl(213 20% 85%);
+  }
+  
+  .dark button[data-variant="default"]:hover {
+    background-color: hsl(215 15% 28%);
+    border-color: hsl(215 20% 30%);
+  }
+  
+  .dark button[data-variant="outline"] {
+    background-color: transparent;
+    border: 1px solid hsl(215 20% 25%);
+    color: hsl(213 20% 80%);
+  }
+  
+  .dark button[data-variant="outline"]:hover {
+    background-color: hsl(215 15% 18%);
+    border-color: hsl(215 20% 30%);
+  }
+  
+  .dark button[data-variant="ghost"] {
+    background-color: transparent;
+    color: hsl(213 20% 75%);
+  }
+  
+  .dark button[data-variant="ghost"]:hover {
+    background-color: hsl(215 15% 18%);
+    color: hsl(213 20% 85%);
+  }
+  
+  /* Subtle primary buttons in dark mode */
+  .dark .bg-blue-600 {
+    background-color: hsl(220 30% 35%) !important;
+  }
+  
+  .dark .bg-blue-600:hover {
+    background-color: hsl(220 30% 40%) !important;
+  }
+  
+  .dark .hover\:bg-blue-700:hover {
+    background-color: hsl(220 30% 40%) !important;
+  }
+  
+  /* Softer icon colors in dark mode */
+  .dark .text-blue-600 {
+    color: hsl(220 40% 65%) !important;
+  }
+  
+  .dark .text-green-600 {
+    color: hsl(160 40% 65%) !important;
+  }
+  
+  .dark .text-purple-600 {
+    color: hsl(280 40% 70%) !important;
+  }
+  
+  .dark .text-orange-500 {
+    color: hsl(30 70% 65%) !important;
+  }
+  
+  /* Subtle hover effects for cards in dark mode */
+  .dark .hover\:bg-card\/80:hover {
+    background-color: hsl(215 15% 16%) !important;
+  }
   .btn-hover {
     transition: all 0.15s ease-in-out;
   }
