@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug App State</title>
+</head>
+<body>
+    <h1>Debug TimelineView App</h1>
+    <button onclick="clearAndReload()">Clear Data & Reload</button>
+    <button onclick="checkLocalStorage()">Check localStorage</button>
+    <div id="output"></div>
+
+    <script>
+        function clearAndReload() {
+            localStorage.clear();
+            window.location.href = 'http://localhost:5173/';
+        }
+
+        function checkLocalStorage() {
+            const output = document.getElementById('output');
+            const releases = localStorage.getItem('gantt-releases');
+            output.innerHTML = `
+                <h3>localStorage Data:</h3>
+                <pre>${releases || 'No data found'}</pre>
+                <br>
+                <strong>All localStorage keys:</strong>
+                <ul>
+                    ${Object.keys(localStorage).map(key => `<li>${key}: ${localStorage.getItem(key)?.substring(0, 100)}...</li>`).join('')}
+                </ul>
+            `;
+        }
+
+        // Auto-check on load
+        window.onload = checkLocalStorage;
+    </script>
+</body>
+</html>

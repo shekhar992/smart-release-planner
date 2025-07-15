@@ -6,7 +6,6 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { CreateReleaseDialog } from './CreateReleaseDialog';
-import { ThemeToggle } from './ThemeToggle';
 import { 
   Plus, 
   AlertTriangle, 
@@ -15,7 +14,7 @@ import {
   Users,
   TrendingUp,
   CheckCircle,
-  Eye,
+  ArrowLeft,
   ChevronRight,
   Zap,
   Target,
@@ -150,14 +149,13 @@ export function HighPriorityDashboard({ onViewAllReleases }: HighPriorityDashboa
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <ThemeToggle />
           <Button 
             variant="outline" 
             onClick={() => onViewAllReleases?.()}
             className="flex items-center gap-2"
           >
-            <Eye className="w-4 h-4" />
-            View All Releases
+            <ArrowLeft className="w-4 h-4" />
+            Back to Releases
           </Button>
           <Button onClick={() => setShowCreateDialog(true)}>
             <Plus className="w-4 h-4 mr-2" />

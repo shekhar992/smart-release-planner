@@ -1,5 +1,4 @@
 import { ReleaseProvider } from './contexts/ReleaseContext';
-import { ThemeProvider } from './contexts/ThemeContext';
 import { StatusProvider } from './contexts/StatusContext';
 import { useReleases } from './contexts/ReleaseContext';
 import { HighPriorityDashboard } from './components/HighPriorityDashboard';
@@ -11,22 +10,22 @@ import { useState } from 'react';
 
 function AppContent() {
   const { currentRelease } = useReleases();
-  const [showAllReleases, setShowAllReleases] = useState(false);
+  const [showPriorityDashboard, setShowPriorityDashboard] = useState(false);
 
   return (
     <>
       {currentRelease ? (
         <ReleaseView />
-      ) : showAllReleases ? (
+      ) : showPriorityDashboard ? (
         <div className="min-h-screen bg-background">
           <div className="container mx-auto px-6 py-8">
-            <ReleasesDashboard onBackToPriority={() => setShowAllReleases(false)} />
+            <HighPriorityDashboard onViewAllReleases={() => setShowPriorityDashboard(false)} />
           </div>
         </div>
       ) : (
         <div className="min-h-screen bg-background">
           <div className="container mx-auto px-6 py-8">
-            <HighPriorityDashboard onViewAllReleases={() => setShowAllReleases(true)} />
+            <ReleasesDashboard onBackToPriority={() => setShowPriorityDashboard(true)} />
           </div>
         </div>
       )}
@@ -36,15 +35,13 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ThemeProvider defaultTheme="system" storageKey="gantt-theme">
-      <StatusProvider>
-        <ReleaseProvider>
-          <DemoDataLoader>
-            <AppContent />
-            <Toaster />
-          </DemoDataLoader>
-        </ReleaseProvider>
-      </StatusProvider>
-    </ThemeProvider>
+    <StatusProvider>
+      <ReleaseProvider>
+        <DemoDataLoader>
+          <AppContent />
+          <Toaster />
+        </DemoDataLoader>
+      </ReleaseProvider>
+    </StatusProvider>
   );
 }

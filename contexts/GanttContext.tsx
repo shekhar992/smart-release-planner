@@ -35,6 +35,9 @@ interface GanttContextType {
   setEditingTask: (task: Task | null) => void;
   conflicts: Conflict[];
   
+  // Release information
+  currentRelease: any; // The current release object
+  
   // Task management
   addTask: (task: Omit<Task, 'id'>) => Promise<void>;
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
@@ -371,6 +374,7 @@ export function GanttProvider({ children, initialTasks = [], initialDevelopers =
       editingTask,
       setEditingTask,
       conflicts,
+      currentRelease: releaseContext?.currentRelease || null,
       addTask,
       updateTask,
       deleteTask,

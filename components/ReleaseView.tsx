@@ -10,7 +10,7 @@ import { DeveloperManager } from './DeveloperManager';
 import { TaskEditManager } from './TaskEditManager';
 import { StatusManager } from './StatusManager';
 import { CreateReleaseDialog } from './CreateReleaseDialog';
-import { ThemeToggle } from './ThemeToggle';
+import { ImportManager } from './ImportManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -27,7 +27,8 @@ import {
   Target,
   Settings2,
   TrendingUp,
-  CalendarDays
+  CalendarDays,
+  Upload
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -98,7 +99,6 @@ export function ReleaseView() {
               </div>
               
               <div className="flex items-center gap-2">
-                <ThemeToggle />
                 <Button
                   variant="outline"
                   size="sm"
@@ -201,7 +201,7 @@ export function ReleaseView() {
             <div className="border-b bg-card/50 backdrop-blur-sm">
               <div className="container mx-auto px-6 py-4">
                 <div className="flex justify-between items-center">
-                  <TabsList className="grid w-full grid-cols-5 max-w-[750px] bg-muted/50 p-1 rounded-lg">
+                  <TabsList className="grid w-full grid-cols-6 max-w-[900px] bg-muted/50 p-1 rounded-lg">
                     <TabsTrigger value="gantt" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Calendar className="w-4 h-4" />
                       Timeline
@@ -221,6 +221,10 @@ export function ReleaseView() {
                     <TabsTrigger value="statuses" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
                       <Settings2 className="w-4 h-4" />
                       Statuses
+                    </TabsTrigger>
+                    <TabsTrigger value="import" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                      <Upload className="w-4 h-4" />
+                      Import
                     </TabsTrigger>
                   </TabsList>
 
@@ -305,6 +309,25 @@ export function ReleaseView() {
                       <p className="text-muted-foreground">Customize task statuses and their workflow to match your team's process.</p>
                     </div>
                     <StatusManager />
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="import" className="flex-1 p-6">
+              <div className="space-y-6">
+                <Card className="card-shadow border-0 hover:card-shadow-hover transition-shadow duration-200 bg-card">
+                  <CardContent className="p-8">
+                    <div className="mb-6">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Upload className="w-4 h-4 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-semibold">Data Import</h3>
+                      </div>
+                      <p className="text-muted-foreground">Import data in bulk using CSV templates for tasks, developers, releases, and more.</p>
+                    </div>
+                    <ImportManager />
                   </CardContent>
                 </Card>
               </div>

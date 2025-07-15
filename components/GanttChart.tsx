@@ -1,6 +1,7 @@
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import { useGantt } from '../contexts/GanttContext';
+import { Task } from '../types';
 import { DraggableTaskBar } from './DraggableTaskBar';
 import { TimelineDropZone } from './TimelineDropZone';
 import { ViewToggle } from './ViewToggle';
@@ -8,6 +9,7 @@ import { ScrollControls } from './ScrollControls';
 import { TimelineEnhancements } from './TimelineEnhancements';
 import { DeveloperFilter } from './DeveloperFilter';
 import { TaskTypeFilter } from './TaskTypeFilter';
+import { EpicFilter } from './EpicFilter';
 import { DragPreview } from './DragPreview';
 import { format, isToday, isWeekend, isSameMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { AlertTriangle, Clock, Move, CalendarDays, Minimize2, Maximize2, ChevronLeft, ChevronRight, Users } from 'lucide-react';
@@ -26,7 +28,8 @@ export function GanttChart() {
     viewConfig, 
     getDateRange, 
     selectedYear,
-    setScrollToToday
+    setScrollToToday,
+    currentRelease
   } = useGantt();
   
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -35,6 +38,9 @@ export function GanttChart() {
   const [isCompactMode, setIsCompactMode] = useState(false);
   const [isTaskListCollapsed, setIsTaskListCollapsed] = useState(false);
   const [isSuperCompact, setIsSuperCompact] = useState(false);
+  
+  // Epic filter state
+  const [epicFilteredTasks, setEpicFilteredTasks] = useState<Task[]>(tasks);
 
   const { units, todayIndex } = getDateRange();
   const today = new Date();
@@ -42,6 +48,16 @@ export function GanttChart() {
 
   // Calculate today's exact position in pixels
   const todayPosition = isTodayInRange ? todayIndex * viewConfig.unitWidth : 0;
+
+  // Handle epic filter change
+  const handleEpicFilterChange = (filteredTasks: Task[]) => {
+    setEpicFilteredTasks(filteredTasks);
+  };
+
+  // Update epic filtered tasks when tasks change
+  useEffect(() => {
+    setEpicFilteredTasks(tasks);
+  }, [tasks]);
 
   // Smooth scroll to specific position
   const scrollToPosition = useCallback((pixelPosition: number, smooth: boolean = true) => {
@@ -321,6 +337,11 @@ export function GanttChart() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <EpicFilter 
+                currentRelease={currentRelease}
+                onFilterChange={handleEpicFilterChange}
+                tasks={tasks}
+              />
               <DeveloperFilter />
               <TaskTypeFilter />
               <ScrollControls scrollAreaRef={scrollAreaRef} className="bg-background/50 backdrop-blur-sm rounded-lg shadow-sm border p-2" />
@@ -442,7 +463,7 @@ export function GanttChart() {
             {/* Enhanced Task List with Modern Cards */}
             <div className="flex-1 overflow-y-auto">
               <div className="p-2 space-y-2">
-                {tasks.map((task) => {
+                {epicFilteredTasks.map((task) => {
                   const conflictCount = getDeveloperConflictCount(task.assignedDeveloperId);
                   
                   const handleTaskClick = () => {
@@ -817,7 +838,7 @@ export function GanttChart() {
                     ))}
                   </div>
 
-                  {tasks.map((task) => (
+                  {epicFilteredTasks.map((task) => (
                     <div key={task.id} className="border-b border-border/30 last:border-b-0">
                       <div 
                         className={`p-4 hover:bg-muted/30 relative transition-colors duration-200 ${

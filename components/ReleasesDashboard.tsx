@@ -6,7 +6,6 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { CreateReleaseDialog } from './CreateReleaseDialog';
-import { ThemeToggle } from './ThemeToggle';
 import { 
   Plus, 
   Users, 
@@ -20,7 +19,7 @@ import {
   Rocket,
   TrendingUp,
   Target,
-  ArrowLeft
+  Flag
 } from 'lucide-react';
 import { format, isPast } from 'date-fns';
 
@@ -61,31 +60,33 @@ function ReleaseCard({ release, onSelect, onEdit, onDuplicate, onDelete }: Relea
   };
 
   return (
-    <Card className="card-shadow hover:card-shadow-hover transition-all duration-200 cursor-pointer group border-0">
+    <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br from-white to-gray-50 hover:from-blue-50 hover:to-indigo-50">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3 flex-1">
             <div 
-              className="w-1 h-16 rounded-full flex-shrink-0"
+              className="w-1.5 h-16 rounded-full flex-shrink-0 shadow-sm"
               style={{ backgroundColor: release.color }}
             />
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-lg truncate">{release.name}</CardTitle>
-              <CardDescription className="text-sm mt-1 line-clamp-2">
+              <CardTitle className="text-xl font-bold truncate group-hover:text-blue-700 transition-colors">
+                {release.name}
+              </CardTitle>
+              <CardDescription className="text-sm mt-2 line-clamp-2 text-gray-600">
                 {release.description}
               </CardDescription>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${getPriorityColor(release.priority)}`} />
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full shadow-sm ${getPriorityColor(release.priority)}`} />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8">
+                <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100 transition-all duration-200 h-8 w-8 hover:bg-blue-100">
                   <MoreHorizontal className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" className="shadow-lg border-0">
                 <DropdownMenuItem onClick={() => onSelect(release)}>
                   <Eye className="w-4 h-4 mr-2" />
                   View Timeline
@@ -111,13 +112,13 @@ function ReleaseCard({ release, onSelect, onEdit, onDuplicate, onDelete }: Relea
           </div>
         </div>
 
-        <div className="flex items-center gap-2 mt-3">
+        <div className="flex items-center gap-3 mt-4">
           <Badge variant="secondary" className={getStatusColor(release.status)}>
             {release.status.replace('-', ' ').toUpperCase()}
           </Badge>
-          <Badge variant="outline">v{release.version}</Badge>
+          <Badge variant="outline" className="border-blue-200 text-blue-700">v{release.version}</Badge>
           {isOverdue && (
-            <Badge variant="destructive" className="text-xs">
+            <Badge variant="destructive" className="text-xs shadow-sm">
               <AlertTriangle className="w-3 h-3 mr-1" />
               Overdue
             </Badge>
@@ -125,40 +126,40 @@ function ReleaseCard({ release, onSelect, onEdit, onDuplicate, onDelete }: Relea
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4" onClick={() => onSelect(release)}>
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm">
-            <span>Progress</span>
-            <span>{progress}%</span>
+      <CardContent className="space-y-5" onClick={() => onSelect(release)}>
+        <div className="space-y-3">
+          <div className="flex justify-between text-sm font-medium">
+            <span className="text-gray-600">Progress</span>
+            <span className="text-blue-700 font-semibold">{progress}%</span>
           </div>
-          <Progress value={progress} className="h-2" />
+          <Progress value={progress} className="h-3 bg-gray-200" />
         </div>
 
         <div className="grid grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 p-2 bg-green-50 rounded-lg">
             <CheckCircle className="w-4 h-4 text-green-600" />
-            <span>{metrics.completedTasks}/{metrics.totalTasks} Tasks</span>
+            <span className="font-medium">{metrics.completedTasks}/{metrics.totalTasks} Tasks</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
             <Users className="w-4 h-4 text-blue-600" />
-            <span>{metrics.teamSize} Team</span>
+            <span className="font-medium">{metrics.teamSize} Team</span>
           </div>
           {metrics.overdueTasks > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 p-2 bg-red-50 rounded-lg">
               <AlertTriangle className="w-4 h-4 text-red-600" />
-              <span>{metrics.overdueTasks} Overdue</span>
+              <span className="font-medium">{metrics.overdueTasks} Overdue</span>
             </div>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 p-2 bg-purple-50 rounded-lg">
             <Target className="w-4 h-4 text-purple-600" />
-            <span>{metrics.daysRemaining} Days</span>
+            <span className="font-medium">{metrics.daysRemaining} Days</span>
           </div>
         </div>
 
-        <div className="pt-2 border-t">
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{format(release.startDate, 'MMM d')}</span>
-            <span>{format(release.targetDate, 'MMM d, yyyy')}</span>
+        <div className="pt-3 border-t border-gray-200">
+          <div className="flex justify-between text-sm font-medium">
+            <span className="text-gray-500">{format(release.startDate, 'MMM d')}</span>
+            <span className="text-gray-700">{format(release.targetDate, 'MMM d, yyyy')}</span>
           </div>
         </div>
       </CardContent>
@@ -205,82 +206,85 @@ export function ReleasesDashboard({ onBackToPriority }: { onBackToPriority?: () 
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex justify-between items-start">
-        <div>
-          <h1 className="mb-2">Release Management</h1>
-          <p className="text-muted-foreground">
-            Manage product releases with interactive timelines
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {onBackToPriority && (
-            <Button variant="outline" onClick={onBackToPriority}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Priority Dashboard
+      {/* Enhanced Header */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-lg p-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="mb-2 text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Release Dashboard
+            </h1>
+            <p className="text-muted-foreground text-lg">
+              Manage and track all your product releases in one place
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {onBackToPriority && (
+              <Button variant="outline" onClick={onBackToPriority} className="border-orange-200 text-orange-700 hover:bg-orange-50">
+                <Flag className="w-4 h-4 mr-2" />
+                Priority Dashboard
+              </Button>
+            )}
+            <Button onClick={() => setShowCreateDialog(true)} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+              <Plus className="w-4 h-4 mr-2" />
+              New Release
             </Button>
-          )}
-          <ThemeToggle />
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Release
-          </Button>
+          </div>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="card-shadow border-0">
+      {/* Enhanced Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100 hover:shadow-xl transition-all duration-200">
           <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <Rocket className="w-5 h-5 text-blue-600" />
-              </div>
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Releases</p>
-                <p className="text-2xl font-semibold">{stats.totalReleases}</p>
+                <p className="text-sm font-medium text-blue-700 mb-1">Total Releases</p>
+                <p className="text-3xl font-bold text-blue-900">{stats.totalReleases}</p>
+              </div>
+              <div className="p-3 bg-blue-500 rounded-full">
+                <Rocket className="w-6 h-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-shadow border-0">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-amber-50 to-amber-100 hover:shadow-xl transition-all duration-200">
           <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-amber-50 rounded-lg">
-                <TrendingUp className="w-5 h-5 text-yellow-600" />
-              </div>
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Active</p>
-                <p className="text-2xl font-semibold">{stats.activeReleases}</p>
+                <p className="text-sm font-medium text-amber-700 mb-1">Active Releases</p>
+                <p className="text-3xl font-bold text-amber-900">{stats.activeReleases}</p>
+              </div>
+              <div className="p-3 bg-amber-500 rounded-full">
+                <TrendingUp className="w-6 h-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-shadow border-0">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100 hover:shadow-xl transition-all duration-200">
           <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-50 rounded-lg">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              </div>
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Completed</p>
-                <p className="text-2xl font-semibold">{stats.completedReleases}</p>
+                <p className="text-sm font-medium text-green-700 mb-1">Completed</p>
+                <p className="text-3xl font-bold text-green-900">{stats.completedReleases}</p>
+              </div>
+              <div className="p-3 bg-green-500 rounded-full">
+                <CheckCircle className="w-6 h-6 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="card-shadow border-0">
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-red-50 to-red-100 hover:shadow-xl transition-all duration-200">
           <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-50 rounded-lg">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
-              </div>
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Overdue</p>
-                <p className="text-2xl font-semibold">{stats.overdueReleases}</p>
+                <p className="text-sm font-medium text-red-700 mb-1">Overdue</p>
+                <p className="text-3xl font-bold text-red-900">{stats.overdueReleases}</p>
+              </div>
+              <div className="p-3 bg-red-500 rounded-full">
+                <AlertTriangle className="w-6 h-6 text-white" />
               </div>
             </div>
           </CardContent>
@@ -302,20 +306,24 @@ export function ReleasesDashboard({ onBackToPriority }: { onBackToPriority?: () 
           ))}
         </div>
       ) : (
-        <Card className="card-shadow border-0">
-          <CardContent className="p-12">
-            <div className="text-center space-y-4">
-              <div className="p-4 bg-muted rounded-full w-fit mx-auto">
-                <Rocket className="w-12 h-12 text-muted-foreground" />
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-gray-50 to-gray-100">
+          <CardContent className="p-16">
+            <div className="text-center space-y-6">
+              <div className="p-6 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full w-fit mx-auto">
+                <Rocket className="w-16 h-16 text-blue-600" />
               </div>
               <div>
-                <h3 className="text-lg mb-2">No releases yet</h3>
-                <p className="text-muted-foreground mb-6">
-                  Create your first release to get started
+                <h3 className="text-2xl font-bold text-gray-800 mb-3">Ready to Launch?</h3>
+                <p className="text-gray-600 text-lg mb-8 max-w-md mx-auto">
+                  Create your first release and start managing your project timeline with ease
                 </p>
-                <Button onClick={() => setShowCreateDialog(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Release
+                <Button 
+                  onClick={() => setShowCreateDialog(true)}
+                  size="lg"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3"
+                >
+                  <Plus className="w-5 h-5 mr-2" />
+                  Create Your First Release
                 </Button>
               </div>
             </div>
