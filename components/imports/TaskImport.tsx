@@ -10,9 +10,7 @@ import {
   Download, 
   FileText, 
   CheckCircle2, 
-  AlertTriangle, 
   Info,
-  Calendar,
   User,
   Target
 } from 'lucide-react';
@@ -30,7 +28,7 @@ interface ImportResult {
   errors: Array<{ row: number; message: string; data: any }>;
 }
 
-export function TaskImport({ releaseId, onImportComplete }: TaskImportProps) {
+export function TaskImport({ onImportComplete }: TaskImportProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [csvContent, setCsvContent] = useState('');
@@ -201,7 +199,7 @@ export function TaskImport({ releaseId, onImportComplete }: TaskImportProps) {
     return developers.find(dev => dev.email.toLowerCase() === email.toLowerCase());
   };
 
-  const validateAndParseTask = (row: string[], headers: string[], rowIndex: number): Task | { error: string } => {
+  const validateAndParseTask = (row: string[], headers: string[]): Task | { error: string } => {
     try {
       const data: any = {};
       headers.forEach((header, index) => {
@@ -295,7 +293,7 @@ export function TaskImport({ releaseId, onImportComplete }: TaskImportProps) {
         continue; // Skip empty rows
       }
 
-      const parseResult = validateAndParseTask(row, headers, rowNumber);
+      const parseResult = validateAndParseTask(row, headers);
       
       if ('error' in parseResult) {
         result.errors.push({

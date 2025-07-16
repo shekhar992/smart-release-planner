@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -7,7 +6,6 @@ import {
   Download, 
   Calendar, 
   Info,
-  User,
   Clock
 } from 'lucide-react';
 
@@ -16,7 +14,7 @@ interface LeaveImportProps {
   onImportComplete?: (success: number, errors: number) => void;
 }
 
-export function LeaveImport({ releaseId, onImportComplete }: LeaveImportProps) {
+export function LeaveImport({}: LeaveImportProps) {
   const getLeaveTemplate = () => {
     const headers = [
       'developerEmail',

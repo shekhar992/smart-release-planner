@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
@@ -7,7 +6,6 @@ import {
   Download, 
   FileText, 
   Info,
-  Target,
   Layers
 } from 'lucide-react';
 
@@ -16,7 +14,7 @@ interface EpicImportProps {
   onImportComplete?: (success: number, errors: number) => void;
 }
 
-export function EpicImport({ releaseId, onImportComplete }: EpicImportProps) {
+export function EpicImport({}: EpicImportProps) {
   const getEpicTemplate = () => {
     const headers = [
       'title',

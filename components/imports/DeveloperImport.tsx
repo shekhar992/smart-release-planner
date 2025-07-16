@@ -10,7 +10,6 @@ import {
   Download, 
   Users, 
   CheckCircle2, 
-  AlertTriangle, 
   Info,
   User,
   Mail,
@@ -30,7 +29,7 @@ interface ImportResult {
   errors: Array<{ row: number; message: string; data: any }>;
 }
 
-export function DeveloperImport({ releaseId, onImportComplete }: DeveloperImportProps) {
+export function DeveloperImport({ onImportComplete }: DeveloperImportProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [csvContent, setCsvContent] = useState('');
@@ -173,7 +172,7 @@ export function DeveloperImport({ releaseId, onImportComplete }: DeveloperImport
     );
   };
 
-  const validateAndParseDeveloper = (row: string[], headers: string[], rowIndex: number): Developer | { error: string } => {
+  const validateAndParseDeveloper = (row: string[], headers: string[]): Developer | { error: string } => {
     try {
       const data: any = {};
       headers.forEach((header, index) => {
@@ -308,7 +307,7 @@ export function DeveloperImport({ releaseId, onImportComplete }: DeveloperImport
         continue; // Skip empty rows
       }
 
-      const parseResult = validateAndParseDeveloper(row, headers, rowNumber);
+      const parseResult = validateAndParseDeveloper(row, headers);
       
       if ('error' in parseResult) {
         result.errors.push({

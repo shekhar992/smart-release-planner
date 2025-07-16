@@ -10,7 +10,6 @@ import {
   Download, 
   Target, 
   CheckCircle2, 
-  AlertTriangle, 
   Info,
   Calendar,
   Package
@@ -131,7 +130,7 @@ export function ReleaseImport({ onImportComplete }: ReleaseImportProps) {
     return result;
   };
 
-  const validateAndParseRelease = (row: string[], headers: string[], rowIndex: number) => {
+  const validateAndParseRelease = (row: string[], headers: string[]) => {
     try {
       const data: any = {};
       headers.forEach((header, index) => {
@@ -210,7 +209,7 @@ export function ReleaseImport({ onImportComplete }: ReleaseImportProps) {
         continue;
       }
 
-      const parseResult = validateAndParseRelease(row, headers, rowNumber);
+      const parseResult = validateAndParseRelease(row, headers);
       
       if ('error' in parseResult) {
         result.errors.push({
