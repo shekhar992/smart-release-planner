@@ -178,7 +178,9 @@ export function ReleaseImport({ onImportComplete }: ReleaseImportProps) {
         targetDate,
         status: status as Release['status'],
         priority: priority as Release['priority'],
-        color: data.color?.trim() || '#3b82f6'
+  color: data.color?.trim() || '#3b82f6',
+  // Default imports to project releases unless specified elsewhere
+  releaseType: 'project' as Release['releaseType']
       };
 
       return release;

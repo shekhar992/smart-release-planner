@@ -86,12 +86,16 @@ export function NewTaskForm({ open, onOpenChange }: NewTaskFormProps) {
 
   // Set default status and priority when they become available
   React.useEffect(() => {
+    console.log('NewTaskForm: useEffect triggered - open:', open, 'activeStatuses:', activeStatuses.length, 'activePriorities:', activePriorities.length);
+    
     if (activeStatuses.length > 0 && !formData.status) {
       const defaultStatus = activeStatuses.find(s => s.isDefault) || activeStatuses[0];
+      console.log('NewTaskForm: Setting default status:', defaultStatus?.name);
       setFormData(prev => ({ ...prev, status: defaultStatus.name }));
     }
     if (activePriorities.length > 0 && !formData.priority) {
       const defaultPriority = activePriorities.find(p => p.isDefault) || activePriorities[1]; // Medium priority
+      console.log('NewTaskForm: Setting default priority:', defaultPriority?.name);
       setFormData(prev => ({ ...prev, priority: defaultPriority.name }));
     }
   }, [activeStatuses, activePriorities, formData.status, formData.priority]);
@@ -149,10 +153,18 @@ export function NewTaskForm({ open, onOpenChange }: NewTaskFormProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('NewTaskForm: Form submission started');
+    console.log('NewTaskForm: Form data:', formData);
+    console.log('NewTaskForm: Available developers:', developers.length);
+    console.log('NewTaskForm: Active statuses:', activeStatuses.length);
+    console.log('NewTaskForm: Active priorities:', activePriorities.length);
+    
     if (!validateForm()) {
+      console.log('NewTaskForm: Validation failed');
       return;
     }
 
+    console.log('NewTaskForm: Validation passed, submitting...');
     setIsSubmitting(true);
     
     try {
@@ -174,7 +186,9 @@ export function NewTaskForm({ open, onOpenChange }: NewTaskFormProps) {
         epicId: formData.epicId || undefined
       };
 
+      console.log('NewTaskForm: About to call addTask with:', newTask);
       await addTask(newTask);
+      console.log('NewTaskForm: addTask completed successfully');
       
       // Reset form
       setFormData({
@@ -193,8 +207,9 @@ export function NewTaskForm({ open, onOpenChange }: NewTaskFormProps) {
       });
       
       onOpenChange(false);
+      console.log('NewTaskForm: Form closed successfully');
     } catch (error) {
-      console.error('Error creating task:', error);
+      console.error('NewTaskForm: Error creating task:', error);
       setErrors({ submit: 'Failed to create task. Please try again.' });
     } finally {
       setIsSubmitting(false);
@@ -229,6 +244,15 @@ export function NewTaskForm({ open, onOpenChange }: NewTaskFormProps) {
             Create New Task
           </DialogTitle>
         </DialogHeader>
+
+        {/* Debug info */}
+        {open && (
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-2 text-xs">
+            <strong>Debug Info:</strong> Form opened | Developers: {developers.length} | 
+            Statuses: {activeStatuses.length} | Priorities: {activePriorities.length} | 
+            Epics: {availableEpics.length}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Task Type Selection */}

@@ -10,6 +10,9 @@ export interface Developer {
   workingCalendar?: WorkingCalendar;
 }
 
+// Export project types
+export * from './project';
+
 export interface Task {
   id: string;
   title: string;

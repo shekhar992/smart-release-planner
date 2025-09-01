@@ -17,6 +17,8 @@ export interface Release {
   team: Developer[];
   tasks: Task[];
   color: string; // For visual distinction
+  releaseType: 'project' | 'poc'; // NEW: Distinguish between project releases and POC releases
+  projectId?: string; // Optional project association for project releases
 }
 
 interface ReleaseContextType {
@@ -27,6 +29,11 @@ interface ReleaseContextType {
   updateRelease: (id: string, updates: Partial<Release>) => Promise<void>;
   deleteRelease: (id: string) => Promise<void>;
   duplicateRelease: (id: string, newName: string) => Promise<Release>;
+  
+  // Release filtering
+  getPocReleases: () => Release[];
+  getProjectReleases: () => Release[];
+  getReleasesByProject: (projectId: string) => Release[];
   
   // Current release management
   addTaskToCurrentRelease: (task: Omit<Task, 'id'>) => Promise<void>;
@@ -288,6 +295,19 @@ export function ReleaseProvider({ children }: { children: ReactNode }) {
     };
   };
 
+  // Release filtering methods
+  const getPocReleases = () => {
+    return releases.filter(release => release.releaseType === 'poc');
+  };
+
+  const getProjectReleases = () => {
+    return releases.filter(release => release.releaseType === 'project');
+  };
+
+  const getReleasesByProject = (projectId: string) => {
+    return releases.filter(release => release.projectId === projectId);
+  };
+
   return (
     <ReleaseContext.Provider value={{
       releases,
@@ -297,6 +317,9 @@ export function ReleaseProvider({ children }: { children: ReactNode }) {
       updateRelease,
       deleteRelease,
       duplicateRelease,
+      getPocReleases,
+      getProjectReleases,
+      getReleasesByProject,
       addTaskToCurrentRelease,
       updateTaskInCurrentRelease,
       deleteTaskFromCurrentRelease,

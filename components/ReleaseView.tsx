@@ -20,7 +20,6 @@ import {
   Plus,
   Calendar, 
   Users, 
-  ArrowLeft,
   Settings,
   CheckCircle,
   AlertTriangle,
@@ -33,11 +32,12 @@ import {
 import { format } from 'date-fns';
 
 export function ReleaseView() {
-  const { currentRelease, setCurrentRelease, calculateReleaseProgress, getReleaseMetrics } = useReleases();
+  const { currentRelease, calculateReleaseProgress, getReleaseMetrics } = useReleases();
+  
   const [showTaskForm, setShowTaskForm] = useState(false);
   const [showReleaseSettings, setShowReleaseSettings] = useState(false);
 
-  console.log('ReleaseView: Current release:', currentRelease);
+  console.log('ReleaseView: Current release:', currentRelease?.name);
   console.log('ReleaseView: Team size:', currentRelease?.team?.length || 0);
 
   if (!currentRelease) {
@@ -72,15 +72,6 @@ export function ReleaseView() {
           <div className="container mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setCurrentRelease(null)}
-                  className="flex items-center gap-2 hover:bg-primary/10"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </Button>
                 <div 
                   className="w-1 h-12 rounded-full flex-shrink-0"
                   style={{ backgroundColor: currentRelease.color }}
@@ -231,11 +222,25 @@ export function ReleaseView() {
                   <div className="flex items-center gap-2">
                     <Button 
                       onClick={() => setShowTaskForm(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+                      disabled={!currentRelease?.team || currentRelease.team.length === 0}
+                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={!currentRelease?.team || currentRelease.team.length === 0 ? "Add team members first before creating tasks" : "Create a new task"}
                     >
                       <Plus className="w-4 h-4 mr-2" />
                       Add Task
                     </Button>
+                    
+                    {(!currentRelease?.team || currentRelease.team.length === 0) && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-md p-3 text-sm text-amber-800 max-w-md">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <strong>No team members!</strong>
+                            <p className="text-xs mt-1">Add developers in the <strong>Team</strong> tab before creating tasks.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
