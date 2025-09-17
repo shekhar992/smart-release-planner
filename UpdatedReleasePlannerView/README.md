@@ -1,12 +1,12 @@
-# New Product
+# Updated Release Planner View
 
-This is a clean React + TypeScript + Vite project setup for your new product.
+This is a clean React + TypeScript + Vite project setup for your release planner application.
 
 ## Getting Started
 
 1. Install dependencies:
 ```bash
-cd NewProduct
+cd UpdatedReleasePlannerView
 npm install
 ```
 
@@ -20,7 +20,7 @@ npm run dev
 ## Project Structure
 
 ```
-NewProduct/
+UpdatedReleasePlannerView/
 ├── public/
 │   └── vite.svg
 ├── src/
@@ -54,4 +54,4 @@ You can now:
 4. Define types in `src/types/`
 5. Create custom hooks in `src/hooks/`
 
-This setup is completely independent of the timeline project and ready for your new product development.
+This setup is completely independent of the timeline project and ready for your release planner development.
