@@ -14,6 +14,7 @@ import { ImportManager } from './ImportManager';
 import { ModernCard, StatusBadge, ModernProgress } from './ui/enhanced-design-system';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
+import { Card, CardContent } from './ui/card';
 import { 
   Plus,
   Calendar, 
@@ -373,16 +374,15 @@ export function ReleaseView() {
             {/* Dialogs */}
             {showTaskForm && (
               <NewTaskForm 
-                open={showTaskForm}
-                onOpenChange={setShowTaskForm}
+                onClose={() => setShowTaskForm(false)}
+                releaseId={currentRelease.id}
               />
             )}
 
             {showReleaseSettings && (
               <CreateReleaseDialog 
                 open={showReleaseSettings}
-                onClose={() => setShowReleaseSettings(false)}
-                editingRelease={currentRelease}
+                onOpenChange={setShowReleaseSettings}
               />
             )}
           </div>
