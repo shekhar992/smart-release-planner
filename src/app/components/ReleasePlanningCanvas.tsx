@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Users, ArrowLeft, Calendar } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
-import { HierarchyPanel } from './HierarchyPanel';
 import { TimelinePanel } from './TimelinePanel';
 import { WorkloadModal } from './WorkloadModal';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
-import { mockProducts, Ticket, Feature, Sprint } from '../data/mockData';
+import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers } from '../data/mockData';
+import { detectConflicts, getConflictSummary } from '../lib/conflictDetection';
+import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
 
 export function ReleasePlanningCanvas() {
   const { releaseId } = useParams();
@@ -34,7 +35,30 @@ export function ReleasePlanningCanvas() {
   const [release, setRelease] = useState(releaseData.releases.find(release => release.id === releaseId) || releaseData.releases[0]);
   const [showWorkloadModal, setShowWorkloadModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<{ featureId: string; ticketId: string } | null>(null);
-  const [hoveredTicket, setHoveredTicket] = useState<{ featureId: string; ticketId: string } | null>(null);
+
+  // Detect conflicts whenever release data changes
+  const allTickets = useMemo(() => {
+    return release.features.flatMap(feature => feature.tickets);
+  }, [release]);
+
+  const conflicts = useMemo(() => {
+    return detectConflicts(allTickets);
+  }, [allTickets]);
+
+  const conflictSummary = useMemo(() => {
+    return getConflictSummary(conflicts, allTickets);
+  }, [conflicts, allTickets]);
+
+  // Calculate sprint capacities
+  const sprintCapacities = useMemo(() => {
+    return calculateAllSprintCapacities(
+      release.sprints || [],
+      allTickets,
+      mockTeamMembers,
+      mockHolidays,
+      1 // velocity: 1 story point = 1 day
+    );
+  }, [release.sprints, allTickets]);
 
   const handleUpdateTicket = (featureId: string, ticketId: string, updates: Partial<Ticket>) => {
     setRelease(prev => ({
@@ -217,45 +241,9 @@ export function ReleasePlanningCanvas() {
 
       {/* Main Canvas */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left Hierarchy Panel - compact and scannable */}
-        <div className="w-56 flex-shrink-0 bg-[#ECEEF2] border-r border-gray-300 overflow-y-auto shadow-sm">
-          <div className="p-3">
-            <HierarchyPanel
-              release={release}
-              onUpdateReleaseName={(name) => {
-                setRelease((prev) => ({ ...prev, name }));
-              }}
-              onUpdateFeatureName={(featureId, name) => {
-                setRelease((prev) => ({
-                  ...prev,
-                  features: prev.features.map((f) =>
-                    f.id === featureId ? { ...f, name } : f
-                  ),
-                }));
-              }}
-              onUpdateTicket={handleUpdateTicket}
-              onAddFeature={handleAddFeature}
-              onAddTicket={handleAddTicket}
-              onBulkAddTickets={handleBulkAddTickets}
-              selectedTicket={selectedTicket}
-              onSelectTicket={handleSelectTicket}
-              hoveredTicket={hoveredTicket}
-              onHoverTicket={(featureId, ticketId) => {
-                if (featureId && ticketId) {
-                  setHoveredTicket({ featureId, ticketId });
-                } else {
-                  setHoveredTicket(null);
-                }
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Timeline Panel - lighter neutral */}
-        <div className="flex-1 bg-[#FAFBFC] overflow-hidden">
-          <div className="p-4 h-full">
-            <div className="bg-white rounded-lg shadow-sm h-full overflow-hidden border border-gray-200">
-              <TimelinePanel
+        {/* Timeline Panel - Full Width */}
+        <div className="flex-1 bg-white overflow-hidden">
+          <TimelinePanel
                 release={release}
                 onMoveTicket={handleMoveTicket}
                 onResizeTicket={handleResizeTicket}
@@ -263,9 +251,10 @@ export function ReleasePlanningCanvas() {
                   setSelectedTicket({ featureId, ticketId });
                 }}
                 onCreateSprint={handleCreateSprint}
+                conflicts={conflicts}
+                conflictSummary={conflictSummary}
+                sprintCapacities={sprintCapacities}
               />
-            </div>
-          </div>
         </div>
       </div>
 

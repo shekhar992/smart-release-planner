@@ -32,7 +32,7 @@ export function PlanningDashboard() {
   };
 
   const handleCreateRelease = (productId: string, name: string, startDate: Date, endDate: Date) => {
-    console.log('Create release:', { productId, name, startDate, endDate });
+    // Create release logic will be implemented
   };
 
   // Calculate planning metrics

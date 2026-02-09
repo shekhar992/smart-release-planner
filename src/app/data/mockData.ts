@@ -1,3 +1,35 @@
+export interface Ticket {
+  id: string;
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  status: 'in-progress' | 'planned' | 'completed';
+  storyPoints: number;
+  assignedTo: string;
+}
+
+export interface Feature {
+  id: string;
+  name: string;
+  tickets: Ticket[];
+}
+
+export interface Sprint {
+  id: string;
+  name: string;
+  startDate: Date;
+  endDate: Date;
+}
+
+export interface Release {
+  id: string;
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  features: Feature[];
+  sprints?: Sprint[];
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -67,6 +99,16 @@ export const mockProducts: Product[] = [
                 endDate: new Date('2026-02-20'),
                 status: 'planned',
                 storyPoints: 5,
+                assignedTo: 'Marcus Rivera'
+              },
+              // CONFLICT: Marcus has overlapping task
+              {
+                id: 't3a',
+                title: 'API Rate Limiting',
+                startDate: new Date('2026-02-10'),
+                endDate: new Date('2026-02-14'),
+                status: 'planned',
+                storyPoints: 3,
                 assignedTo: 'Marcus Rivera'
               },
               // Sprint 2
@@ -150,6 +192,16 @@ export const mockProducts: Product[] = [
                 status: 'in-progress',
                 storyPoints: 8,
                 assignedTo: 'Jin Park'
+              },
+              // CONFLICT: Elena has overlapping task with t2
+              {
+                id: 't11a',
+                title: 'Mobile UI Design Review',
+                startDate: new Date('2026-02-12'),
+                endDate: new Date('2026-02-18'),
+                status: 'planned',
+                storyPoints: 5,
+                assignedTo: 'Elena Zhang'
               },
               {
                 id: 't12',
