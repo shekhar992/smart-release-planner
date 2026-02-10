@@ -2,19 +2,32 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Calendar, Trash2, Edit2, X } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { mockTeamMembers, TeamMember, PTOEntry } from '../data/mockData';
-import { loadTeamMembers } from '../lib/localStorage';
+import { loadTeamMembers, saveTeamMembers } from '../lib/localStorage';
 
 export function TeamMemberDetail() {
-  const { memberId } = useParams();
+  const { memberId, productId } = useParams();
   const navigate = useNavigate();
   const [member, setMember] = useState<TeamMember | null>(null);
+  const [allMembers, setAllMembers] = useState<TeamMember[]>([]);
+  const [showAddPTO, setShowAddPTO] = useState(false);
+  const [isEditingInfo, setIsEditingInfo] = useState(false);
   
   // Load team member from localStorage on mount
   useEffect(() => {
     const storedTeamMembers = loadTeamMembers() || mockTeamMembers;
+    setAllMembers(storedTeamMembers);
     const memberData = storedTeamMembers.find(m => m.id === memberId);
     setMember(memberData || null);
   }, [memberId]);
+
+  // Persist changes to localStorage whenever member is updated
+  const persistMember = (updatedMember: TeamMember) => {
+    const updatedAll = allMembers.map(m => m.id === updatedMember.id ? updatedMember : m);
+    setAllMembers(updatedAll);
+    saveTeamMembers(updatedAll);
+  };
+
+  const backPath = productId ? `/product/${productId}/team` : '/team';
   
   if (member === null) {
     return (
@@ -32,7 +45,7 @@ export function TeamMemberDetail() {
         <div className="text-center">
           <h2 className="text-lg font-medium text-gray-900">Team member not found</h2>
           <button
-            onClick={() => navigate('/team')}
+            onClick={() => navigate(backPath)}
             className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
           >
             Back to Team Roster
@@ -41,9 +54,6 @@ export function TeamMemberDetail() {
       </div>
     );
   }
-  const [showAddPTO, setShowAddPTO] = useState(false);
-  const [isEditingInfo, setIsEditingInfo] = useState(false);
-
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'Developer': return 'bg-blue-100 text-blue-700';
@@ -54,21 +64,27 @@ export function TeamMemberDetail() {
   };
 
   const addPTO = (pto: PTOEntry) => {
-    setMember(prev => ({
-      ...prev,
-      pto: [...prev.pto, pto].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
-    }));
+    const updated = {
+      ...member,
+      pto: [...member.pto, pto].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+    } as TeamMember;
+    setMember(updated);
+    persistMember(updated);
   };
 
   const deletePTO = (ptoId: string) => {
-    setMember(prev => ({
-      ...prev,
-      pto: prev.pto.filter(p => p.id !== ptoId)
-    }));
+    const updated = {
+      ...member,
+      pto: member.pto.filter(p => p.id !== ptoId)
+    } as TeamMember;
+    setMember(updated);
+    persistMember(updated);
   };
 
   const updateMemberInfo = (updates: Partial<TeamMember>) => {
-    setMember(prev => ({ ...prev, ...updates }));
+    const updated = { ...member, ...updates } as TeamMember;
+    setMember(updated);
+    persistMember(updated);
   };
 
   return (
@@ -77,7 +93,7 @@ export function TeamMemberDetail() {
       <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/team')}
+            onClick={() => navigate(backPath)}
             className="p-1.5 hover:bg-gray-100 rounded transition-colors"
             title="Back to Team Roster"
           >

@@ -1,20 +1,45 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Plus, User, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router';
-import { mockTeamMembers, TeamMember } from '../data/mockData';
-import { loadTeamMembers } from '../lib/localStorage';
+import { useNavigate, useParams } from 'react-router';
+import { mockTeamMembers, TeamMember, mockProducts } from '../data/mockData';
+import { loadTeamMembers, loadProducts, saveTeamMembers } from '../lib/localStorage';
 
 export function TeamRoster() {
   const navigate = useNavigate();
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const { productId, releaseId } = useParams();
+  const [allTeamMembers, setAllTeamMembers] = useState<TeamMember[]>([]);
   
+  // Resolve productId from releaseId if needed (when navigating from release canvas)
+  const resolvedProductId = useMemo(() => {
+    if (productId) return productId;
+    if (releaseId) {
+      const products = loadProducts() || mockProducts;
+      const product = products.find(p => p.releases.some(r => r.id === releaseId));
+      return product?.id || null;
+    }
+    return null;
+  }, [productId, releaseId]);
+
+  // Get the product name for the header
+  const productName = useMemo(() => {
+    if (!resolvedProductId) return null;
+    const products = loadProducts() || mockProducts;
+    return products.find(p => p.id === resolvedProductId)?.name || null;
+  }, [resolvedProductId]);
+
   // Load team members from localStorage on mount
   useEffect(() => {
-    const storedTeamMembers = loadTeamMembers();
-    setTeamMembers(storedTeamMembers || mockTeamMembers);
+    const storedTeamMembers = loadTeamMembers() || mockTeamMembers;
+    setAllTeamMembers(storedTeamMembers);
   }, []);
+
+  // Filter team members by product
+  const teamMembers = useMemo(() => {
+    if (!resolvedProductId) return allTeamMembers;
+    return allTeamMembers.filter(m => m.productId === resolvedProductId);
+  }, [allTeamMembers, resolvedProductId]);
+
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
   const getRoleColor = (role: string) => {
     switch (role) {
@@ -32,24 +57,32 @@ export function TeamRoster() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate(releaseId ? `/release/${releaseId}` : '/')}
               className="p-1.5 hover:bg-gray-100 rounded transition-colors"
-              title="Back to Dashboard"
+              title="Back"
             >
               <ArrowLeft className="w-4 h-4 text-gray-600" />
             </button>
             <div>
               <h1 className="text-lg font-medium text-gray-900">Team Roster</h1>
-              <p className="text-sm text-gray-500">{teamMembers.length} team members</p>
+              <p className="text-sm text-gray-500">
+                {productName ? (
+                  <>{productName} &middot; {teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''}</>
+                ) : (
+                  <>{teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''}</>
+                )}
+              </p>
             </div>
           </div>
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
-          >
-            <Plus className="w-4 h-4" />
-            Add Team Member
-          </button>
+          {resolvedProductId && (
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
+            >
+              <Plus className="w-4 h-4" />
+              Add Team Member
+            </button>
+          )}
         </div>
       </div>
 
@@ -61,7 +94,12 @@ export function TeamRoster() {
             {teamMembers.map(member => (
               <div
                 key={member.id}
-                onClick={() => navigate(`/team/${member.id}`)}
+                onClick={() => {
+                  const basePath = resolvedProductId
+                    ? `/product/${resolvedProductId}/team/${member.id}`
+                    : `/team/${member.id}`;
+                  navigate(basePath);
+                }}
                 className="bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
               >
                 <div className="flex items-start gap-3">
@@ -94,25 +132,34 @@ export function TeamRoster() {
             <div className="text-center py-12">
               <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-sm font-medium text-gray-900 mb-1">No team members yet</h3>
-              <p className="text-sm text-gray-500 mb-4">Add your first team member to get started.</p>
-              <button
-                onClick={() => setShowAddForm(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                Add Team Member
-              </button>
+              <p className="text-sm text-gray-500 mb-4">
+                {resolvedProductId 
+                  ? 'Add your first team member to get started.'
+                  : 'Select a product to manage its team roster.'}
+              </p>
+              {resolvedProductId && (
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Team Member
+                </button>
+              )}
             </div>
           )}
         </div>
       </div>
 
       {/* Add/Edit Form Modal */}
-      {showAddForm && (
+      {showAddForm && resolvedProductId && (
         <AddTeamMemberModal
+          productId={resolvedProductId}
           onClose={() => setShowAddForm(false)}
           onAdd={(member) => {
-            setTeamMembers(prev => [...prev, member]);
+            const updatedAll = [...allTeamMembers, member];
+            setAllTeamMembers(updatedAll);
+            saveTeamMembers(updatedAll);
             setShowAddForm(false);
           }}
         />
@@ -122,11 +169,12 @@ export function TeamRoster() {
 }
 
 interface AddTeamMemberModalProps {
+  productId: string;
   onClose: () => void;
   onAdd: (member: TeamMember) => void;
 }
 
-function AddTeamMemberModal({ onClose, onAdd }: AddTeamMemberModalProps) {
+function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalProps) {
   const [name, setName] = useState('');
   const [role, setRole] = useState<'Developer' | 'Designer' | 'QA'>('Developer');
   const [notes, setNotes] = useState('');
@@ -140,7 +188,8 @@ function AddTeamMemberModal({ onClose, onAdd }: AddTeamMemberModalProps) {
       name: name.trim(),
       role,
       notes: notes.trim() || undefined,
-      pto: []
+      pto: [],
+      productId
     };
 
     onAdd(newMember);

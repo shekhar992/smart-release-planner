@@ -50,6 +50,7 @@ export interface TeamMember {
   role: 'Developer' | 'Designer' | 'QA';
   notes?: string;
   pto: PTOEntry[];
+  productId: string;
 }
 
 export interface Holiday {
@@ -914,14 +915,20 @@ export function findReleaseById(releaseId: string): { product: Product; release:
 }
 
 // ===========================================
-// TEAM MEMBERS (12 total)
+// TEAM MEMBERS (12 total, scoped to products)
+// Product 1 (Enterprise SaaS): tm1-tm7, tm9 (8 members)
+// Product 2 (Mobile Banking): tm1, tm8-tm12 (6 members) 
+// Product 3 (Data Analytics): tm3, tm5-tm7, tm10-tm12 (7 members)
+// Some members work across multiple products
 // ===========================================
 export const mockTeamMembers: TeamMember[] = [
+  // --- Product 1: Enterprise SaaS Platform ---
   {
     id: 'tm1',
     name: 'Sarah Chen',
     role: 'Developer',
     notes: 'Senior Full-Stack Engineer, Mobile Expert',
+    productId: 'p1',
     pto: [
       {
         id: 'pto1',
@@ -936,6 +943,7 @@ export const mockTeamMembers: TeamMember[] = [
     name: 'Marcus Rivera',
     role: 'Developer',
     notes: 'Backend Specialist, Security Focus',
+    productId: 'p1',
     pto: [
       {
         id: 'pto2',
@@ -950,6 +958,7 @@ export const mockTeamMembers: TeamMember[] = [
     name: 'Elena Zhang',
     role: 'Developer',
     notes: 'Frontend Lead, UI/UX Integration',
+    productId: 'p1',
     pto: []
   },
   {
@@ -957,6 +966,7 @@ export const mockTeamMembers: TeamMember[] = [
     name: 'James Wilson',
     role: 'Developer',
     notes: 'DevOps & Infrastructure Lead',
+    productId: 'p1',
     pto: [
       {
         id: 'pto3',
@@ -971,6 +981,7 @@ export const mockTeamMembers: TeamMember[] = [
     name: 'Priya Patel',
     role: 'Developer',
     notes: 'Data Engineering & Analytics',
+    productId: 'p1',
     pto: [
       {
         id: 'pto4',
@@ -985,6 +996,7 @@ export const mockTeamMembers: TeamMember[] = [
     name: 'Alex Thompson',
     role: 'Developer',
     notes: 'API & Microservices Architecture',
+    productId: 'p1',
     pto: []
   },
   {
@@ -992,13 +1004,46 @@ export const mockTeamMembers: TeamMember[] = [
     name: 'Yuki Tanaka',
     role: 'Developer',
     notes: 'Full-Stack, Integration Specialist',
+    productId: 'p1',
     pto: []
+  },
+  {
+    id: 'tm9',
+    name: 'Sofia Martinez',
+    role: 'Designer',
+    notes: 'Senior Product Designer, Design Systems',
+    productId: 'p1',
+    pto: [
+      {
+        id: 'pto6',
+        name: 'Design Workshop',
+        startDate: new Date('2026-04-14'),
+        endDate: new Date('2026-04-16')
+      }
+    ]
+  },
+  // --- Product 2: Mobile Banking App ---
+  {
+    id: 'tm1-p2',
+    name: 'Sarah Chen',
+    role: 'Developer',
+    notes: 'Senior Full-Stack Engineer, Mobile Expert',
+    productId: 'p2',
+    pto: [
+      {
+        id: 'pto1-p2',
+        name: 'Spring Break',
+        startDate: new Date('2026-03-24'),
+        endDate: new Date('2026-03-31')
+      }
+    ]
   },
   {
     id: 'tm8',
     name: 'Maria Garcia',
     role: 'Developer',
     notes: 'Mobile Development Lead (iOS & Android)',
+    productId: 'p2',
     pto: [
       {
         id: 'pto5',
@@ -1009,13 +1054,14 @@ export const mockTeamMembers: TeamMember[] = [
     ]
   },
   {
-    id: 'tm9',
+    id: 'tm9-p2',
     name: 'Sofia Martinez',
     role: 'Designer',
     notes: 'Senior Product Designer, Design Systems',
+    productId: 'p2',
     pto: [
       {
-        id: 'pto6',
+        id: 'pto6-p2',
         name: 'Design Workshop',
         startDate: new Date('2026-04-14'),
         endDate: new Date('2026-04-16')
@@ -1027,6 +1073,7 @@ export const mockTeamMembers: TeamMember[] = [
     name: 'David Kim',
     role: 'Designer',
     notes: 'UX Researcher & Interaction Designer',
+    productId: 'p2',
     pto: []
   },
   {
@@ -1034,6 +1081,7 @@ export const mockTeamMembers: TeamMember[] = [
     name: 'Lisa Park',
     role: 'QA',
     notes: 'QA Lead, Test Automation',
+    productId: 'p2',
     pto: [
       {
         id: 'pto7',
@@ -1048,9 +1096,88 @@ export const mockTeamMembers: TeamMember[] = [
     name: 'Tom Zhang',
     role: 'QA',
     notes: 'Performance & Security Testing',
+    productId: 'p2',
+    pto: []
+  },
+  // --- Product 3: Data Analytics Platform ---
+  {
+    id: 'tm3-p3',
+    name: 'Elena Zhang',
+    role: 'Developer',
+    notes: 'Frontend Lead, UI/UX Integration',
+    productId: 'p3',
+    pto: []
+  },
+  {
+    id: 'tm5-p3',
+    name: 'Priya Patel',
+    role: 'Developer',
+    notes: 'Data Engineering & Analytics',
+    productId: 'p3',
+    pto: [
+      {
+        id: 'pto4-p3',
+        name: 'Family Celebration',
+        startDate: new Date('2026-03-19'),
+        endDate: new Date('2026-03-21')
+      }
+    ]
+  },
+  {
+    id: 'tm6-p3',
+    name: 'Alex Thompson',
+    role: 'Developer',
+    notes: 'API & Microservices Architecture',
+    productId: 'p3',
+    pto: []
+  },
+  {
+    id: 'tm7-p3',
+    name: 'Yuki Tanaka',
+    role: 'Developer',
+    notes: 'Full-Stack, Integration Specialist',
+    productId: 'p3',
+    pto: []
+  },
+  {
+    id: 'tm10-p3',
+    name: 'David Kim',
+    role: 'Designer',
+    notes: 'UX Researcher & Interaction Designer',
+    productId: 'p3',
+    pto: []
+  },
+  {
+    id: 'tm11-p3',
+    name: 'Lisa Park',
+    role: 'QA',
+    notes: 'QA Lead, Test Automation',
+    productId: 'p3',
+    pto: [
+      {
+        id: 'pto7-p3',
+        name: 'Training Course',
+        startDate: new Date('2026-04-21'),
+        endDate: new Date('2026-04-23')
+      }
+    ]
+  },
+  {
+    id: 'tm12-p3',
+    name: 'Tom Zhang',
+    role: 'QA',
+    notes: 'Performance & Security Testing',
+    productId: 'p3',
     pto: []
   }
 ];
+
+/**
+ * Get team members for a specific product
+ */
+export function getTeamMembersByProduct(productId: string, allMembers: TeamMember[] = mockTeamMembers): TeamMember[] {
+  return allMembers.filter(m => m.productId === productId);
+}
 
 // ===========================================
 // COMPANY HOLIDAYS (4 key dates)

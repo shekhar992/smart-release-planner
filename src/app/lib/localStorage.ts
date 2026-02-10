@@ -6,7 +6,7 @@
 import { Product, Release, Ticket, Holiday, TeamMember } from '../data/mockData';
 
 // Data version - increment this to force refresh of all localStorage data
-const DATA_VERSION = '2.0.0';
+const DATA_VERSION = '3.0.0';
 
 const STORAGE_KEYS = {
   PRODUCTS: 'timeline_view_products',
@@ -135,6 +135,15 @@ export function loadTeamMembers(): TeamMember[] | null {
 }
 
 /**
+ * Load team members for a specific product
+ */
+export function loadTeamMembersByProduct(productId: string): TeamMember[] | null {
+  const allMembers = loadTeamMembers();
+  if (!allMembers) return null;
+  return allMembers.filter(m => m.productId === productId);
+}
+
+/**
  * Save a specific release to localStorage
  */
 export function saveRelease(productId: string, release: Release): void {
@@ -157,6 +166,27 @@ export function saveRelease(productId: string, release: Release): void {
     saveProducts(updatedProducts);
   } catch (error) {
     console.error('Failed to save release:', error);
+  }
+}
+
+export function deleteRelease(productId: string, releaseId: string): void {
+  try {
+    const products = loadProducts();
+    if (!products) return;
+
+    const updatedProducts = products.map(product => {
+      if (product.id === productId) {
+        return {
+          ...product,
+          releases: product.releases.filter(r => r.id !== releaseId),
+        };
+      }
+      return product;
+    });
+
+    saveProducts(updatedProducts);
+  } catch (error) {
+    console.error('Failed to delete release:', error);
   }
 }
 

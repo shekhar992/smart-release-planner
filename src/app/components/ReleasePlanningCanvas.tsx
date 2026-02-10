@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus } from 'lucide-react';
+import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { WorkloadModal } from './WorkloadModal';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
 import { TicketCreationModal } from './TicketCreationModal';
-import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers } from '../data/mockData';
+import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct } from '../data/mockData';
 import { detectConflicts, getConflictSummary } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
-import { loadProducts, saveRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembers, forceRefreshStorage } from '../lib/localStorage';
+import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage } from '../lib/localStorage';
 
 export function ReleasePlanningCanvas() {
   const { releaseId } = useParams();
@@ -26,13 +26,21 @@ export function ReleasePlanningCanvas() {
   // Load products, holidays, and team members from localStorage or use mock data
   const products = useMemo(() => loadProducts() || mockProducts, [initialized]);
   const holidays = useMemo(() => loadHolidays() || mockHolidays, [initialized]);
-  const teamMembers = useMemo(() => loadTeamMembers() || mockTeamMembers, [initialized]);
   
   // Find the release by ID
   const releaseData = useMemo(() => 
     products.find(product => product.releases.some(release => release.id === releaseId)),
     [products, releaseId]
   );
+
+  // Load team members scoped to the product that owns this release
+  const teamMembers = useMemo(() => {
+    if (!releaseData) return [];
+    const productId = releaseData.id;
+    const stored = loadTeamMembersByProduct(productId);
+    if (stored && stored.length > 0) return stored;
+    return getTeamMembersByProduct(productId, mockTeamMembers);
+  }, [initialized, releaseData]);
   
   // Find the specific release
   const currentRelease = useMemo(() => {
@@ -40,7 +48,64 @@ export function ReleasePlanningCanvas() {
     return releaseData.releases.find(r => r.id === releaseId) || releaseData.releases[0];
   }, [releaseData, releaseId]);
 
-  if (!releaseData || !currentRelease) {
+  // All hooks MUST be above any conditional returns (React Rules of Hooks)
+  const [release, setRelease] = useState(currentRelease);
+  const [showWorkloadModal, setShowWorkloadModal] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<{ featureId: string; ticketId: string } | null>(null);
+  const [showTicketCreation, setShowTicketCreation] = useState<{ featureId?: string } | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
+  const [editingRelease, setEditingRelease] = useState(false);
+  const [confirmDeleteRelease, setConfirmDeleteRelease] = useState(false);
+  const [draftReleaseName, setDraftReleaseName] = useState('');
+  const [draftStartDate, setDraftStartDate] = useState('');
+  const [draftEndDate, setDraftEndDate] = useState('');
+
+  const openEditRelease = () => {
+    if (!release) return;
+    setDraftReleaseName(release.name);
+    setDraftStartDate(release.startDate.toISOString().split('T')[0]);
+    setDraftEndDate(release.endDate.toISOString().split('T')[0]);
+    setEditingRelease(true);
+  };
+
+  const commitEditRelease = () => {
+    if (!release || !draftReleaseName.trim()) return;
+    const updated = {
+      ...release,
+      name: draftReleaseName.trim(),
+      startDate: new Date(draftStartDate + 'T00:00:00'),
+      endDate: new Date(draftEndDate + 'T00:00:00'),
+    };
+    setRelease(updated);
+    setEditingRelease(false);
+  };
+
+  const handleDeleteRelease = () => {
+    if (!releaseData || !release) return;
+    deleteRelease(releaseData.id, release.id);
+    navigate('/');
+  };
+
+  // Sync release state when currentRelease changes (e.g., after data loads)
+  useEffect(() => {
+    if (currentRelease) {
+      setRelease(currentRelease);
+    }
+  }, [currentRelease]);
+
+  // Auto-save release to localStorage when it changes (debounced)
+  useEffect(() => {
+    if (release && releaseData && initialized) {
+      const timeoutId = setTimeout(() => {
+        saveRelease(releaseData.id, release);
+        setLastSaved(new Date());
+      }, 300);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [release, releaseData?.id, initialized]);
+
+  // Early return for not-found — AFTER all hooks
+  if (!releaseData || !currentRelease || !release) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
@@ -56,31 +121,6 @@ export function ReleasePlanningCanvas() {
       </div>
     );
   }
-
-  const [release, setRelease] = useState(currentRelease);
-  const [showWorkloadModal, setShowWorkloadModal] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<{ featureId: string; ticketId: string } | null>(null);
-  const [showTicketCreation, setShowTicketCreation] = useState<{ featureId?: string } | null>(null);
-  const [lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
-
-  // Sync release state when currentRelease changes (e.g., after data loads)
-  useEffect(() => {
-    if (currentRelease) {
-      setRelease(currentRelease);
-    }
-  }, [currentRelease]);
-
-  // Auto-save release to localStorage when it changes (debounced)
-  useEffect(() => {
-    if (release && releaseData && initialized) {
-      const timeoutId = setTimeout(() => {
-        saveRelease(releaseData.id, release);
-        setLastSaved(new Date());
-      }, 300); // Debounce saves by 300ms
-      
-      return () => clearTimeout(timeoutId);
-    }
-  }, [release, releaseData?.id, initialized]);
   
   // Handle storage reset
   const handleResetStorage = () => {
@@ -93,7 +133,7 @@ export function ReleasePlanningCanvas() {
 
   // Detect conflicts whenever release data changes
   const allTickets = useMemo(() => {
-    return release.features.flatMap(feature => feature.tickets);
+    return release?.features.flatMap(feature => feature.tickets) ?? [];
   }, [release]);
 
   const conflicts = useMemo(() => {
@@ -107,16 +147,18 @@ export function ReleasePlanningCanvas() {
   // Calculate sprint capacities
   const sprintCapacities = useMemo(() => {
     return calculateAllSprintCapacities(
-      release.sprints || [],
+      release?.sprints || [],
       allTickets,
       teamMembers,
       holidays,
       1 // velocity: 1 story point = 1 day
     );
-  }, [release.sprints, allTickets, teamMembers, holidays]);
+  }, [release?.sprints, allTickets, teamMembers, holidays]);
 
   const handleUpdateTicket = (featureId: string, ticketId: string, updates: Partial<Ticket>) => {
-    setRelease(prev => ({
+    setRelease(prev => {
+      if (!prev) return prev;
+      return {
       ...prev,
       features: prev.features.map(f => 
         f.id === featureId 
@@ -128,11 +170,12 @@ export function ReleasePlanningCanvas() {
             }
           : f
       )
-    }));
+    };
+    });
     
     // Update the selected ticket if it's the one being edited
     if (selectedTicket?.ticketId === ticketId) {
-      const updatedFeature = release.features.find(f => f.id === featureId);
+      const updatedFeature = release?.features.find(f => f.id === featureId);
       const updatedTicket = updatedFeature?.tickets.find(t => t.id === ticketId);
       if (updatedTicket) {
         setSelectedTicket({ featureId, ticketId });
@@ -147,10 +190,10 @@ export function ReleasePlanningCanvas() {
       name,
       tickets: []
     };
-    setRelease(prev => ({
-      ...prev,
-      features: [...prev.features, newFeature]
-    }));
+    setRelease(prev => {
+      if (!prev) return prev;
+      return { ...prev, features: [...prev.features, newFeature] };
+    });
     return id;
   };
 
@@ -159,18 +202,23 @@ export function ReleasePlanningCanvas() {
       id: `t${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       ...ticketData
     };
-    setRelease(prev => ({
+    setRelease(prev => {
+      if (!prev) return prev;
+      return {
       ...prev,
       features: prev.features.map(f =>
         f.id === featureId
           ? { ...f, tickets: [...f.tickets, newTicket] }
           : f
       )
-    }));
+    };
+    });
   };
 
   const handleMoveTicket = (featureId: string, ticketId: string, newStartDate: Date) => {
-    setRelease(prev => ({
+    setRelease(prev => {
+      if (!prev) return prev;
+      return {
       ...prev,
       features: prev.features.map(f => {
         if (f.id === featureId) {
@@ -188,11 +236,14 @@ export function ReleasePlanningCanvas() {
         }
         return f;
       })
-    }));
+    };
+    });
   };
 
   const handleResizeTicket = (featureId: string, ticketId: string, newEndDate: Date) => {
-    setRelease(prev => ({
+    setRelease(prev => {
+      if (!prev) return prev;
+      return {
       ...prev,
       features: prev.features.map(f => {
         if (f.id === featureId) {
@@ -205,23 +256,28 @@ export function ReleasePlanningCanvas() {
         }
         return f;
       })
-    }));
+    };
+    });
   };
 
   const handleDeleteTicket = (featureId: string, ticketId: string) => {
-    setRelease(prev => ({
+    setRelease(prev => {
+      if (!prev) return prev;
+      return {
       ...prev,
       features: prev.features.map(f => 
         f.id === featureId 
           ? { ...f, tickets: f.tickets.filter(t => t.id !== ticketId) }
           : f
       )
-    }));
+    };
+    });
     setSelectedTicket(null);
   };
 
   const handleMoveTicketToFeature = (fromFeatureId: string, ticketId: string, toFeatureId: string) => {
     setRelease(prev => {
+      if (!prev) return prev;
       const fromFeature = prev.features.find(f => f.id === fromFeatureId);
       const ticket = fromFeature?.tickets.find(t => t.id === ticketId);
       if (!ticket) return prev;
@@ -251,26 +307,26 @@ export function ReleasePlanningCanvas() {
       endDate
     };
     
-    setRelease(prev => ({
-      ...prev,
-      sprints: [...(prev.sprints || []), newSprint].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
-    }));
+    setRelease(prev => {
+      if (!prev) return prev;
+      return { ...prev, sprints: [...(prev.sprints || []), newSprint].sort((a, b) => a.startDate.getTime() - b.startDate.getTime()) };
+    });
   };
 
   const handleUpdateSprint = (sprintId: string, name: string, startDate: Date, endDate: Date) => {
-    setRelease(prev => ({
-      ...prev,
-      sprints: (prev.sprints || []).map(s => 
+    setRelease(prev => {
+      if (!prev) return prev;
+      return { ...prev, sprints: (prev.sprints || []).map(s => 
         s.id === sprintId ? { ...s, name, startDate, endDate } : s
-      ).sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
-    }));
+      ).sort((a, b) => a.startDate.getTime() - b.startDate.getTime()) };
+    });
   };
 
   const handleDeleteSprint = (sprintId: string) => {
-    setRelease(prev => ({
-      ...prev,
-      sprints: (prev.sprints || []).filter(s => s.id !== sprintId)
-    }));
+    setRelease(prev => {
+      if (!prev) return prev;
+      return { ...prev, sprints: (prev.sprints || []).filter(s => s.id !== sprintId) };
+    });
   };
 
   return (
@@ -288,6 +344,22 @@ export function ReleasePlanningCanvas() {
           <div>
             <h1 className="text-base font-medium text-gray-900">{releaseData.name}</h1>
             <p className="text-xs text-gray-500 mt-1">{release.name}</p>
+          </div>
+          <div className="flex items-center gap-1 ml-1">
+            <button
+              onClick={openEditRelease}
+              className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              title="Edit release"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setConfirmDeleteRelease(true)}
+              className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+              title="Delete release"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -322,7 +394,7 @@ export function ReleasePlanningCanvas() {
           </button>
           
           <button
-            onClick={() => navigate(`/release/${releaseId}/team`)}
+            onClick={() => navigate(`/product/${releaseData.id}/team`)}
             className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all border border-transparent hover:border-gray-200"
           >
             <Users className="w-4 h-4" />
@@ -388,6 +460,90 @@ export function ReleasePlanningCanvas() {
           onAddFeature={handleAddFeatureWithName}
           onAddTicket={handleAddTicketFull}
         />
+      )}
+
+      {/* Edit Release Dialog */}
+      {editingRelease && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-[380px] animate-fade-in">
+            <h3 className="text-sm font-semibold text-gray-900 mb-4">Edit Release</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-gray-600 mb-1 block">Name</label>
+                <input
+                  autoFocus
+                  value={draftReleaseName}
+                  onChange={e => setDraftReleaseName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">Start Date</label>
+                  <input
+                    type="date"
+                    value={draftStartDate}
+                    onChange={e => setDraftStartDate(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1 block">End Date</label>
+                  <input
+                    type="date"
+                    value={draftEndDate}
+                    onChange={e => setDraftEndDate(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+                </div>
+              </div>
+              {draftEndDate && draftStartDate && draftEndDate < draftStartDate && (
+                <p className="text-xs text-red-500">End date must be after start date</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setEditingRelease(false)}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={commitEditRelease}
+                disabled={!draftReleaseName.trim() || (draftEndDate < draftStartDate)}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Release Confirmation */}
+      {confirmDeleteRelease && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-[380px] animate-fade-in">
+            <h3 className="text-sm font-semibold text-red-700 mb-2">Delete Release</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Are you sure you want to delete <strong>{release.name}</strong>? All features, tickets, and sprints within this release will be permanently removed.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteRelease(false)}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteRelease}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

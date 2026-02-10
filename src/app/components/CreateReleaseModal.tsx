@@ -14,9 +14,11 @@ export function CreateReleaseModal({ onClose, onCreate, products }: CreateReleas
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  const datesInvalid = startDate && endDate && endDate < startDate;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (productId && name.trim() && startDate && endDate) {
+    if (productId && name.trim() && startDate && endDate && !datesInvalid) {
       onCreate(
         productId,
         name.trim(),
@@ -106,6 +108,10 @@ export function CreateReleaseModal({ onClose, onCreate, products }: CreateReleas
               </div>
             </div>
 
+            {datesInvalid && (
+              <p className="text-xs text-red-500">End date must be on or after start date</p>
+            )}
+
             <p className="text-xs text-gray-500">
               You'll add features and define sprints after creating the release
             </p>
@@ -122,7 +128,7 @@ export function CreateReleaseModal({ onClose, onCreate, products }: CreateReleas
             </button>
             <button
               type="submit"
-              disabled={!productId || !name.trim() || !startDate || !endDate}
+              disabled={!productId || !name.trim() || !startDate || !endDate || !!datesInvalid}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded transition-colors shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Create & Plan Release

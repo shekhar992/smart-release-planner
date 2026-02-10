@@ -108,8 +108,10 @@ export function TicketCreationModal({
     setStep('ticket');
   };
 
+  const datesInvalid = startDate && endDate && endDate < startDate;
+
   const handleCreateTicket = () => {
-    if (!title.trim() || !selectedFeatureId) return;
+    if (!title.trim() || !selectedFeatureId || datesInvalid) return;
     onAddTicket(selectedFeatureId, {
       title: title.trim(),
       description: description.trim() || undefined,
@@ -123,7 +125,7 @@ export function TicketCreationModal({
   };
 
   const handleCreateAndAddAnother = () => {
-    if (!title.trim() || !selectedFeatureId) return;
+    if (!title.trim() || !selectedFeatureId || datesInvalid) return;
     onAddTicket(selectedFeatureId, {
       title: title.trim(),
       description: description.trim() || undefined,
@@ -425,14 +427,14 @@ export function TicketCreationModal({
               <>
                 <button
                   onClick={handleCreateAndAddAnother}
-                  disabled={!title.trim()}
+                  disabled={!title.trim() || !!datesInvalid}
                   className="px-4 py-2.5 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create & Add Another
                 </button>
                 <button
                   onClick={handleCreateTicket}
-                  disabled={!title.trim()}
+                  disabled={!title.trim() || !!datesInvalid}
                   className="px-4 py-2.5 text-sm text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 >
                   Create Ticket

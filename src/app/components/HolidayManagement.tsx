@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, Calendar, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { mockHolidays, Holiday } from '../data/mockData';
-import { loadHolidays } from '../lib/localStorage';
+import { loadHolidays, saveHolidays } from '../lib/localStorage';
 
 export function HolidayManagement() {
   const navigate = useNavigate();
@@ -16,11 +16,19 @@ export function HolidayManagement() {
   const [showAddForm, setShowAddForm] = useState(false);
 
   const deleteHoliday = (holidayId: string) => {
-    setHolidays(prev => prev.filter(h => h.id !== holidayId));
+    setHolidays(prev => {
+      const updated = prev.filter(h => h.id !== holidayId);
+      saveHolidays(updated);
+      return updated;
+    });
   };
 
   const addHoliday = (holiday: Holiday) => {
-    setHolidays(prev => [...prev, holiday].sort((a, b) => a.startDate.getTime() - b.startDate.getTime()));
+    setHolidays(prev => {
+      const updated = [...prev, holiday].sort((a, b) => a.startDate.getTime() - b.startDate.getTime());
+      saveHolidays(updated);
+      return updated;
+    });
   };
 
   const formatDateRange = (startDate: Date, endDate: Date) => {
@@ -134,9 +142,11 @@ function AddHolidayModal({ onClose, onAdd }: AddHolidayModalProps) {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
+  const datesInvalid = startDate && endDate && endDate < startDate;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || datesInvalid) return;
 
     const newHoliday: Holiday = {
       id: `h${Date.now()}`,
@@ -205,6 +215,10 @@ function AddHolidayModal({ onClose, onAdd }: AddHolidayModalProps) {
               </div>
             </div>
 
+            {datesInvalid && (
+              <p className="text-xs text-red-500">End date must be on or after start date</p>
+            )}
+
             <p className="text-xs text-gray-500">
               For single-day holidays, set the same start and end date.
             </p>
@@ -221,7 +235,7 @@ function AddHolidayModal({ onClose, onAdd }: AddHolidayModalProps) {
             </button>
             <button
               type="submit"
-              disabled={!name.trim()}
+              disabled={!name.trim() || !!datesInvalid}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
             >
               Add Holiday

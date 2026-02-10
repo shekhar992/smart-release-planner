@@ -34,7 +34,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   const [showPTO, setShowPTO] = useState(true);
   const [showConflictSummary, setShowConflictSummary] = useState(false);
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
-  const [showSprintSummary, setShowSprintSummary] = useState(true);
+  const [showSprintSummary, setShowSprintSummary] = useState(false);
   
   // Refs for scroll synchronization
   const sidebarRef = useRef<HTMLDivElement>(null);

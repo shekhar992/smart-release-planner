@@ -14,13 +14,14 @@
 import { Product, Holiday, TeamMember } from './mockData';
 
 // ========================================
-// DEMO TEAM: 8 Developers
+// DEMO TEAM: 8 Developers (all belong to prod1)
 // ========================================
 export const demoTeamMembers: TeamMember[] = [
   {
     id: 'tm1',
     name: 'Sarah Chen',
     role: 'Developer',
+    productId: 'prod1',
     pto: [
       { id: 'pto1', name: 'Spring Break', startDate: new Date('2026-03-10'), endDate: new Date('2026-03-14') },
       { id: 'pto2', name: 'Family Vacation', startDate: new Date('2026-04-20'), endDate: new Date('2026-04-25') }
@@ -31,6 +32,7 @@ export const demoTeamMembers: TeamMember[] = [
     id: 'tm2',
     name: 'Marcus Rivera',
     role: 'Developer',
+    productId: 'prod1',
     pto: [
       { id: 'pto3', name: 'Conference', startDate: new Date('2026-02-23'), endDate: new Date('2026-02-28') },
       { id: 'pto4', name: 'Wedding', startDate: new Date('2026-04-06'), endDate: new Date('2026-04-10') }
@@ -41,6 +43,7 @@ export const demoTeamMembers: TeamMember[] = [
     id: 'tm3',
     name: 'Elena Zhang',
     role: 'Developer',
+    productId: 'prod1',
     pto: [
       { id: 'pto5', name: 'Medical', startDate: new Date('2026-03-23'), endDate: new Date('2026-03-27') }
     ],
@@ -50,6 +53,7 @@ export const demoTeamMembers: TeamMember[] = [
     id: 'tm4',
     name: 'James Wilson',
     role: 'Developer',
+    productId: 'prod1',
     pto: [
       { id: 'pto6', name: 'Personal', startDate: new Date('2026-05-04'), endDate: new Date('2026-05-08') }
     ],
@@ -59,6 +63,7 @@ export const demoTeamMembers: TeamMember[] = [
     id: 'tm5',
     name: 'Priya Patel',
     role: 'Developer',
+    productId: 'prod1',
     pto: [
       { id: 'pto7', name: 'Diwali Vacation', startDate: new Date('2026-02-16'), endDate: new Date('2026-02-20') }
     ],
@@ -68,6 +73,7 @@ export const demoTeamMembers: TeamMember[] = [
     id: 'tm6',
     name: 'Alex Thompson',
     role: 'Developer',
+    productId: 'prod1',
     pto: [
       { id: 'pto8', name: 'Moving', startDate: new Date('2026-04-27'), endDate: new Date('2026-05-01') }
     ],
@@ -77,6 +83,7 @@ export const demoTeamMembers: TeamMember[] = [
     id: 'tm7',
     name: 'Yuki Tanaka',
     role: 'Developer',
+    productId: 'prod1',
     pto: [
       { id: 'pto9', name: 'Training', startDate: new Date('2026-03-02'), endDate: new Date('2026-03-06') }
     ],
@@ -86,6 +93,7 @@ export const demoTeamMembers: TeamMember[] = [
     id: 'tm8',
     name: 'Maria Garcia',
     role: 'Developer',
+    productId: 'prod1',
     pto: [
       { id: 'pto10', name: 'Vacation', startDate: new Date('2026-05-18'), endDate: new Date('2026-05-22') }
     ],

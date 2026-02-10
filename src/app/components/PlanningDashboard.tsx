@@ -1,10 +1,11 @@
-import { Link, useNavigate } from 'react-router';
-import { Plus, Calendar, Package, FolderPlus, Users, Layers, CheckSquare, Upload, ArrowRight, TrendingUp, Clock } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { mockProducts, Product, Release, mockHolidays, mockTeamMembers } from '../data/mockData';
+import { Link } from 'react-router';
+import { Plus, Calendar, Package, FolderPlus, Users, Upload, ChevronRight, BarChart3, Layers, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { mockProducts, Product, Release, mockHolidays, mockTeamMembers, TeamMember } from '../data/mockData';
 import { CreateProductModal } from './CreateProductModal';
 import { CreateReleaseModal } from './CreateReleaseModal';
 import { ImportReleaseWizard } from './ImportReleaseWizard';
+import { PageShell } from './PageShell';
 import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers, saveHolidays, loadHolidays } from '../lib/localStorage';
 import type { ImportedReleaseData } from './ImportReleaseWizard';
 
@@ -13,7 +14,6 @@ export function PlanningDashboard() {
   const [showCreateRelease, setShowCreateRelease] = useState(false);
   const [showImportWizard, setShowImportWizard] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
-  const navigate = useNavigate();
   
   // Initialize and load products from localStorage
   useEffect(() => {
@@ -28,13 +28,30 @@ export function PlanningDashboard() {
   const countTickets = (release: Release) => 
     release.features.reduce((sum, feature) => sum + feature.tickets.length, 0);
 
-  const handleCreateProduct = (name: string) => {
+  const handleCreateProduct = (name: string, teamMemberDrafts: Omit<TeamMember, 'id' | 'productId'>[]) => {
+    const productId = `p${Date.now()}`;
     const newProduct: Product = {
-      id: `p${Date.now()}`,
+      id: productId,
       name,
       releases: []
     };
-    setProducts([...products, newProduct]);
+    const updatedProducts = [...products, newProduct];
+    setProducts(updatedProducts);
+    saveProducts(updatedProducts);
+
+    // Create and save team members scoped to this product
+    if (teamMemberDrafts.length > 0) {
+      const existingTeam = loadTeamMembers() || [];
+      const newMembers: TeamMember[] = teamMemberDrafts.map((m, i) => ({
+        id: `tm-${productId}-${Date.now()}-${i}`,
+        name: m.name,
+        role: m.role,
+        notes: m.notes,
+        pto: m.pto || [],
+        productId,
+      }));
+      saveTeamMembers([...existingTeam, ...newMembers]);
+    }
   };
 
   const handleCreateRelease = (productId: string, name: string, startDate: Date, endDate: Date, importedData?: ImportedReleaseData) => {
@@ -51,19 +68,26 @@ export function PlanningDashboard() {
       assignedTo: t.assignedTo,
     }));
 
-    // Group all tickets under a single "Imported" feature
-    const feature: import('../data/mockData').Feature = {
-      id: `f-${Date.now()}`,
-      name: 'Imported Tickets',
-      tickets,
-    };
+    // Group tickets by feature name (from CSV 'feature' column, or default 'Imported Tickets')
+    const featureMap = new Map<string, typeof tickets>();
+    tickets.forEach(t => {
+      const featureName = ((importedData?.tickets || []).find(it => it.id === t.id) as any)?.feature || 'Imported Tickets';
+      if (!featureMap.has(featureName)) featureMap.set(featureName, []);
+      featureMap.get(featureName)!.push(t);
+    });
+
+    const features: import('../data/mockData').Feature[] = Array.from(featureMap.entries()).map(([featureName, featureTickets], i) => ({
+      id: `f-${Date.now()}-${i}`,
+      name: featureName,
+      tickets: featureTickets,
+    }));
 
     const newRelease: Release = {
       id: releaseId,
       name,
       startDate,
       endDate,
-      features: tickets.length > 0 ? [feature] : [],
+      features,
       sprints: [],
     };
 
@@ -77,16 +101,17 @@ export function PlanningDashboard() {
     setProducts(updatedProducts);
     saveProducts(updatedProducts);
 
-    // Save imported team members
+    // Save imported team members (scoped to the product)
     if (importedData?.team && importedData.team.length > 0) {
       const existingTeam = loadTeamMembers() || [];
       const newMembers: import('../data/mockData').TeamMember[] = importedData.team
-        .filter(m => !existingTeam.some(e => e.name === m.name))
+        .filter(m => !existingTeam.some(e => e.name === m.name && e.productId === productId))
         .map(m => ({
           id: m.id,
           name: m.name,
           role: m.role as 'Developer' | 'Designer' | 'QA',
           pto: [],
+          productId,
         }));
       if (newMembers.length > 0) {
         saveTeamMembers([...existingTeam, ...newMembers]);
@@ -133,273 +158,141 @@ export function PlanningDashboard() {
     setShowImportWizard(false);
   };
 
-  // Calculate planning metrics
-  const totalProducts = products.length;
+  // ── Product edit / delete ──
+  const handleRenameProduct = (productId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const updatedProducts = products.map(p =>
+      p.id === productId ? { ...p, name: trimmed } : p
+    );
+    setProducts(updatedProducts);
+    saveProducts(updatedProducts);
+  };
+
+  const handleDeleteProduct = (productId: string) => {
+    const updatedProducts = products.filter(p => p.id !== productId);
+    setProducts(updatedProducts);
+    saveProducts(updatedProducts);
+
+    // Also remove team members scoped to this product
+    const existingTeam = loadTeamMembers() || [];
+    saveTeamMembers(existingTeam.filter(m => m.productId !== productId));
+  };
+
+  // ── Derived data ──
   const allReleases = products.flatMap(p => p.releases);
-  const activeReleases = allReleases.filter(r => {
-    const now = new Date();
-    return r.startDate <= now && r.endDate >= now;
-  }).length;
-  const totalSprints = allReleases.reduce((sum, r) => sum + (r.sprints?.length ?? 0), 0);
   const totalTickets = allReleases.reduce((sum, r) => sum + countTickets(r), 0);
 
-  // Get recent and upcoming releases
-  const now = new Date();
-  const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+  // Load team member counts per product (memoized)
+  const teamCounts = useMemo(() => {
+    const all = loadTeamMembers() || mockTeamMembers;
+    const map: Record<string, number> = {};
+    products.forEach(p => {
+      map[p.id] = all.filter(m => m.productId === p.id).length;
+    });
+    return map;
+  }, [products]);
 
-  const recentReleases = allReleases
-    .filter(r => r.startDate >= new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000))
-    .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
-    .slice(0, 3);
-
-  const upcomingReleases = allReleases
-    .filter(r => r.startDate > now && r.startDate <= sixtyDaysFromNow)
-    .sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
-    .slice(0, 3);
-
-  const hasAnyReleases = allReleases.length > 0;
-  const mostRecentRelease = recentReleases.length > 0 ? recentReleases[0] : null;
+  const hasProducts = products.length > 0;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Modern Header with Gradient Border */}
-      <div className="sticky top-0 z-10 bg-card border-b border-border backdrop-blur-sm bg-card/95">
-        <div className="max-w-[1400px] mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-lg">
-                <Layers className="w-5 h-5 text-white" />
+    <PageShell>
+      {/* ── Greeting ── */}
+      <div className="mb-8 animate-fade-in">
+        <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+          Release Planning
+        </h1>
+        {hasProducts ? (
+          <p className="text-sm text-muted-foreground mt-1">
+            {products.length} product{products.length !== 1 ? 's' : ''}
+            <span className="mx-1.5 text-border">·</span>
+            {allReleases.length} release{allReleases.length !== 1 ? 's' : ''}
+            <span className="mx-1.5 text-border">·</span>
+            {totalTickets} ticket{totalTickets !== 1 ? 's' : ''}
+          </p>
+        ) : (
+          <p className="text-sm text-muted-foreground mt-1">Create your first product to get started</p>
+        )}
+      </div>
+
+      {/* ── Empty state ── */}
+      {!hasProducts && (
+        <div className="flex flex-col items-center justify-center py-32 animate-fade-in">
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center border border-primary/10 mb-6">
+            <Layers className="w-10 h-10 text-primary" />
+          </div>
+          <h2 className="text-xl font-semibold text-foreground mb-2 tracking-tight">No products yet</h2>
+          <p className="text-sm text-muted-foreground mb-8 max-w-sm text-center leading-relaxed">
+            Products group your releases and teams together. Create one to start planning your roadmap.
+          </p>
+          <button
+            onClick={() => setShowCreateProduct(true)}
+            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary-hover transition-all shadow-sm hover:shadow-md"
+          >
+            <FolderPlus className="w-4 h-4" />
+            Create Your First Product
+          </button>
+        </div>
+      )}
+
+      {/* ── Product workspace grid ── */}
+      {hasProducts && (
+        <div className="animate-fade-in space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            {products.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                teamCount={teamCounts[product.id] || 0}
+                onNewRelease={() => setShowCreateRelease(true)}
+                onRename={(name) => handleRenameProduct(product.id, name)}
+                onDelete={() => handleDeleteProduct(product.id)}
+              />
+            ))}
+
+            {/* Ghost card */}
+            <button
+              onClick={() => setShowCreateProduct(true)}
+              className="group flex flex-col items-center justify-center gap-3 min-h-[260px] rounded-xl border-2 border-dashed border-border hover:border-primary/40 bg-card/50 hover:bg-primary/[0.02] transition-all duration-200 cursor-pointer"
+            >
+              <div className="w-11 h-11 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
-              <div>
-                <h1 className="text-xl font-semibold text-foreground tracking-tight">Release Planning</h1>
-                <p className="text-sm text-muted-foreground">Manage your product roadmap</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Primary CTA */}
-              <button
-                onClick={() => setShowCreateRelease(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary-hover transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={products.length === 0}
-              >
-                <Plus className="w-4 h-4" />
-                New Release
-              </button>
-              
-              {/* Secondary CTAs */}
-              <button
-                onClick={() => setShowImportWizard(true)}
-                className="flex items-center gap-2 px-3 py-2 border border-border bg-card text-foreground text-sm font-medium rounded-lg hover:bg-accent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={products.length === 0}
-              >
-                <Upload className="w-4 h-4" />
-                Import
-              </button>
-              <button
-                onClick={() => setShowCreateProduct(true)}
-                className="flex items-center gap-2 px-3 py-2 border border-border bg-card text-foreground text-sm font-medium rounded-lg hover:bg-accent transition-all duration-200"
-              >
-                <FolderPlus className="w-4 h-4" />
+              <span className="text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">
                 New Product
-              </button>
-            </div>
+              </span>
+            </button>
+          </div>
+
+          {/* ── Quick actions bar ── */}
+          <div className="flex items-center gap-3 pt-6 border-t border-border">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-2">Quick&nbsp;Actions</span>
+            <Link
+              to="/holidays"
+              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-accent hover:border-primary/20 transition-all"
+            >
+              <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+              Holidays
+            </Link>
+            <button
+              onClick={() => setShowImportWizard(true)}
+              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-accent hover:border-primary/20 transition-all"
+            >
+              <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+              Bulk Import
+            </button>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Main Content */}
-      <div className="flex-1 px-8 py-8">
-        <div className="max-w-[1400px] mx-auto">
-          
-          {/* Empty State */}
-          {!hasAnyReleases && (
-            <div className="mt-24 animate-fade-in">
-              <div className="max-w-2xl mx-auto text-center">
-                <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center border border-primary/10">
-                  <Layers className="w-12 h-12 text-primary" />
-                </div>
-                <h2 className="text-3xl font-semibold text-foreground mb-4 tracking-tight">
-                  Welcome to Release Planning
-                </h2>
-                <p className="text-lg text-muted-foreground mb-8 leading-relaxed max-w-md mx-auto">
-                  Create your first product to start planning releases and managing your roadmap
-                </p>
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => setShowCreateProduct(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary-hover transition-all duration-200 shadow-md hover:shadow-lg"
-                  >
-                    <FolderPlus className="w-4 h-4" />
-                    Create Your First Product
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Dashboard Content */}
-          {hasAnyReleases && (
-            <div className="space-y-8 animate-fade-in">
-              
-              {/* Planning Overview - Modern Cards */}
-              <section>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Overview</h2>
-                </div>
-                <div className="grid grid-cols-4 gap-4">
-                  <MetricCard
-                    icon={<Package className="w-5 h-5" />}
-                    value={totalProducts}
-                    label="Products"
-                    gradient="from-blue-500 to-cyan-500"
-                    onClick={() => navigate('/products')}
-                  />
-                  <MetricCard
-                    icon={<Layers className="w-5 h-5" />}
-                    value={activeReleases}
-                    label="Active Releases"
-                    gradient="from-purple-500 to-pink-500"
-                    onClick={() => navigate('/releases')}
-                  />
-                  <MetricCard
-                    icon={<Calendar className="w-5 h-5" />}
-                    value={totalSprints}
-                    label="Planned Sprints"
-                    gradient="from-orange-500 to-red-500"
-                    onClick={() => {}}
-                  />
-                  <MetricCard
-                    icon={<CheckSquare className="w-5 h-5" />}
-                    value={totalTickets}
-                    label="Total Tickets"
-                    gradient="from-green-500 to-emerald-500"
-                    onClick={() => mostRecentRelease && navigate(`/release/${mostRecentRelease.id}`)}
-                  />
-                </div>
-              </section>
-
-              {/* Active Planning - Hero Section */}
-              {mostRecentRelease && (
-                <section>
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Continue Planning</h2>
-                  </div>
-                  <HeroReleaseCard 
-                    release={mostRecentRelease}
-                    productName={products.find(p => p.releases.includes(mostRecentRelease))?.name || ''}
-                  />
-                </section>
-              )}
-
-              {/* Recent Releases */}
-              {recentReleases.length > 1 && (
-                <section>
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Recent Releases</h2>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    {recentReleases.slice(1).map((release) => {
-                      const product = products.find(p => p.releases.includes(release));
-                      return (
-                        <ModernReleaseCard
-                          key={release.id}
-                          release={release}
-                          productName={product?.name || ''}
-                        />
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
-              {/* Upcoming Releases */}
-              {upcomingReleases.length > 0 && (
-                <section>
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                      <Clock className="w-4 h-4" />
-                      Upcoming
-                    </h2>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    {upcomingReleases.map((release) => {
-                      const product = products.find(p => p.releases.includes(release));
-                      return (
-                        <ModernReleaseCard
-                          key={release.id}
-                          release={release}
-                          productName={product?.name || ''}
-                          upcoming
-                        />
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
-              {/* All Releases */}
-              {allReleases.length > 3 && (
-                <section>
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">All Releases</h2>
-                    <span className="text-sm text-muted-foreground">{allReleases.length} total</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    {allReleases
-                      .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
-                      .slice(3)
-                      .map((release) => {
-                        const product = products.find(p => p.releases.includes(release));
-                        return (
-                          <ModernReleaseCard
-                            key={release.id}
-                            release={release}
-                            productName={product?.name || ''}
-                          />
-                        );
-                      })}
-                  </div>
-                </section>
-              )}
-
-              {/* Resources Footer */}
-              <section className="pt-8 border-t border-border">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground mb-1">Resources</h3>
-                    <p className="text-sm text-muted-foreground">Manage team members and company holidays</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Link
-                      to="/team"
-                      className="flex items-center gap-2 px-4 py-2 border border-border bg-card text-foreground text-sm font-medium rounded-lg hover:bg-accent transition-all duration-200"
-                    >
-                      <Users className="w-4 h-4" />
-                      Team
-                    </Link>
-                    <Link
-                      to="/holidays"
-                      className="flex items-center gap-2 px-4 py-2 border border-border bg-card text-foreground text-sm font-medium rounded-lg hover:bg-accent transition-all duration-200"
-                    >
-                      <Calendar className="w-4 h-4" />
-                      Holidays
-                    </Link>
-                  </div>
-                </div>
-              </section>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Modals */}
+      {/* ── Modals (unchanged) ── */}
       {showCreateProduct && (
         <CreateProductModal
           onClose={() => setShowCreateProduct(false)}
           onCreate={handleCreateProduct}
         />
       )}
-      
+
       {showCreateRelease && products.length > 0 && (
         <CreateReleaseModal
           onClose={() => setShowCreateRelease(false)}
@@ -407,7 +300,7 @@ export function PlanningDashboard() {
           products={products}
         />
       )}
-      
+
       {showImportWizard && products.length > 0 && (
         <ImportReleaseWizard
           onClose={() => setShowImportWizard(false)}
@@ -415,164 +308,269 @@ export function PlanningDashboard() {
           onCreate={handleCreateRelease}
         />
       )}
-    </div>
+    </PageShell>
   );
 }
 
-// Modern Metric Card with Gradient
-function MetricCard({ 
-  icon, 
-  value, 
-  label, 
-  gradient,
-  onClick 
-}: { 
-  icon: React.ReactNode; 
-  value: number; 
-  label: string; 
-  gradient: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="group relative bg-card rounded-xl p-6 border border-border hover:border-primary/30 transition-all duration-200 hover:shadow-lg overflow-hidden text-left w-full"
-    >
-      {/* Gradient Background on Hover */}
-      <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-0 group-hover:opacity-5 transition-opacity duration-200`}></div>
-      
-      <div className="relative">
-        <div className="flex items-center justify-between mb-4">
-          <div className={`p-2.5 rounded-lg bg-gradient-to-br ${gradient} text-white shadow-sm`}>
-            {icon}
-          </div>
-        </div>
-        <div className="text-3xl font-semibold text-foreground mb-1 tracking-tight">{value}</div>
-        <div className="text-sm text-muted-foreground font-medium">{label}</div>
-      </div>
-    </button>
-  );
+// ═══════════════════════════════════════════
+// SUB-COMPONENTS
+// ═══════════════════════════════════════════
+
+/** Format a date range compactly */
+function fmtRange(start: Date, end: Date) {
+  const s = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const e = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${s} – ${e}`;
 }
 
-// Hero Release Card - Featured prominently
-function HeroReleaseCard({ 
-  release, 
-  productName 
-}: { 
-  release: Release; 
-  productName: string;
+/** Compute ticket completion % for a release */
+function completionPct(release: Release) {
+  const total = release.features.reduce((s, f) => s + f.tickets.length, 0);
+  if (total === 0) return 0;
+  const done = release.features.reduce(
+    (s, f) => s + f.tickets.filter(t => t.status === 'completed').length, 0
+  );
+  return Math.round((done / total) * 100);
+}
+
+// ── Product Card ──
+function ProductCard({
+  product,
+  teamCount,
+  onNewRelease,
+  onRename,
+  onDelete,
+}: {
+  product: Product;
+  teamCount: number;
+  onNewRelease: () => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
 }) {
-  const countTickets = (r: Release) => r.features.reduce((sum, f) => sum + f.tickets.length, 0);
-  const formatDateRange = (start: Date, end: Date) => {
-    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState(product.name);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const ticketCount = product.releases.reduce(
+    (s, r) => s + r.features.reduce((s2, f) => s2 + f.tickets.length, 0), 0
+  );
+
+  const commitRename = () => {
+    if (draftName.trim() && draftName.trim() !== product.name) {
+      onRename(draftName.trim());
+    }
+    setRenaming(false);
+    setMenuOpen(false);
   };
 
   return (
-    <div className="relative group bg-gradient-to-br from-card to-secondary/30 rounded-2xl p-8 border border-primary/20 shadow-lg hover:shadow-xl transition-all duration-300">
-      {/* Subtle gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent rounded-2xl"></div>
-      
-      <div className="relative">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-semibold mb-3 border border-primary/20">
-              <TrendingUp className="w-3 h-3" />
-              {productName}
-            </div>
-            <h3 className="text-2xl font-semibold text-foreground mb-2 tracking-tight">
-              {release.name}
-            </h3>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="w-4 h-4" />
-              <span className="font-medium">{formatDateRange(release.startDate, release.endDate)}</span>
-            </div>
-          </div>
+    <div className="group flex flex-col bg-card rounded-xl border border-border hover:border-primary/25 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+      {/* Card header */}
+      <div className="flex items-center gap-3 px-5 pt-5 pb-3">
+        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center shrink-0">
+          <Package className="w-4 h-4 text-primary" />
         </div>
-
-        <div className="flex items-center gap-6 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-md">
-              <span className="text-xl font-bold">{release.sprints?.length ?? 0}</span>
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-foreground">{release.sprints?.length ?? 0}</div>
-              <div className="text-xs text-muted-foreground">Sprints</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white shadow-md">
-              <span className="text-xl font-bold">{countTickets(release)}</span>
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-foreground">{countTickets(release)}</div>
-              <div className="text-xs text-muted-foreground">Tickets</div>
-            </div>
-          </div>
-        </div>
-
-        <Link
-          to={`/release/${release.id}`}
-          className="inline-flex items-center gap-2 px-6 py-3 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary-hover transition-all duration-200 shadow-md hover:shadow-lg group"
-        >
-          Continue Planning
-          <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// Modern Release Card
-function ModernReleaseCard({ 
-  release, 
-  productName,
-  upcoming = false
-}: { 
-  release: Release; 
-  productName: string;
-  upcoming?: boolean;
-}) {
-  const countTickets = (r: Release) => r.features.reduce((sum, f) => sum + f.tickets.length, 0);
-  const formatDateRange = (start: Date, end: Date) => {
-    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-  };
-
-  return (
-    <Link
-      to={`/release/${release.id}`}
-      className="group block bg-card rounded-xl p-5 border border-border hover:border-primary/30 hover:shadow-lg transition-all duration-200"
-    >
-      <div className="mb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            {productName}
-          </span>
-          {upcoming && (
-            <span className="px-2 py-0.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[10px] font-semibold rounded-full border border-orange-500/20">
-              UPCOMING
+        <div className="min-w-0 flex-1">
+          {renaming ? (
+            <input
+              autoFocus
+              value={draftName}
+              onChange={e => setDraftName(e.target.value)}
+              onBlur={commitRename}
+              onKeyDown={e => {
+                if (e.key === 'Enter') commitRename();
+                if (e.key === 'Escape') { setDraftName(product.name); setRenaming(false); }
+              }}
+              className="text-sm font-semibold text-foreground bg-transparent border-b border-primary outline-none w-full"
+            />
+          ) : (
+            <h3 className="text-sm font-semibold text-foreground truncate">{product.name}</h3>
+          )}
+          <p className="text-xs text-muted-foreground">
+            {product.releases.length} release{product.releases.length !== 1 ? 's' : ''}
+            <span className="mx-1 text-border">·</span>
+            <span className="inline-flex items-center gap-0.5">
+              <Users className="w-3 h-3" /> {teamCount}
             </span>
+            {ticketCount > 0 && (
+              <>
+                <span className="mx-1 text-border">·</span>
+                {ticketCount} ticket{ticketCount !== 1 ? 's' : ''}
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* Kebab menu */}
+        <div className="relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </button>
+          {menuOpen && (
+            <>
+              {/* Click-away backdrop */}
+              <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-full mt-1 w-36 bg-popover border border-border rounded-lg shadow-lg z-50 py-1 animate-fade-in">
+                <button
+                  onClick={() => { setRenaming(true); setMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                  Rename
+                </button>
+                <button
+                  onClick={() => { setConfirmDelete(true); setMenuOpen(false); }}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete
+                </button>
+              </div>
+            </>
           )}
         </div>
-        <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors duration-200 leading-tight">
-          {release.name}
-        </h3>
-      </div>
-      
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-4">
-        <Calendar className="w-3.5 h-3.5" />
-        <span>{formatDateRange(release.startDate, release.endDate)}</span>
       </div>
 
-      <div className="flex items-center gap-4 pt-4 border-t border-border">
-        <div>
-          <div className="text-lg font-semibold text-foreground">{release.sprints?.length ?? 0}</div>
-          <div className="text-xs text-muted-foreground">Sprints</div>
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="mx-3 mb-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg animate-fade-in">
+          <p className="text-xs text-red-700 dark:text-red-400 mb-2">
+            Delete <strong>{product.name}</strong>? This removes all releases, tickets, and team members for this product.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { onDelete(); setConfirmDelete(false); }}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+            >
+              Delete
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="px-3 py-1.5 text-xs font-medium text-foreground bg-secondary hover:bg-accent rounded-md transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
-        <div>
-          <div className="text-lg font-semibold text-foreground">{countTickets(release)}</div>
-          <div className="text-xs text-muted-foreground">Tickets</div>
-        </div>
+      )}
+
+      {/* Releases list */}
+      <div className="flex-1 px-3 pb-2">
+        {product.releases.length === 0 ? (
+          <div className="px-2 py-6 text-center">
+            <p className="text-xs text-muted-foreground mb-3">No releases yet</p>
+            <button
+              onClick={onNewRelease}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              + Create first release
+            </button>
+          </div>
+        ) : (
+          <ul className="space-y-0.5">
+            {product.releases
+              .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
+              .slice(0, 4)
+              .map((release) => (
+                <ReleaseRow key={release.id} release={release} />
+              ))}
+            {product.releases.length > 4 && (
+              <li className="px-2 py-1.5 text-xs text-muted-foreground text-center">
+                +{product.releases.length - 4} more
+              </li>
+            )}
+          </ul>
+        )}
       </div>
-    </Link>
+
+      {/* Card footer */}
+      <div className="flex items-center gap-1.5 px-3 pb-3 pt-1 mt-auto">
+        <Link
+          to={product.releases[0] ? `/release/${product.releases[0].id}` : '#'}
+          onClick={(e) => {
+            if (!product.releases[0]) { e.preventDefault(); onNewRelease(); }
+          }}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-secondary hover:bg-accent rounded-lg transition-colors"
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          Open
+        </Link>
+        <Link
+          to={`/product/${product.id}/team`}
+          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-secondary hover:bg-accent rounded-lg transition-colors"
+        >
+          <Users className="w-3.5 h-3.5" />
+          Team
+        </Link>
+        <button
+          onClick={onNewRelease}
+          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-primary bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Release
+        </button>
+      </div>
+    </div>
   );
 }
+
+// ── Release Row (inside a product card) ──
+function ReleaseRow({ release }: { release: Release }) {
+  const tickets = release.features.reduce((s, f) => s + f.tickets.length, 0);
+  const pct = completionPct(release);
+  const now = new Date();
+  const isActive = release.startDate <= now && release.endDate >= now;
+  const isUpcoming = release.startDate > now;
+
+  return (
+    <li>
+      <Link
+        to={`/release/${release.id}`}
+        className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent/60 transition-colors group/row"
+      >
+        {/* Status dot */}
+        <span
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+            isActive
+              ? 'bg-green-500'
+              : isUpcoming
+                ? 'bg-amber-400'
+                : 'bg-muted-foreground/30'
+          }`}
+        />
+
+        {/* Name + date */}
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-foreground truncate group-hover/row:text-primary transition-colors">
+            {release.name}
+          </p>
+          <p className="text-[10px] text-muted-foreground">{fmtRange(release.startDate, release.endDate)}</p>
+        </div>
+
+        {/* Inline progress */}
+        {tickets > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary/60 transition-all"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="text-[10px] tabular-nums text-muted-foreground w-6 text-right">{pct}%</span>
+          </div>
+        )}
+
+        {tickets === 0 && (
+          <span className="text-[10px] text-muted-foreground italic">empty</span>
+        )}
+
+        <ChevronRight className="w-3 h-3 text-muted-foreground/40 group-hover/row:text-primary transition-colors shrink-0" />
+      </Link>
+    </li>
+  );
+}
+

@@ -5,6 +5,7 @@ import { TeamRoster } from './components/TeamRoster';
 import { TeamMemberDetail } from './components/TeamMemberDetail';
 import { HolidayManagement } from './components/HolidayManagement';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import NotFoundPage from './pages/NotFoundPage';
 
 export const router = createBrowserRouter([
   {
@@ -28,6 +29,16 @@ export const router = createBrowserRouter([
     ErrorBoundary: ErrorBoundary
   },
   {
+    path: '/product/:productId/team',
+    Component: TeamRoster,
+    ErrorBoundary: ErrorBoundary
+  },
+  {
+    path: '/product/:productId/team/:memberId',
+    Component: TeamMemberDetail,
+    ErrorBoundary: ErrorBoundary
+  },
+  {
     path: '/team',
     Component: TeamRoster,
     ErrorBoundary: ErrorBoundary
@@ -41,5 +52,9 @@ export const router = createBrowserRouter([
     path: '/holidays',
     Component: HolidayManagement,
     ErrorBoundary: ErrorBoundary
+  },
+  {
+    path: '*',
+    Component: NotFoundPage,
   }
 ]);

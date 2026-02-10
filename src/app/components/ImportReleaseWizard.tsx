@@ -5,7 +5,7 @@ import { parseCSV, validateAndTransformCSV, CSVParseResult } from '../lib/csvPar
 import { ticketImportMapping, teamMemberImportMapping, ptoImportMapping, holidayImportMapping } from '../lib/importMappings';
 
 export interface ImportedReleaseData {
-  tickets: Array<{ id: string; title: string; assignedTo: string; startDate: string; endDate: string; storyPoints: number; status: string }>;
+  tickets: Array<{ id: string; title: string; assignedTo: string; startDate: string; endDate: string; storyPoints: number; status: string; feature?: string }>;
   team: Array<{ id: string; name: string; role: string }>;
   pto: Array<{ id: string; name: string; startDate: string; endDate: string }>;
   holidays: Array<{ id: string; name: string; startDate: string; endDate: string }>;
@@ -176,6 +176,7 @@ export function ImportReleaseWizard({ onClose, products, onCreate }: ImportRelea
           endDate: t.endDate instanceof Date ? t.endDate.toISOString().split('T')[0] : String(t.endDate),
           storyPoints: Number(t.storyPoints) || 0,
           status: t.status || 'planned',
+          feature: t.feature || undefined,
         })),
         team: allTeam.map((m: any) => ({
           id: m.id || `tm-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,

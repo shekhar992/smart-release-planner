@@ -83,16 +83,18 @@ export function SprintCreationPopover({
     setUsePreset(false);
   };
 
+  const sprintDatesInvalid = startDate && endDate && endDate < startDate;
+
   const handleSubmitCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || sprintDatesInvalid) return;
     onCreateSprint(name.trim(), new Date(startDate), new Date(endDate));
     onClose();
   };
 
   const handleSubmitEdit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !editingSprintId || !onUpdateSprint) return;
+    if (!name.trim() || !editingSprintId || !onUpdateSprint || sprintDatesInvalid) return;
     onUpdateSprint(editingSprintId, name.trim(), new Date(startDate), new Date(endDate));
     setEditingSprintId(null);
     setMode('create');
@@ -305,7 +307,7 @@ export function SprintCreationPopover({
                 </button>
                 <button
                   type="submit"
-                  disabled={!name.trim()}
+                  disabled={!name.trim() || !!sprintDatesInvalid}
                   className="px-4 py-2.5 text-sm font-normal text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
                 >
                   {mode === 'edit' ? 'Save Changes' : 'Create Sprint'}

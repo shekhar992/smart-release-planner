@@ -1,13 +1,13 @@
-Name,Role
-Sarah Chen,Developer
-Marcus Rivera,Developer
-Elena Zhang,Developer
-James Wilson,Developer
-Priya Patel,Developer
-Alex Thompson,Developer
-Yuki Tanaka,Developer
-Maria Garcia,Developer
-Sofia Martinez,Designer
-David Kim,Designer
-Lisa Park,QA
-Tom Zhang,QA
+id,name,role,notes
+tm1,Sarah Chen,Developer,Senior full-stack engineer specializing in React and Node.js
+tm2,Marcus Rivera,Developer,Backend specialist with expertise in Python and databases
+tm3,Elena Zhang,Developer,Frontend engineer focusing on UI/UX implementation
+tm4,James Wilson,Developer,DevOps engineer managing CI/CD and infrastructure
+tm5,Priya Patel,Developer,Junior developer learning full-stack development
+tm6,Alex Thompson,Developer,Mobile app developer working on iOS and Android
+tm7,Yuki Tanaka,Developer,Data engineer building analytics pipelines
+tm8,Maria Garcia,Developer,Performance testing specialist
+tm9,Sofia Martinez,Designer,Product designer handling UI mockups and user research
+tm10,David Kim,Designer,UX designer conducting user interviews and wireframing
+tm11,Lisa Park,QA,Lead QA engineer with automation testing experience
+tm12,Tom Zhang,QA,QA analyst focusing on manual testing and bug reports
