@@ -61,6 +61,12 @@ export const ticketImportMapping: ColumnMapping[] = [
     validator: validators.isNotEmpty
   },
   {
+    csvColumn: 'description',
+    dataField: 'description',
+    required: false,
+    transformer: transformers.toString,
+  },
+  {
     csvColumn: 'feature',
     dataField: 'feature',
     required: false,

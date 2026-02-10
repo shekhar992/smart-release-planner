@@ -34,9 +34,11 @@ export interface ConflictSummary {
 
 /**
  * Check if two date ranges overlap
+ * Uses strict inequality so that back-to-back (cascading) tickets
+ * sharing the same boundary date are NOT treated as conflicts.
  */
 function datesOverlap(start1: Date, end1: Date, start2: Date, end2: Date): boolean {
-  return start1 <= end2 && start2 <= end1;
+  return start1 < end2 && start2 < end1;
 }
 
 /**

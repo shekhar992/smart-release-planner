@@ -3,6 +3,8 @@
  * Calculates sprint capacity considering working days, holidays, PTO, and team velocity
  */
 
+import { StoryPointMapping, storyPointsToDays } from '../data/mockData';
+
 export interface Sprint {
   id: string;
   name: string;
@@ -60,8 +62,9 @@ export interface SprintCapacity {
   
   // Load metrics
   plannedStoryPoints: number;
-  utilizationPercent: number; // (planned / capacity) × 100
-  overCapacity: boolean; // planned > capacity
+  plannedDays: number; // SP converted to days via mapping
+  utilizationPercent: number; // (plannedDays / totalTeamDays) × 100
+  overCapacity: boolean; // plannedDays > totalTeamDays
   
   // Breakdown
   ticketCount: number;
@@ -127,7 +130,8 @@ export function calculateSprintCapacity(
   tickets: Ticket[],
   teamMembers: TeamMember[],
   holidays: Holiday[],
-  velocityPerDay: number = 1
+  velocityPerDay: number = 1,
+  spMapping?: StoryPointMapping
 ): SprintCapacity {
   // Calculate total calendar days
   const totalCalendarDays = Math.ceil(
@@ -184,13 +188,18 @@ export function calculateSprintCapacity(
   const plannedStoryPoints = sprintTickets.reduce((sum, ticket) => {
     return sum + ticket.storyPoints;
   }, 0);
+
+  // Convert planned SP to days using mapping
+  const plannedDays = sprintTickets.reduce((sum, ticket) => {
+    return sum + storyPointsToDays(ticket.storyPoints, spMapping);
+  }, 0);
   
-  // Calculate utilization
-  const utilizationPercent = capacityStoryPoints > 0 
-    ? (plannedStoryPoints / capacityStoryPoints) * 100 
+  // Calculate utilization based on days (mapping-aware)
+  const utilizationPercent = totalTeamDays > 0 
+    ? (plannedDays / totalTeamDays) * 100 
     : 0;
   
-  const overCapacity = plannedStoryPoints > capacityStoryPoints;
+  const overCapacity = plannedDays > totalTeamDays;
   
   return {
     sprintId: sprint.id,
@@ -205,6 +214,7 @@ export function calculateSprintCapacity(
     velocityPerDay,
     capacityStoryPoints,
     plannedStoryPoints,
+    plannedDays,
     utilizationPercent,
     overCapacity,
     ticketCount: sprintTickets.length,
@@ -220,12 +230,13 @@ export function calculateAllSprintCapacities(
   tickets: Ticket[],
   teamMembers: TeamMember[],
   holidays: Holiday[],
-  velocityPerDay: number = 1
+  velocityPerDay: number = 1,
+  spMapping?: StoryPointMapping
 ): Map<string, SprintCapacity> {
   const capacityMap = new Map<string, SprintCapacity>();
   
   sprints.forEach(sprint => {
-    const capacity = calculateSprintCapacity(sprint, tickets, teamMembers, holidays, velocityPerDay);
+    const capacity = calculateSprintCapacity(sprint, tickets, teamMembers, holidays, velocityPerDay, spMapping);
     capacityMap.set(sprint.id, capacity);
   });
   

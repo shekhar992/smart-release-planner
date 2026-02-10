@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, AlertTriangle, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, AlertTriangle, GripVertical, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { Release, Ticket, Holiday, TeamMember } from '../data/mockData';
 import { SprintCreationPopover } from './SprintCreationPopover';
 import { TicketConflict, ConflictSummary, hasConflict, getTicketConflicts } from '../lib/conflictDetection';
@@ -14,6 +14,7 @@ interface TimelinePanelProps {
   onMoveTicket: (featureId: string, ticketId: string, newStartDate: Date) => void;
   onResizeTicket: (featureId: string, ticketId: string, newEndDate: Date) => void;
   onSelectTicket: (featureId: string, ticketId: string) => void;
+  onCloneTicket?: (featureId: string, ticketId: string) => void;
   onCreateSprint: (name: string, startDate: Date, endDate: Date) => void;
   onUpdateSprint?: (sprintId: string, name: string, startDate: Date, endDate: Date) => void;
   onDeleteSprint?: (sprintId: string) => void;
@@ -27,7 +28,7 @@ const ROW_HEIGHT = 48;
 const FEATURE_HEADER_HEIGHT = 40;
 const SIDEBAR_WIDTH = 320; // Fixed left sidebar width
 
-export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, conflictSummary, sprintCapacities }: TimelinePanelProps) {
+export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, conflictSummary, sprintCapacities }: TimelinePanelProps) {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [showSprintCreation, setShowSprintCreation] = useState(false);
   const [showHolidays, setShowHolidays] = useState(true);
@@ -392,6 +393,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                       <TicketTimelineBar
                         ticket={ticket}
                         featureId={feature.id}
+                        featureName={feature.name}
                         rowHeight={ROW_HEIGHT}
                         dayWidth={DAY_WIDTH}
                         getPositionFromDate={getPositionFromDate}
@@ -403,6 +405,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                         }}
                         onMove={(newStartDate) => onMoveTicket(feature.id, ticket.id, newStartDate)}
                         onResize={(newEndDate) => onResizeTicket(feature.id, ticket.id, newEndDate)}
+                        onClone={onCloneTicket ? () => onCloneTicket(feature.id, ticket.id) : undefined}
                         showPTO={showPTO}
                         startDate={startDate}
                         hasConflict={hasConflict(ticket.id, conflicts)}
@@ -983,11 +986,11 @@ function SprintHeaderRow({
                   </span>
                 </div>
 
-                {/* Story points summary */}
+                {/* Story points / days summary */}
                 <div className="text-[10px]" style={{ color: designTokens.colors.neutral[600], fontWeight: designTokens.typography.fontWeight.medium }}>
-                  <span className="font-semibold">{capacity.plannedStoryPoints}</span>
-                  <span style={{ color: designTokens.colors.neutral[400] }}> / </span>
-                  <span>{capacity.capacityStoryPoints} SP</span>
+                  <span className="font-semibold">{capacity.plannedStoryPoints} SP</span>
+                  <span style={{ color: designTokens.colors.neutral[400] }}> · </span>
+                  <span>{Math.round(capacity.plannedDays * 10) / 10}d / {capacity.totalTeamDays}d</span>
                 </div>
 
                 {/* Detailed hover tooltip */}
@@ -1031,12 +1034,12 @@ function SprintHeaderRow({
                       </div>
                       <div className="flex justify-between font-semibold text-gray-800">
                         <span>Planned work:</span>
-                        <span>{capacity.plannedStoryPoints} story points</span>
+                        <span>{capacity.plannedStoryPoints} SP ({Math.round(capacity.plannedDays * 10) / 10} days)</span>
                       </div>
                       {capacity.overCapacity && (
                         <div className="mt-2 pt-2 border-t border-red-200 text-red-600 font-semibold flex items-center gap-1">
                           <AlertTriangle className="w-3 h-3" />
-                          Over by {capacity.plannedStoryPoints - capacity.capacityStoryPoints} SP
+                          Over by {Math.round((capacity.plannedDays - capacity.totalTeamDays) * 10) / 10} days
                         </div>
                       )}
                     </div>
@@ -1064,8 +1067,9 @@ function SprintSummaryStrip({
   onCollapse: () => void;
 }) {
   const totalPlanned = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.plannedStoryPoints, 0);
-  const totalCapacity = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.capacityStoryPoints, 0);
-  const overallUtil = totalCapacity > 0 ? Math.round((totalPlanned / totalCapacity) * 100) : 0;
+  const totalPlannedDays = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.plannedDays, 0);
+  const totalTeamDays = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.totalTeamDays, 0);
+  const overallUtil = totalTeamDays > 0 ? Math.round((totalPlannedDays / totalTeamDays) * 100) : 0;
 
   return (
     <div className="bg-white border-b border-gray-200 px-4 py-2.5">
@@ -1076,7 +1080,7 @@ function SprintSummaryStrip({
           <div className="flex items-center gap-2 text-[11px] text-gray-500">
             <span>{sprints.length} sprint{sprints.length > 1 ? 's' : ''}</span>
             <span className="text-gray-300">|</span>
-            <span>{totalPlanned} / {totalCapacity} SP</span>
+            <span>{totalPlanned} SP · {Math.round(totalPlannedDays * 10) / 10}d / {totalTeamDays}d</span>
             <span className="text-gray-300">|</span>
             <span 
               className="font-semibold"
@@ -1140,7 +1144,7 @@ function SprintSummaryStrip({
 
               <div className="flex items-center justify-between text-[10px] text-gray-500">
                 <span>
-                  <span className="font-semibold text-gray-700">{capacity.plannedStoryPoints}</span> / {capacity.capacityStoryPoints} SP
+                  <span className="font-semibold text-gray-700">{capacity.plannedStoryPoints} SP</span> · {Math.round(capacity.plannedDays * 10) / 10}d / {capacity.totalTeamDays}d
                 </span>
                 <span>{ticketsInSprint.length} ticket{ticketsInSprint.length !== 1 ? 's' : ''}</span>
               </div>
@@ -1152,7 +1156,7 @@ function SprintSummaryStrip({
                 {capacity.overCapacity && (
                   <span className="ml-auto text-red-500 font-medium flex items-center gap-0.5">
                     <AlertTriangle className="w-2.5 h-2.5" />
-                    Over by {capacity.plannedStoryPoints - capacity.capacityStoryPoints} SP
+                    Over by {Math.round((capacity.plannedDays - capacity.totalTeamDays) * 10) / 10}d
                   </span>
                 )}
               </div>
@@ -1395,6 +1399,7 @@ function TicketSidebarRow({
 function TicketTimelineBar({
   ticket,
   featureId: _featureId,
+  featureName,
   rowHeight,
   dayWidth,
   getPositionFromDate,
@@ -1403,6 +1408,7 @@ function TicketTimelineBar({
   onSelect,
   onMove,
   onResize,
+  onClone,
   showPTO,
   startDate: _startDate,
   hasConflict,
@@ -1412,6 +1418,7 @@ function TicketTimelineBar({
 }: {
   ticket: Ticket;
   featureId: string;
+  featureName: string;
   rowHeight: number;
   dayWidth: number;
   getPositionFromDate: (date: Date) => number;
@@ -1420,6 +1427,7 @@ function TicketTimelineBar({
   onSelect: () => void;
   onMove: (newStartDate: Date) => void;
   onResize: (newEndDate: Date) => void;
+  onClone?: () => void;
   showPTO: boolean;
   startDate: Date;
   hasConflict: boolean;
@@ -1651,9 +1659,7 @@ function TicketTimelineBar({
         }}
         onMouseEnter={() => {
           setIsHovering(true);
-          if (hasConflict || ptoDays > 0) {
-            setShowConflictTooltip(true);
-          }
+          setShowConflictTooltip(true);
         }}
         onMouseLeave={() => {
           setIsHovering(false);
@@ -1729,6 +1735,20 @@ function TicketTimelineBar({
               +{ptoDays}d
             </span>
           )}
+          {/* Clone ticket button - visible on hover */}
+          {onClone && (
+            <button
+              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-0.5 rounded hover:bg-black/10"
+              style={{ marginLeft: 'auto' }}
+              title="Clone ticket"
+              onClick={(e) => {
+                e.stopPropagation();
+                onClone();
+              }}
+            >
+              <Copy className="w-3 h-3" style={{ color: hasConflict ? getConflictColors('warning').text : getTicketColors(ticket.status).text }} />
+            </button>
+          )}
         </div>
 
         {/* 1.2.4: Right resize handle with improved affordance */}
@@ -1743,8 +1763,8 @@ function TicketTimelineBar({
           onMouseDown={(e) => handleMouseDown(e, 'resize-right')}
         />
 
-        {/* Enhanced Tooltip - Shows conflicts and PTO impact */}
-        {(hasConflict || ptoDays > 0) && showConflictTooltip && (
+        {/* Enhanced Tooltip - Shows ticket details, conflicts and PTO impact */}
+        {showConflictTooltip && (
           <div 
             className="absolute left-0 top-full mt-2 bg-white border rounded-lg shadow-xl p-3 min-w-[280px] z-50"
             style={{ 
@@ -1752,6 +1772,39 @@ function TicketTimelineBar({
               borderColor: hasConflict ? 'rgb(252, 211, 77)' : 'rgb(209, 213, 219)'
             }}
           >
+            {/* Basic Ticket Info Section */}
+            <div className={hasConflict || ptoDays > 0 ? 'mb-3 pb-3 border-b border-gray-200' : ''}>
+              <div className="text-xs font-semibold text-gray-900 mb-2 leading-relaxed">{ticket.title}</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Story Points</span>
+                  <span className="font-medium text-gray-800">{ticket.storyPoints}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Status</span>
+                  <span className={`font-medium ${
+                    ticket.status === 'completed' ? 'text-green-700' :
+                    ticket.status === 'in-progress' ? 'text-blue-700' : 'text-gray-600'
+                  }`}>
+                    {ticket.status === 'in-progress' ? 'In Progress' : ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Assignee</span>
+                  <span className="font-medium text-gray-800">{ticket.assignedTo}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Feature</span>
+                  <span className="font-medium text-gray-800 truncate ml-1">{featureName}</span>
+                </div>
+                <div className="col-span-2 flex justify-between">
+                  <span className="text-gray-500">Dates</span>
+                  <span className="font-medium text-gray-800">
+                    {ticket.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {ticket.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </span>
+                </div>
+              </div>
+            </div>
             {/* Conflict Section */}
             {hasConflict && ticketConflicts.length > 0 && (
               <div className="mb-3">

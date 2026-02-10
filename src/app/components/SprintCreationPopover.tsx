@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Trash2, Edit3, AlertTriangle } from 'lucide-react';
+import { X, Trash2, Edit3, AlertTriangle, Info } from 'lucide-react';
 import { Sprint } from '../data/mockData';
 
 interface SprintCreationPopoverProps {
@@ -39,18 +39,25 @@ export function SprintCreationPopover({
   const autoStartDate = lastSprint 
     ? new Date(lastSprint.endDate.getTime() + 24 * 60 * 60 * 1000) // Day after last sprint ends
     : (defaultStartDate || new Date());
+
+  // Auto-detect last sprint's duration (carry forward) — fallback to 14 days
+  const detectedDuration = lastSprint
+    ? Math.round((lastSprint.endDate.getTime() - lastSprint.startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1
+    : 14;
+  // Snap to nearest preset if close, otherwise use detected
+  const snappedDuration = DURATION_PRESETS.find(p => Math.abs(p.days - detectedDuration) <= 1)?.days || detectedDuration;
   
   const [name, setName] = useState(`Sprint ${nextSprintNumber}`);
   const [startDate, setStartDate] = useState(autoStartDate.toISOString().split('T')[0]);
-  const [selectedDuration, setSelectedDuration] = useState<number>(14);
+  const [selectedDuration, setSelectedDuration] = useState<number>(snappedDuration);
   const [endDate, setEndDate] = useState(
-    new Date(autoStartDate.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    new Date(autoStartDate.getTime() + (snappedDuration - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
   const [usePreset, setUsePreset] = useState(true);
 
   // Bulk creation state
   const [bulkCount, setBulkCount] = useState(4);
-  const [bulkDuration, setBulkDuration] = useState(14);
+  const [bulkDuration, setBulkDuration] = useState(snappedDuration);
   const [bulkStartDate, setBulkStartDate] = useState(autoStartDate.toISOString().split('T')[0]);
   const [bulkStartNumber, setBulkStartNumber] = useState(nextSprintNumber);
 
@@ -179,6 +186,20 @@ export function SprintCreationPopover({
           {(mode === 'create' || mode === 'edit') && (
             <form onSubmit={mode === 'edit' ? handleSubmitEdit : handleSubmitCreate}>
               <div className="px-6 py-5 space-y-5">
+                {/* Auto-calculated info banner */}
+                {mode === 'create' && lastSprint && (
+                  <div className="flex items-start gap-2.5 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+                    <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+                    <div className="text-xs text-blue-700 leading-relaxed">
+                      <span>Continues after </span>
+                      <span className="font-semibold">{lastSprint.name}</span>
+                      <span className="text-blue-500"> · ends {lastSprint.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                      <br />
+                      <span className="text-blue-600">Start date &amp; duration auto-filled from previous sprint</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Sprint Name */}
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-2">Sprint Name</label>

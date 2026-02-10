@@ -1,10 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { WorkloadModal } from './WorkloadModal';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
 import { TicketCreationModal } from './TicketCreationModal';
+import { BulkTicketImportModal } from './BulkTicketImportModal';
 import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct } from '../data/mockData';
 import { detectConflicts, getConflictSummary } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
@@ -53,6 +54,7 @@ export function ReleasePlanningCanvas() {
   const [showWorkloadModal, setShowWorkloadModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<{ featureId: string; ticketId: string } | null>(null);
   const [showTicketCreation, setShowTicketCreation] = useState<{ featureId?: string } | null>(null);
+  const [showBulkImport, setShowBulkImport] = useState<{ featureId?: string } | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
   const [editingRelease, setEditingRelease] = useState(false);
   const [confirmDeleteRelease, setConfirmDeleteRelease] = useState(false);
@@ -151,9 +153,10 @@ export function ReleasePlanningCanvas() {
       allTickets,
       teamMembers,
       holidays,
-      1 // velocity: 1 story point = 1 day
+      1, // velocity: 1 story point = 1 day (base rate)
+      release?.storyPointMapping
     );
-  }, [release?.sprints, allTickets, teamMembers, holidays]);
+  }, [release?.sprints, allTickets, teamMembers, holidays, release?.storyPointMapping]);
 
   const handleUpdateTicket = (featureId: string, ticketId: string, updates: Partial<Ticket>) => {
     setRelease(prev => {
@@ -313,6 +316,26 @@ export function ReleasePlanningCanvas() {
     });
   };
 
+  const handleCloneTicket = (featureId: string, ticketId: string) => {
+    const feature = release?.features.find(f => f.id === featureId);
+    const ticket = feature?.tickets.find(t => t.id === ticketId);
+    if (!ticket) return;
+
+    const duration = ticket.endDate.getTime() - ticket.startDate.getTime();
+    const newStart = new Date(ticket.endDate.getTime());
+    const newEnd = new Date(newStart.getTime() + duration);
+
+    handleAddTicketFull(featureId, {
+      title: `${ticket.title} (Copy)`,
+      description: ticket.description,
+      startDate: newStart,
+      endDate: newEnd,
+      status: 'planned',
+      storyPoints: ticket.storyPoints,
+      assignedTo: ticket.assignedTo,
+    });
+  };
+
   const handleUpdateSprint = (sprintId: string, name: string, startDate: Date, endDate: Date) => {
     setRelease(prev => {
       if (!prev) return prev;
@@ -392,6 +415,14 @@ export function ReleasePlanningCanvas() {
             <Plus className="w-4 h-4" />
             <span>New Ticket</span>
           </button>
+
+          <button
+            onClick={() => setShowBulkImport({})}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all border border-gray-200 hover:border-gray-300"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Import Tickets</span>
+          </button>
           
           <button
             onClick={() => navigate(`/product/${releaseData.id}/team`)}
@@ -419,6 +450,7 @@ export function ReleasePlanningCanvas() {
           onMoveTicket={handleMoveTicket}
           onResizeTicket={handleResizeTicket}
           onSelectTicket={(featureId, ticketId) => setSelectedTicket({ featureId, ticketId })}
+          onCloneTicket={handleCloneTicket}
           onCreateSprint={handleCreateSprint}
           onUpdateSprint={handleUpdateSprint}
           onDeleteSprint={handleDeleteSprint}
@@ -457,6 +489,16 @@ export function ReleasePlanningCanvas() {
           teamMembers={teamMembers}
           preselectedFeatureId={showTicketCreation.featureId}
           onClose={() => setShowTicketCreation(null)}
+          onAddFeature={handleAddFeatureWithName}
+          onAddTicket={handleAddTicketFull}
+        />
+      )}
+
+      {/* Bulk Ticket Import Modal */}
+      {showBulkImport && (
+        <BulkTicketImportModal
+          release={release}
+          onClose={() => setShowBulkImport(null)}
           onAddFeature={handleAddFeatureWithName}
           onAddTicket={handleAddTicketFull}
         />

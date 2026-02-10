@@ -1,18 +1,15 @@
 import { Link } from 'react-router';
-import { Plus, Calendar, Package, FolderPlus, Users, Upload, ChevronRight, BarChart3, Layers, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Calendar, Package, FolderPlus, Users, ChevronRight, BarChart3, Layers, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { mockProducts, Product, Release, mockHolidays, mockTeamMembers, TeamMember } from '../data/mockData';
 import { CreateProductModal } from './CreateProductModal';
 import { CreateReleaseModal } from './CreateReleaseModal';
-import { ImportReleaseWizard } from './ImportReleaseWizard';
 import { PageShell } from './PageShell';
-import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers, saveHolidays, loadHolidays } from '../lib/localStorage';
-import type { ImportedReleaseData } from './ImportReleaseWizard';
+import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers } from '../lib/localStorage';
 
 export function PlanningDashboard() {
   const [showCreateProduct, setShowCreateProduct] = useState(false);
-  const [showCreateRelease, setShowCreateRelease] = useState(false);
-  const [showImportWizard, setShowImportWizard] = useState(false);
+  const [showCreateRelease, setShowCreateRelease] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   
   // Initialize and load products from localStorage
@@ -54,41 +51,17 @@ export function PlanningDashboard() {
     }
   };
 
-  const handleCreateRelease = (productId: string, name: string, startDate: Date, endDate: Date, importedData?: ImportedReleaseData) => {
+  const handleCreateRelease = (productId: string, name: string, startDate: Date, endDate: Date, _importedData?: any, sprints?: import('../data/mockData').Sprint[], storyPointMapping?: import('../data/mockData').StoryPointMapping) => {
     const releaseId = `r-${Date.now()}`;
-
-    // Convert imported tickets into features/tickets structure
-    const tickets: import('../data/mockData').Ticket[] = (importedData?.tickets || []).map(t => ({
-      id: t.id,
-      title: t.title,
-      startDate: new Date(t.startDate),
-      endDate: new Date(t.endDate),
-      status: (t.status as 'planned' | 'in-progress' | 'completed') || 'planned',
-      storyPoints: t.storyPoints,
-      assignedTo: t.assignedTo,
-    }));
-
-    // Group tickets by feature name (from CSV 'feature' column, or default 'Imported Tickets')
-    const featureMap = new Map<string, typeof tickets>();
-    tickets.forEach(t => {
-      const featureName = ((importedData?.tickets || []).find(it => it.id === t.id) as any)?.feature || 'Imported Tickets';
-      if (!featureMap.has(featureName)) featureMap.set(featureName, []);
-      featureMap.get(featureName)!.push(t);
-    });
-
-    const features: import('../data/mockData').Feature[] = Array.from(featureMap.entries()).map(([featureName, featureTickets], i) => ({
-      id: `f-${Date.now()}-${i}`,
-      name: featureName,
-      tickets: featureTickets,
-    }));
 
     const newRelease: Release = {
       id: releaseId,
       name,
       startDate,
       endDate,
-      features,
-      sprints: [],
+      features: [],
+      sprints: sprints && sprints.length > 0 ? sprints : [],
+      storyPointMapping,
     };
 
     // Update products state
@@ -101,61 +74,7 @@ export function PlanningDashboard() {
     setProducts(updatedProducts);
     saveProducts(updatedProducts);
 
-    // Save imported team members (scoped to the product)
-    if (importedData?.team && importedData.team.length > 0) {
-      const existingTeam = loadTeamMembers() || [];
-      const newMembers: import('../data/mockData').TeamMember[] = importedData.team
-        .filter(m => !existingTeam.some(e => e.name === m.name && e.productId === productId))
-        .map(m => ({
-          id: m.id,
-          name: m.name,
-          role: m.role as 'Developer' | 'Designer' | 'QA',
-          pto: [],
-          productId,
-        }));
-      if (newMembers.length > 0) {
-        saveTeamMembers([...existingTeam, ...newMembers]);
-      }
-    }
-
-    // Save imported holidays
-    if (importedData?.holidays && importedData.holidays.length > 0) {
-      const existingHolidays = loadHolidays() || [];
-      const newHolidays: import('../data/mockData').Holiday[] = importedData.holidays
-        .filter(h => !existingHolidays.some(e => e.name === h.name))
-        .map(h => ({
-          id: h.id,
-          name: h.name,
-          startDate: new Date(h.startDate),
-          endDate: new Date(h.endDate),
-        }));
-      if (newHolidays.length > 0) {
-        saveHolidays([...existingHolidays, ...newHolidays]);
-      }
-    }
-
-    // Save PTO entries to team members
-    if (importedData?.pto && importedData.pto.length > 0) {
-      const teamMembers = loadTeamMembers() || [];
-      const updatedTeam = teamMembers.map(member => {
-        const memberPto = importedData.pto
-          .filter(p => p.name === member.name)
-          .map(p => ({
-            id: p.id,
-            name: p.name,
-            startDate: new Date(p.startDate),
-            endDate: new Date(p.endDate),
-          }));
-        if (memberPto.length > 0) {
-          return { ...member, pto: [...(member.pto || []), ...memberPto] };
-        }
-        return member;
-      });
-      saveTeamMembers(updatedTeam);
-    }
-
-    setShowCreateRelease(false);
-    setShowImportWizard(false);
+    setShowCreateRelease(null);
   };
 
   // ── Product edit / delete ──
@@ -244,7 +163,7 @@ export function PlanningDashboard() {
                 key={product.id}
                 product={product}
                 teamCount={teamCounts[product.id] || 0}
-                onNewRelease={() => setShowCreateRelease(true)}
+                onNewRelease={() => setShowCreateRelease(product.id)}
                 onRename={(name) => handleRenameProduct(product.id, name)}
                 onDelete={() => handleDeleteProduct(product.id)}
               />
@@ -274,13 +193,6 @@ export function PlanningDashboard() {
               <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
               Holidays
             </Link>
-            <button
-              onClick={() => setShowImportWizard(true)}
-              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-accent hover:border-primary/20 transition-all"
-            >
-              <Upload className="w-3.5 h-3.5 text-muted-foreground" />
-              Bulk Import
-            </button>
           </div>
         </div>
       )}
@@ -295,19 +207,13 @@ export function PlanningDashboard() {
 
       {showCreateRelease && products.length > 0 && (
         <CreateReleaseModal
-          onClose={() => setShowCreateRelease(false)}
+          onClose={() => setShowCreateRelease(null)}
           onCreate={handleCreateRelease}
           products={products}
+          defaultProductId={showCreateRelease !== 'any' ? showCreateRelease : undefined}
         />
       )}
 
-      {showImportWizard && products.length > 0 && (
-        <ImportReleaseWizard
-          onClose={() => setShowImportWizard(false)}
-          products={products}
-          onCreate={handleCreateRelease}
-        />
-      )}
     </PageShell>
   );
 }

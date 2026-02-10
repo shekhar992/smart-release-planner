@@ -113,8 +113,8 @@ export function TicketDetailsPanel({
         onClick={onClose}
       />
 
-      {/* Side Panel */}
-      <div className="fixed right-0 top-0 bottom-0 w-[420px] bg-white shadow-2xl z-50 flex flex-col animate-slide-in border-l border-gray-200">
+      {/* Center Modal */}
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] bg-white rounded-xl shadow-2xl z-50 flex flex-col max-h-[85vh] border border-gray-200">
         {/* Header */}
         <div className="flex items-start justify-between px-6 py-5 border-b border-gray-200 bg-gray-50/50">
           <div className="flex-1 min-w-0">

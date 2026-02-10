@@ -22,6 +22,72 @@ export interface Sprint {
   endDate: Date;
 }
 
+// ── Story Point ↔ Days Mapping ──
+
+export type SPMappingPreset = 'fibonacci' | 'linear' | 'custom';
+
+export interface SPMappingEntry {
+  sp: number;
+  days: number;
+}
+
+export interface StoryPointMapping {
+  preset: SPMappingPreset;
+  /** Ordered list of SP → days pairs (ascending by sp) */
+  entries: SPMappingEntry[];
+}
+
+export const SP_PRESETS: Record<Exclude<SPMappingPreset, 'custom'>, StoryPointMapping> = {
+  fibonacci: {
+    preset: 'fibonacci',
+    entries: [
+      { sp: 1, days: 0.5 },
+      { sp: 2, days: 1 },
+      { sp: 3, days: 2 },
+      { sp: 5, days: 3 },
+      { sp: 8, days: 5 },
+      { sp: 13, days: 8 },
+    ],
+  },
+  linear: {
+    preset: 'linear',
+    entries: [
+      { sp: 1, days: 1 },
+      { sp: 2, days: 2 },
+      { sp: 3, days: 3 },
+      { sp: 5, days: 5 },
+      { sp: 8, days: 8 },
+      { sp: 13, days: 13 },
+    ],
+  },
+};
+
+/**
+ * Convert a story-point value to days using the mapping.
+ * For SP values not in the table, interpolates linearly between nearest entries.
+ * Falls back to 1:1 when no mapping provided.
+ */
+export function storyPointsToDays(sp: number, mapping?: StoryPointMapping): number {
+  if (!mapping || mapping.entries.length === 0) return sp; // 1:1 fallback
+  const entries = mapping.entries;
+  // Exact match
+  const exact = entries.find(e => e.sp === sp);
+  if (exact) return exact.days;
+  // Below minimum → proportional
+  if (sp <= entries[0].sp) return (sp / entries[0].sp) * entries[0].days;
+  // Above maximum → proportional from last entry
+  const last = entries[entries.length - 1];
+  if (sp >= last.sp) return (sp / last.sp) * last.days;
+  // Between two entries → linear interpolation
+  for (let i = 0; i < entries.length - 1; i++) {
+    if (sp > entries[i].sp && sp < entries[i + 1].sp) {
+      const ratio = (sp - entries[i].sp) / (entries[i + 1].sp - entries[i].sp);
+      return entries[i].days + ratio * (entries[i + 1].days - entries[i].days);
+    }
+  }
+  return sp; // ultimate fallback
+}
+
 export interface Release {
   id: string;
   name: string;
@@ -29,6 +95,7 @@ export interface Release {
   endDate: Date;
   features: Feature[];
   sprints?: Sprint[];
+  storyPointMapping?: StoryPointMapping;
 }
 
 export interface Product {
