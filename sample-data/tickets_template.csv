@@ -1,0 +1,51 @@
+Ticket Name,Story Points,Assigned To,Start Date,End Date
+User Login API,5,Sarah Chen,2026-02-10,2026-02-14
+Password Reset Flow,3,Marcus Rivera,2026-02-17,2026-02-21
+Session Management,5,Elena Zhang,2026-02-24,2026-02-28
+OAuth Integration,8,James Wilson,2026-03-03,2026-03-10
+JWT Token Refresh,3,Priya Patel,2026-03-10,2026-03-14
+Multi-Factor Auth Setup,5,Alex Thompson,2026-03-17,2026-03-21
+User Profile Management,3,Yuki Tanaka,2026-03-24,2026-03-28
+RBAC Implementation,8,Maria Garcia,2026-03-31,2026-04-07
+Audit Logging,5,Sarah Chen,2026-04-07,2026-04-11
+Security Headers,3,Marcus Rivera,2026-04-14,2026-04-18
+API Rate Limiting,5,Elena Zhang,2026-04-21,2026-04-25
+CORS Configuration,3,James Wilson,2026-04-28,2026-05-02
+Dashboard Analytics API,8,Priya Patel,2026-02-10,2026-02-17
+Chart Component Library,8,Alex Thompson,2026-02-17,2026-02-24
+Data Export CSV,5,Yuki Tanaka,2026-02-24,2026-03-03
+Real-time Metrics,13,Maria Garcia,2026-03-03,2026-03-17
+Custom Reports,8,Sarah Chen,2026-03-17,2026-03-24
+Email Notifications,5,Marcus Rivera,2026-03-24,2026-03-31
+Performance Tuning,5,Elena Zhang,2026-03-31,2026-04-07
+Dashboard Caching,3,James Wilson,2026-04-07,2026-04-11
+Mobile App Setup,5,Maria Garcia,2026-02-10,2026-02-14
+Navigation System,5,Priya Patel,2026-02-17,2026-02-21
+Offline Sync,13,Alex Thompson,2026-02-24,2026-03-10
+Push Notifications,8,Yuki Tanaka,2026-03-10,2026-03-17
+Camera Integration,5,Sarah Chen,2026-03-17,2026-03-24
+File Upload,5,Marcus Rivera,2026-03-24,2026-03-31
+Biometric Auth,8,Elena Zhang,2026-03-31,2026-04-07
+App Store Deployment,8,Maria Garcia,2026-04-07,2026-04-14
+CI/CD Pipeline,8,James Wilson,2026-02-10,2026-02-17
+Kubernetes Setup,8,James Wilson,2026-02-17,2026-02-24
+Monitoring & Alerts,8,Alex Thompson,2026-02-24,2026-03-03
+Auto-scaling Config,5,Alex Thompson,2026-03-03,2026-03-10
+Backup Strategy,8,James Wilson,2026-03-10,2026-03-17
+Security Hardening,8,Alex Thompson,2026-03-17,2026-03-24
+Load Balancer Setup,5,James Wilson,2026-03-24,2026-03-31
+Production Deployment,13,James Wilson,2026-03-31,2026-04-14
+E2E Test Framework,5,Lisa Park,2026-02-17,2026-02-21
+API Integration Tests,8,Tom Zhang,2026-02-24,2026-03-03
+Mobile Testing iOS,8,Lisa Park,2026-03-10,2026-03-17
+Mobile Testing Android,8,Tom Zhang,2026-03-10,2026-03-17
+Performance Tests,8,Lisa Park,2026-03-17,2026-03-24
+Security Testing,8,Tom Zhang,2026-03-24,2026-03-31
+UAT Coordination,5,Lisa Park,2026-03-31,2026-04-07
+Regression Testing,8,Tom Zhang,2026-04-07,2026-04-14
+Design System,5,Sofia Martinez,2026-02-10,2026-02-17
+Dashboard Mockups,8,Sofia Martinez,2026-02-17,2026-02-24
+Mobile UI Design,13,Sofia Martinez,2026-02-24,2026-03-10
+Accessibility Audit,5,David Kim,2026-03-10,2026-03-17
+User Flow Optimization,5,David Kim,2026-03-17,2026-03-24
+Usability Testing,8,Sofia Martinez,2026-03-24,2026-03-31

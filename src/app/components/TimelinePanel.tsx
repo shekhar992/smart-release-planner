@@ -1,12 +1,14 @@
 import { useState, useRef } from 'react';
 import { Plus, AlertTriangle } from 'lucide-react';
-import { Release, Ticket, mockHolidays, mockTeamMembers } from '../data/mockData';
+import { Release, Ticket, Holiday, TeamMember } from '../data/mockData';
 import { SprintCreationPopover } from './SprintCreationPopover';
 import { TicketConflict, ConflictSummary, hasConflict, getTicketConflicts } from '../lib/conflictDetection';
 import { SprintCapacity, getCapacityStatusColor } from '../lib/capacityCalculation';
 
 interface TimelinePanelProps {
   release: Release;
+  holidays: Holiday[];
+  teamMembers: TeamMember[];
   onMoveTicket: (featureId: string, ticketId: string, newStartDate: Date) => void;
   onResizeTicket: (featureId: string, ticketId: string, newEndDate: Date) => void;
   onSelectTicket: (featureId: string, ticketId: string) => void;
@@ -21,7 +23,7 @@ const ROW_HEIGHT = 48;
 const FEATURE_HEADER_HEIGHT = 40;
 const SIDEBAR_WIDTH = 320; // Fixed left sidebar width
 
-export function TimelinePanel({ release, onMoveTicket, onResizeTicket, onSelectTicket, onCreateSprint, conflicts, conflictSummary, sprintCapacities }: TimelinePanelProps) {
+export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCreateSprint, conflicts, conflictSummary, sprintCapacities }: TimelinePanelProps) {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [showSprintCreation, setShowSprintCreation] = useState(false);
   const [showHolidays, setShowHolidays] = useState(true);
@@ -32,31 +34,59 @@ export function TimelinePanel({ release, onMoveTicket, onResizeTicket, onSelectT
   // Refs for scroll synchronization
   const sidebarRef = useRef<HTMLDivElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
-  const isSyncingScroll = useRef(false);
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  const isSyncingScrollVertical = useRef(false);
+  const isSyncingScrollHorizontal = useRef(false);
 
   const startDate = new Date(release.startDate);
   const endDate = new Date(release.endDate);
   
-  // Synchronize scroll positions
+  // Synchronize vertical scroll positions
   const handleSidebarScroll = () => {
-    if (isSyncingScroll.current) return;
-    isSyncingScroll.current = true;
+    if (isSyncingScrollVertical.current) return;
+    isSyncingScrollVertical.current = true;
     if (sidebarRef.current && timelineRef.current) {
       timelineRef.current.scrollTop = sidebarRef.current.scrollTop;
     }
     requestAnimationFrame(() => {
-      isSyncingScroll.current = false;
+      isSyncingScrollVertical.current = false;
     });
   };
   
   const handleTimelineScroll = () => {
-    if (isSyncingScroll.current) return;
-    isSyncingScroll.current = true;
+    if (isSyncingScrollVertical.current) return;
+    isSyncingScrollVertical.current = true;
     if (sidebarRef.current && timelineRef.current) {
       sidebarRef.current.scrollTop = timelineRef.current.scrollTop;
     }
     requestAnimationFrame(() => {
-      isSyncingScroll.current = false;
+      isSyncingScrollVertical.current = false;
+    });
+    
+    // Also sync horizontal scroll with header
+    handleTimelineHorizontalScroll();
+  };
+  
+  // Synchronize horizontal scroll positions
+  const handleHeaderScroll = () => {
+    if (isSyncingScrollHorizontal.current) return;
+    isSyncingScrollHorizontal.current = true;
+    if (headerScrollRef.current && timelineRef.current) {
+      timelineRef.current.scrollLeft = headerScrollRef.current.scrollLeft;
+    }
+    requestAnimationFrame(() => {
+      isSyncingScrollHorizontal.current = false;
+    });
+  };
+  
+  const handleTimelineHorizontalScroll = () => {
+    if (isSyncingScrollHorizontal.current) return;
+    isSyncingScrollHorizontal.current = true;
+    if (headerScrollRef.current && timelineRef.current) {
+      headerScrollRef.current.scrollLeft = timelineRef.current.scrollLeft;
+    }
+    requestAnimationFrame(() => {
+      isSyncingScrollHorizontal.current = false;
     });
   };
 
@@ -83,6 +113,13 @@ export function TimelinePanel({ release, onMoveTicket, onResizeTicket, onSelectT
 
   return (
     <div className="h-full flex flex-col bg-white">
+      {/* Hide scrollbar for header while maintaining scroll functionality */}
+      <style>{`
+        .header-scroll-hidden::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
+      
       {/* Sticky Header Row */}
       <div className="sticky top-0 z-30 bg-white border-b border-gray-200 flex">
         {/* Left Sidebar Header */}
@@ -102,8 +139,17 @@ export function TimelinePanel({ release, onMoveTicket, onResizeTicket, onSelectT
           />
         </div>
 
-        {/* Timeline Header (Dates + Sprints) */}
-        <div className="flex-1 overflow-x-auto">
+        {/* Timeline Header (Dates + Sprints) - Scrollbar hidden, synced with timeline */}
+        <div 
+          ref={headerScrollRef}
+          className="flex-1 overflow-x-auto header-scroll-hidden"
+          style={{
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            WebkitOverflowScrolling: 'touch'
+          }}
+          onScroll={handleHeaderScroll}
+        >
           <div style={{ width: timelineWidth }}>
             <TimelineHeader
               startDate={startDate}
@@ -212,7 +258,7 @@ export function TimelinePanel({ release, onMoveTicket, onResizeTicket, onSelectT
             {/* LAYER 3: HOLIDAYS */}
             {showHolidays && (
               <HolidayBands
-                holidays={mockHolidays}
+                holidays={holidays}
                 startDate={startDate}
                 endDate={endDate}
                 getPositionFromDate={getPositionFromDate}
@@ -251,6 +297,7 @@ export function TimelinePanel({ release, onMoveTicket, onResizeTicket, onSelectT
                       startDate={startDate}
                       hasConflict={hasConflict(ticket.id, conflicts)}
                       conflicts={conflicts}
+                      teamMembers={teamMembers}
                       isLastInFeature={ticketIndex === feature.tickets.length - 1}
                     />
                   ))}
@@ -342,7 +389,7 @@ function SprintBands({
   );
 }
 
-// LAYER 3: HOLIDAYS
+// LAYER 3: HOLIDAYS (Enhanced with diagonal pattern)
 function HolidayBands({
   holidays,
   startDate,
@@ -375,19 +422,27 @@ function HolidayBands({
             style={{
               left,
               width,
-              backgroundColor: 'rgba(100, 116, 139, 0.08)',
+              background: `
+                repeating-linear-gradient(
+                  45deg,
+                  rgba(100, 116, 139, 0.04),
+                  rgba(100, 116, 139, 0.04) 10px,
+                  rgba(100, 116, 139, 0.08) 10px,
+                  rgba(100, 116, 139, 0.08) 20px
+                )
+              `,
             }}
             title={holiday.name}
           >
             <div className="absolute top-2 left-0 right-0 text-center">
               <div 
-                className="inline-block px-2 py-0.5 text-[9px] font-medium rounded"
+                className="inline-block px-2 py-0.5 text-[9px] font-medium rounded shadow-sm"
                 style={{
                   backgroundColor: 'rgba(100, 116, 139, 0.9)',
                   color: 'white',
                 }}
               >
-                {holiday.name}
+                🏖️ {holiday.name}
               </div>
             </div>
           </div>
@@ -798,6 +853,7 @@ function TicketTimelineBar({
   startDate: _startDate,
   hasConflict,
   conflicts,
+  teamMembers,
   isLastInFeature: _isLastInFeature
 }: {
   ticket: Ticket;
@@ -814,6 +870,7 @@ function TicketTimelineBar({
   startDate: Date;
   hasConflict: boolean;
   conflicts: Map<string, TicketConflict>;
+  teamMembers: TeamMember[];
   isLastInFeature?: boolean;
 }) {
   const [isDragging, setIsDragging] = useState(false);
@@ -821,11 +878,28 @@ function TicketTimelineBar({
   const [showConflictTooltip, setShowConflictTooltip] = useState(false);
   const ticketRef = useRef<HTMLDivElement>(null);
 
-  const assignedMember = mockTeamMembers.find(m => m.name === ticket.assignedTo);
+  const assignedMember = teamMembers.find(m => m.name === ticket.assignedTo);
   const ptoEntries = assignedMember?.pto || [];
 
   const ticketLeft = getPositionFromDate(ticket.startDate);
   const ticketWidth = getDaysDifference(ticket.startDate, ticket.endDate) * dayWidth;
+
+  // Calculate PTO impact on ticket duration
+  const calculatePTOImpact = () => {
+    let ptoDaysInTicket = 0;
+    ptoEntries.forEach(pto => {
+      if (pto.endDate < ticket.startDate || pto.startDate > ticket.endDate) return;
+      const overlapStart = pto.startDate < ticket.startDate ? ticket.startDate : pto.startDate;
+      const overlapEnd = pto.endDate > ticket.endDate ? ticket.endDate : pto.endDate;
+      ptoDaysInTicket += getDaysDifference(overlapStart, overlapEnd);
+    });
+    return ptoDaysInTicket;
+  };
+  
+  const ptoDays = showPTO ? calculatePTOImpact() : 0;
+  const ticketDuration = getDaysDifference(ticket.startDate, ticket.endDate);
+  const effectiveDays = ticketDuration - ptoDays;
+  const ptoImpactPercent = ticketDuration > 0 ? (ptoDays / ticketDuration) * 100 : 0;
 
   // Get conflict details for tooltip
   const ticketConflicts = hasConflict ? getTicketConflicts(ticket.id, conflicts) : [];
@@ -923,7 +997,7 @@ function TicketTimelineBar({
         height: rowHeight
       }}
     >
-      {/* LAYER 4: PTO OVERLAYS */}
+      {/* LAYER 4: PTO OVERLAYS - Enhanced with pattern */}
       {showPTO && ptoEntries.map((pto) => {
         if (pto.endDate < ticket.startDate || pto.startDate > ticket.endDate) return null;
         
@@ -941,7 +1015,16 @@ function TicketTimelineBar({
               width,
               top: 4,
               bottom: 4,
-              backgroundColor: 'rgba(194, 135, 65, 0.15)',
+              background: `
+                repeating-linear-gradient(
+                  -45deg,
+                  rgba(194, 135, 65, 0.12),
+                  rgba(194, 135, 65, 0.12) 4px,
+                  rgba(194, 135, 65, 0.20) 4px,
+                  rgba(194, 135, 65, 0.20) 8px
+                )
+              `,
+              border: '1px dashed rgba(194, 135, 65, 0.4)',
               zIndex: 4,
             }}
             title={`${ticket.assignedTo} - ${pto.name}`}
@@ -975,7 +1058,7 @@ function TicketTimelineBar({
             handleMouseDown(e, 'drag');
           }
         }}
-        onMouseEnter={() => hasConflict && setShowConflictTooltip(true)}
+        onMouseEnter={() => (hasConflict || ptoDays > 0) && setShowConflictTooltip(true)}
         onMouseLeave={() => setShowConflictTooltip(false)}
       >
         <div className="flex items-center gap-2 px-2 h-full">
@@ -984,6 +1067,9 @@ function TicketTimelineBar({
               className="flex-shrink-0 w-3.5 h-3.5" 
               style={{ color: '#f59e0b' }}
             />
+          )}
+          {ptoDays > 0 && (
+            <span className="flex-shrink-0 text-[10px]" title={`${ptoDays} PTO days during ticket`}>📅</span>
           )}
           <div 
             className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium"
@@ -1000,6 +1086,17 @@ function TicketTimelineBar({
           >
             {ticket.title}
           </span>
+          {ptoDays > 0 && ptoImpactPercent > 30 && (
+            <span 
+              className="flex-shrink-0 text-[9px] font-medium px-1 py-0.5 rounded"
+              style={{
+                backgroundColor: 'rgba(194, 135, 65, 0.15)',
+                color: '#92400e'
+              }}
+            >
+              +{ptoDays}d
+            </span>
+          )}
         </div>
 
         {/* Right resize handle */}
@@ -1009,37 +1106,77 @@ function TicketTimelineBar({
           onMouseDown={(e) => handleMouseDown(e, 'resize-right')}
         />
 
-        {/* Conflict Tooltip */}
-        {hasConflict && showConflictTooltip && ticketConflicts.length > 0 && (
+        {/* Enhanced Tooltip - Shows conflicts and PTO impact */}
+        {(hasConflict || ptoDays > 0) && showConflictTooltip && (
           <div 
-            className="absolute left-0 top-full mt-2 bg-white border border-amber-300 rounded-lg shadow-xl p-3 min-w-[280px] z-50"
-            style={{ pointerEvents: 'none' }}
+            className="absolute left-0 top-full mt-2 bg-white border rounded-lg shadow-xl p-3 min-w-[280px] z-50"
+            style={{ 
+              pointerEvents: 'none',
+              borderColor: hasConflict ? 'rgb(252, 211, 77)' : 'rgb(209, 213, 219)'
+            }}
           >
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              <span className="text-xs font-semibold text-amber-900">
-                Scheduling Conflict
-              </span>
-            </div>
-            <div className="text-xs text-gray-600 mb-2">
-              {ticket.assignedTo} has overlapping tasks:
-            </div>
-            <ul className="space-y-1.5">
-              {ticketConflicts.map((conflict, idx) => (
-                <li key={idx} className="text-xs">
-                  <div className="flex items-start gap-1.5">
-                    <span className="text-amber-600">•</span>
-                    <div>
-                      <div className="font-medium text-gray-800">{conflict.ticketTitle}</div>
-                      <div className="text-gray-500">
-                        {conflict.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {conflict.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                        {' '}({conflict.overlapDays} day{conflict.overlapDays > 1 ? 's' : ''} overlap)
+            {/* Conflict Section */}
+            {hasConflict && ticketConflicts.length > 0 && (
+              <div className="mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <span className="text-xs font-semibold text-amber-900">
+                    Scheduling Conflict
+                  </span>
+                </div>
+                <div className="text-xs text-gray-600 mb-2">
+                  {ticket.assignedTo} has overlapping tasks:
+                </div>
+                <ul className="space-y-1.5">
+                  {ticketConflicts.map((conflict, idx) => (
+                    <li key={idx} className="text-xs">
+                      <div className="flex items-start gap-1.5">
+                        <span className="text-amber-600">•</span>
+                        <div>
+                          <div className="font-medium text-gray-800">{conflict.ticketTitle}</div>
+                          <div className="text-gray-500">
+                            {conflict.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {conflict.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {' '}({conflict.overlapDays} day{conflict.overlapDays > 1 ? 's' : ''} overlap)
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {/* PTO Impact Section */}
+            {ptoDays > 0 && (
+              <div className={hasConflict ? 'border-t border-gray-200 pt-3' : ''}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xs">📅</span>
+                  <span className="text-xs font-semibold text-gray-800">
+                    PTO Impact Analysis
+                  </span>
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between text-gray-700">
+                    <span>Planned duration:</span>
+                    <span className="font-medium">{ticketDuration} days</span>
                   </div>
-                </li>
-              ))}
-            </ul>
+                  <div className="flex justify-between text-amber-700">
+                    <span>PTO days:</span>
+                    <span className="font-medium">-{ptoDays} days</span>
+                  </div>
+                  <div className="flex justify-between border-t border-gray-200 pt-1 mt-1 font-semibold text-gray-800">
+                    <span>Effective working days:</span>
+                    <span>{effectiveDays} days</span>
+                  </div>
+                  {ptoImpactPercent > 30 && (
+                    <div className="mt-2 pt-2 border-t border-amber-200 text-amber-700 font-medium flex items-center gap-1">
+                      <span>⚠️</span>
+                      <span>Consider extending timeline or reassigning</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

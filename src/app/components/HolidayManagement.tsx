@@ -1,11 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Calendar, Trash2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { mockHolidays, Holiday } from '../data/mockData';
+import { loadHolidays } from '../lib/localStorage';
 
 export function HolidayManagement() {
   const navigate = useNavigate();
-  const [holidays, setHolidays] = useState(mockHolidays);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  
+  // Load holidays from localStorage on mount
+  useEffect(() => {
+    const storedHolidays = loadHolidays();
+    setHolidays(storedHolidays || mockHolidays);
+  }, []);
   const [showAddForm, setShowAddForm] = useState(false);
 
   const deleteHoliday = (holidayId: string) => {

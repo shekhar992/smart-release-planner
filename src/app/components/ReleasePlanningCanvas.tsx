@@ -1,21 +1,45 @@
-import { useState, useMemo } from 'react';
-import { Users, ArrowLeft, Calendar } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Users, ArrowLeft, Calendar, Database, RotateCcw } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { WorkloadModal } from './WorkloadModal';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
-import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers } from '../data/mockData';
+import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, Holiday, TeamMember } from '../data/mockData';
 import { detectConflicts, getConflictSummary } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
+import { loadProducts, saveRelease, initializeStorage, clearStorage, getLastUpdated, loadHolidays, loadTeamMembers, forceRefreshStorage } from '../lib/localStorage';
 
 export function ReleasePlanningCanvas() {
   const { releaseId } = useParams();
   const navigate = useNavigate();
   
-  // Find the release by ID
-  const releaseData = mockProducts.find(product => product.releases.some(release => release.id === releaseId));
+  // Initialize localStorage with mock data if empty (only once)
+  const [initialized, setInitialized] = useState(false);
+  useEffect(() => {
+    if (!initialized) {
+      initializeStorage(mockProducts, mockHolidays, mockTeamMembers);
+      setInitialized(true);
+    }
+  }, [initialized]);
   
-  if (!releaseData) {
+  // Load products, holidays, and team members from localStorage or use mock data
+  const products = useMemo(() => loadProducts() || mockProducts, [initialized]);
+  const holidays = useMemo(() => loadHolidays() || mockHolidays, [initialized]);
+  const teamMembers = useMemo(() => loadTeamMembers() || mockTeamMembers, [initialized]);
+  
+  // Find the release by ID
+  const releaseData = useMemo(() => 
+    products.find(product => product.releases.some(release => release.id === releaseId)),
+    [products, releaseId]
+  );
+  
+  // Find the specific release
+  const currentRelease = useMemo(() => {
+    if (!releaseData) return null;
+    return releaseData.releases.find(r => r.id === releaseId) || releaseData.releases[0];
+  }, [releaseData, releaseId]);
+
+  if (!releaseData || !currentRelease) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
@@ -32,9 +56,38 @@ export function ReleasePlanningCanvas() {
     );
   }
 
-  const [release, setRelease] = useState(releaseData.releases.find(release => release.id === releaseId) || releaseData.releases[0]);
+  const [release, setRelease] = useState(currentRelease);
   const [showWorkloadModal, setShowWorkloadModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<{ featureId: string; ticketId: string } | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
+
+  // Sync release state when currentRelease changes (e.g., after data loads)
+  useEffect(() => {
+    if (currentRelease) {
+      setRelease(currentRelease);
+    }
+  }, [currentRelease]);
+
+  // Auto-save release to localStorage when it changes (debounced)
+  useEffect(() => {
+    if (release && releaseData && initialized) {
+      const timeoutId = setTimeout(() => {
+        saveRelease(releaseData.id, release);
+        setLastSaved(new Date());
+      }, 300); // Debounce saves by 300ms
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [release, releaseData?.id, initialized]);
+  
+  // Handle storage reset
+  const handleResetStorage = () => {
+    if (window.confirm('This will reset all your test data to the latest mock data. Continue?')) {
+      forceRefreshStorage(mockProducts, mockHolidays, mockTeamMembers);
+      // Reload the page to get fresh data
+      window.location.reload();
+    }
+  };
 
   // Detect conflicts whenever release data changes
   const allTickets = useMemo(() => {
@@ -54,11 +107,11 @@ export function ReleasePlanningCanvas() {
     return calculateAllSprintCapacities(
       release.sprints || [],
       allTickets,
-      mockTeamMembers,
-      mockHolidays,
+      teamMembers,
+      holidays,
       1 // velocity: 1 story point = 1 day
     );
-  }, [release.sprints, allTickets]);
+  }, [release.sprints, allTickets, teamMembers, holidays]);
 
   const handleUpdateTicket = (featureId: string, ticketId: string, updates: Partial<Ticket>) => {
     setRelease(prev => ({
@@ -222,6 +275,28 @@ export function ReleasePlanningCanvas() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Storage indicator */}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-md text-xs text-green-700 mr-2">
+            <Database className="w-3.5 h-3.5" />
+            <span>
+              Data saved
+              {lastSaved && (
+                <span className="ml-1 text-green-600">
+                  • {lastSaved.toLocaleTimeString()}
+                </span>
+              )}
+            </span>
+          </div>
+          
+          <button
+            onClick={handleResetStorage}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-md transition-colors"
+            title="Reset to original mock data"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            Reset
+          </button>
+          
           <button
             onClick={() => navigate(`/release/${releaseId}/team`)}
             className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all border border-transparent hover:border-gray-200"
@@ -240,22 +315,19 @@ export function ReleasePlanningCanvas() {
       </div>
 
       {/* Main Canvas */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Timeline Panel - Full Width */}
-        <div className="flex-1 bg-white overflow-hidden">
-          <TimelinePanel
-                release={release}
-                onMoveTicket={handleMoveTicket}
-                onResizeTicket={handleResizeTicket}
-                onSelectTicket={(featureId, ticketId) => {
-                  setSelectedTicket({ featureId, ticketId });
-                }}
-                onCreateSprint={handleCreateSprint}
-                conflicts={conflicts}
-                conflictSummary={conflictSummary}
-                sprintCapacities={sprintCapacities}
-              />
-        </div>
+      <div className="flex-1 overflow-hidden">
+        <TimelinePanel
+          release={release}
+          holidays={holidays}
+          teamMembers={teamMembers}
+          onMoveTicket={handleMoveTicket}
+          onResizeTicket={handleResizeTicket}
+          onSelectTicket={(featureId, ticketId) => setSelectedTicket({ featureId, ticketId })}
+          onCreateSprint={handleCreateSprint}
+          conflicts={conflicts}
+          conflictSummary={conflictSummary}
+          sprintCapacities={sprintCapacities}
+        />
       </div>
 
       {/* Workload Modal */}

@@ -1,15 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Plus, Calendar, Trash2, Edit2, X } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { mockTeamMembers, TeamMember, PTOEntry } from '../data/mockData';
+import { loadTeamMembers } from '../lib/localStorage';
 
 export function TeamMemberDetail() {
   const { memberId } = useParams();
   const navigate = useNavigate();
+  const [member, setMember] = useState<TeamMember | null>(null);
   
-  const memberData = mockTeamMembers.find(m => m.id === memberId);
+  // Load team member from localStorage on mount
+  useEffect(() => {
+    const storedTeamMembers = loadTeamMembers() || mockTeamMembers;
+    const memberData = storedTeamMembers.find(m => m.id === memberId);
+    setMember(memberData || null);
+  }, [memberId]);
   
-  if (!memberData) {
+  if (member === null) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-lg font-medium text-gray-900">Loading...</h2>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!member) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
@@ -24,8 +41,6 @@ export function TeamMemberDetail() {
       </div>
     );
   }
-
-  const [member, setMember] = useState(memberData);
   const [showAddPTO, setShowAddPTO] = useState(false);
   const [isEditingInfo, setIsEditingInfo] = useState(false);
 

@@ -1,23 +1,32 @@
 import { Link, useNavigate } from 'react-router';
 import { Plus, Calendar, Package, FolderPlus, Users, Layers, CheckSquare, Upload, ArrowRight, TrendingUp, Clock } from 'lucide-react';
-import { useState } from 'react';
-import { mockProducts, Product, Release } from '../data/mockData';
+import { useState, useEffect } from 'react';
+import { mockProducts, Product, Release, mockHolidays, mockTeamMembers } from '../data/mockData';
 import { CreateProductModal } from './CreateProductModal';
 import { CreateReleaseModal } from './CreateReleaseModal';
 import { ImportReleaseWizard } from './ImportReleaseWizard';
+import { loadProducts, initializeStorage } from '../lib/localStorage';
 
 export function PlanningDashboard() {
   const [showCreateProduct, setShowCreateProduct] = useState(false);
   const [showCreateRelease, setShowCreateRelease] = useState(false);
   const [showImportWizard, setShowImportWizard] = useState(false);
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const navigate = useNavigate();
+  
+  // Initialize and load products from localStorage
+  useEffect(() => {
+    // Initialize storage with mock data if empty
+    initializeStorage(mockProducts, mockHolidays, mockTeamMembers);
+    
+    // Load products from localStorage
+    const storedProducts = loadProducts();
+    setProducts(storedProducts || mockProducts);
+  }, []);
 
   const formatDateRange = (start: Date, end: Date) => {
     return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
   };
-
-  const countFeatures = (release: Release) => release.features.length;
   
   const countTickets = (release: Release) => 
     release.features.reduce((sum, feature) => sum + feature.tickets.length, 0);
@@ -31,8 +40,9 @@ export function PlanningDashboard() {
     setProducts([...products, newProduct]);
   };
 
-  const handleCreateRelease = (productId: string, name: string, startDate: Date, endDate: Date) => {
-    // Create release logic will be implemented
+  const handleCreateRelease = (_productId: string, _name: string, _startDate: Date, _endDate: Date) => {
+    // Release creation logic will be implemented when needed
+    setShowCreateRelease(false);
   };
 
   // Calculate planning metrics
@@ -42,12 +52,11 @@ export function PlanningDashboard() {
     const now = new Date();
     return r.startDate <= now && r.endDate >= now;
   }).length;
-  const totalSprints = allReleases.reduce((sum, r) => sum + r.sprints.length, 0);
+  const totalSprints = allReleases.reduce((sum, r) => sum + (r.sprints?.length ?? 0), 0);
   const totalTickets = allReleases.reduce((sum, r) => sum + countTickets(r), 0);
 
   // Get recent and upcoming releases
   const now = new Date();
-  const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
   const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
 
   const recentReleases = allReleases
@@ -395,10 +404,10 @@ function HeroReleaseCard({
         <div className="flex items-center gap-6 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white shadow-md">
-              <span className="text-xl font-bold">{release.sprints.length}</span>
+              <span className="text-xl font-bold">{release.sprints?.length ?? 0}</span>
             </div>
             <div>
-              <div className="text-sm font-semibold text-foreground">{release.sprints.length}</div>
+              <div className="text-sm font-semibold text-foreground">{release.sprints?.length ?? 0}</div>
               <div className="text-xs text-muted-foreground">Sprints</div>
             </div>
           </div>
@@ -468,7 +477,7 @@ function ModernReleaseCard({
 
       <div className="flex items-center gap-4 pt-4 border-t border-border">
         <div>
-          <div className="text-lg font-semibold text-foreground">{release.sprints.length}</div>
+          <div className="text-lg font-semibold text-foreground">{release.sprints?.length ?? 0}</div>
           <div className="text-xs text-muted-foreground">Sprints</div>
         </div>
         <div>

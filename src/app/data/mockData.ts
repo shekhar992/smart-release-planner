@@ -58,368 +58,848 @@ export interface Holiday {
   endDate: Date;
 }
 
-export const mockProducts: Product[] = [
-  {
-    id: 'p1',
-    name: 'GenAI Chatbot & SAMD Mobile App',
-    releases: [
-      {
-        id: 'r1',
-        name: 'Q1 2026 Sprint Planning',
-        startDate: new Date('2026-02-09'),
-        endDate: new Date('2026-04-03'),
-        features: [
-          {
-            id: 'f1',
-            name: 'GenAI Chatbot (Web)',
-            tickets: [
-              // Sprint 1
-              {
-                id: 't1',
-                title: 'LLM Integration Architecture',
-                startDate: new Date('2026-02-09'),
-                endDate: new Date('2026-02-13'),
-                status: 'in-progress',
-                storyPoints: 8,
-                assignedTo: 'Marcus Rivera'
-              },
-              {
-                id: 't2',
-                title: 'Chat UI Components',
-                startDate: new Date('2026-02-09'),
-                endDate: new Date('2026-02-16'),
-                status: 'in-progress',
-                storyPoints: 5,
-                assignedTo: 'Elena Zhang'
-              },
-              {
-                id: 't3',
-                title: 'Streaming Response Handler',
-                startDate: new Date('2026-02-16'),
-                endDate: new Date('2026-02-20'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Marcus Rivera'
-              },
-              // CONFLICT: Marcus has overlapping task
-              {
-                id: 't3a',
-                title: 'API Rate Limiting',
-                startDate: new Date('2026-02-10'),
-                endDate: new Date('2026-02-14'),
-                status: 'planned',
-                storyPoints: 3,
-                assignedTo: 'Marcus Rivera'
-              },
-              // Sprint 2
-              {
-                id: 't4',
-                title: 'Context Management System',
-                startDate: new Date('2026-02-23'),
-                endDate: new Date('2026-03-02'),
-                status: 'planned',
-                storyPoints: 8,
-                assignedTo: 'Priya Patel'
-              },
-              {
-                id: 't5',
-                title: 'Prompt Engineering Module',
-                startDate: new Date('2026-02-23'),
-                endDate: new Date('2026-02-27'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Kenji Nakamura'
-              },
-              {
-                id: 't6',
-                title: 'Conversation History API',
-                startDate: new Date('2026-03-02'),
-                endDate: new Date('2026-03-06'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Marcus Rivera'
-              },
-              // Sprint 3
-              {
-                id: 't7',
-                title: 'RAG Pipeline Integration',
-                startDate: new Date('2026-03-09'),
-                endDate: new Date('2026-03-16'),
-                status: 'planned',
-                storyPoints: 13,
-                assignedTo: 'Kenji Nakamura'
-              },
-              {
-                id: 't8',
-                title: 'Token Usage Monitoring',
-                startDate: new Date('2026-03-09'),
-                endDate: new Date('2026-03-13'),
-                status: 'planned',
-                storyPoints: 3,
-                assignedTo: 'Priya Patel'
-              },
-              // Sprint 4
-              {
-                id: 't9',
-                title: 'Error Recovery & Fallbacks',
-                startDate: new Date('2026-03-23'),
-                endDate: new Date('2026-03-27'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Marcus Rivera'
-              },
-              {
-                id: 't10',
-                title: 'Chat Export Feature',
-                startDate: new Date('2026-03-30'),
-                endDate: new Date('2026-04-03'),
-                status: 'planned',
-                storyPoints: 3,
-                assignedTo: 'Elena Zhang'
-              }
-            ]
-          },
-          {
-            id: 'f2',
-            name: 'SAMD Mobile Application',
-            tickets: [
-              // Sprint 1
-              {
-                id: 't11',
-                title: 'Medical Device Authorization Flow',
-                startDate: new Date('2026-02-09'),
-                endDate: new Date('2026-02-16'),
-                status: 'in-progress',
-                storyPoints: 8,
-                assignedTo: 'Jin Park'
-              },
-              // CONFLICT: Elena has overlapping task with t2
-              {
-                id: 't11a',
-                title: 'Mobile UI Design Review',
-                startDate: new Date('2026-02-12'),
-                endDate: new Date('2026-02-18'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Elena Zhang'
-              },
-              {
-                id: 't12',
-                title: 'Patient Data Encryption',
-                startDate: new Date('2026-02-16'),
-                endDate: new Date('2026-02-20'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Jin Park'
-              },
-              // Sprint 2
-              {
-                id: 't13',
-                title: 'Biometric Authentication',
-                startDate: new Date('2026-02-23'),
-                endDate: new Date('2026-03-02'),
-                status: 'planned',
-                storyPoints: 8,
-                assignedTo: 'Sofia Torres'
-              },
-              {
-                id: 't14',
-                title: 'HIPAA Compliance Audit Logs',
-                startDate: new Date('2026-03-02'),
-                endDate: new Date('2026-03-06'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Marcus Rivera'
-              },
-              // Sprint 3
-              {
-                id: 't15',
-                title: 'Vital Signs Dashboard',
-                startDate: new Date('2026-03-09'),
-                endDate: new Date('2026-03-16'),
-                status: 'planned',
-                storyPoints: 8,
-                assignedTo: 'Sofia Torres'
-              },
-              {
-                id: 't16',
-                title: 'Offline Data Sync',
-                startDate: new Date('2026-03-16'),
-                endDate: new Date('2026-03-20'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Jin Park'
-              },
-              // Sprint 4
-              {
-                id: 't17',
-                title: 'Push Notification System',
-                startDate: new Date('2026-03-23'),
-                endDate: new Date('2026-03-27'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Sofia Torres'
-              },
-              {
-                id: 't18',
-                title: 'Emergency Alert Protocol',
-                startDate: new Date('2026-03-30'),
-                endDate: new Date('2026-04-03'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Jin Park'
-              }
-            ]
-          },
-          {
-            id: 'f3',
-            name: 'Design',
-            tickets: [
-              // Sprint 1
-              {
-                id: 't19',
-                title: 'Chat Interface Design System',
-                startDate: new Date('2026-02-09'),
-                endDate: new Date('2026-02-13'),
-                status: 'completed',
-                storyPoints: 5,
-                assignedTo: 'Aisha Williams'
-              },
-              // Sprint 2
-              {
-                id: 't20',
-                title: 'Mobile App UI/UX Mockups',
-                startDate: new Date('2026-02-23'),
-                endDate: new Date('2026-03-02'),
-                status: 'planned',
-                storyPoints: 8,
-                assignedTo: 'Aisha Williams'
-              },
-              // Sprint 3
-              {
-                id: 't21',
-                title: 'Accessibility Audit',
-                startDate: new Date('2026-03-09'),
-                endDate: new Date('2026-03-13'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Aisha Williams'
-              }
-            ]
-          },
-          {
-            id: 'f4',
-            name: 'QA',
-            tickets: [
-              // Sprint 2
-              {
-                id: 't22',
-                title: 'Chatbot E2E Test Suite',
-                startDate: new Date('2026-03-02'),
-                endDate: new Date('2026-03-06'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Omar Hassan'
-              },
-              // Sprint 3
-              {
-                id: 't23',
-                title: 'Mobile Security Testing',
-                startDate: new Date('2026-03-16'),
-                endDate: new Date('2026-03-20'),
-                status: 'planned',
-                storyPoints: 5,
-                assignedTo: 'Yuki Tanaka'
-              },
-              // Sprint 4
-              {
-                id: 't24',
-                title: 'Performance & Load Testing',
-                startDate: new Date('2026-03-23'),
-                endDate: new Date('2026-03-31'),
-                status: 'planned',
-                storyPoints: 8,
-                assignedTo: 'Omar Hassan'
-              }
-            ]
-          }
-        ],
-        sprints: [
-          {
-            id: 's1',
-            name: 'Sprint 1',
-            startDate: new Date('2026-02-09'),
-            endDate: new Date('2026-02-20')
-          },
-          {
-            id: 's2',
-            name: 'Sprint 2',
-            startDate: new Date('2026-02-23'),
-            endDate: new Date('2026-03-06')
-          },
-          {
-            id: 's3',
-            name: 'Sprint 3',
-            startDate: new Date('2026-03-09'),
-            endDate: new Date('2026-03-20')
-          },
-          {
-            id: 's4',
-            name: 'Sprint 4',
-            startDate: new Date('2026-03-23'),
-            endDate: new Date('2026-04-03')
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'p2',
-    name: 'Customer Portal',
-    releases: [
-      {
-        id: 'r2',
-        name: 'Q1 2026 Release',
-        startDate: new Date('2026-01-05'),
-        endDate: new Date('2026-03-31'),
-        features: [
-          {
-            id: 'f5',
-            name: 'User Authentication',
-            tickets: [
-              {
-                id: 't25',
-                title: 'Design login flow',
-                startDate: new Date('2026-01-06'),
-                endDate: new Date('2026-01-10'),
-                status: 'completed',
-                storyPoints: 5,
-                assignedTo: 'Aisha Williams'
-              },
-              {
-                id: 't26',
-                title: 'Implement OAuth integration',
-                startDate: new Date('2026-01-13'),
-                endDate: new Date('2026-01-24'),
-                status: 'completed',
-                storyPoints: 8,
-                assignedTo: 'Priya Patel'
-              }
-            ]
-          }
-        ],
-        sprints: [
-          {
-            id: 's5',
-            name: 'Sprint 1',
-            startDate: new Date('2026-01-05'),
-            endDate: new Date('2026-01-26')
-          }
-        ]
-      }
-    ]
-  }
-];
+// ===========================================
+// PRODUCT 1: Enterprise SaaS Platform
+// ===========================================
+const product1: Product = {
+  id: 'p1',
+  name: 'Enterprise SaaS Platform',
+  releases: [
+    {
+      id: 'r1',
+      name: 'Q1 2026 - Authentication & Core Features',
+      startDate: new Date('2026-02-10'),
+      endDate: new Date('2026-03-28'),
+      features: [
+        {
+          id: 'f1',
+          name: 'Authentication System',
+          tickets: [
+            {
+              id: 't1',
+              title: 'SSO Integration - OAuth 2.0',
+              startDate: new Date('2026-02-10'),
+              endDate: new Date('2026-02-17'),
+              status: 'in-progress',
+              storyPoints: 8,
+              assignedTo: 'Sarah Chen'
+            },
+            {
+              id: 't2',
+              title: 'Multi-Factor Authentication (MFA)',
+              startDate: new Date('2026-02-10'),
+              endDate: new Date('2026-02-14'),
+              status: 'in-progress',
+              storyPoints: 5,
+              assignedTo: 'Marcus Rivera'
+            },
+            // CONFLICT: Marcus has overlapping tasks
+            {
+              id: 't3',
+              title: 'JWT Token Management',
+              startDate: new Date('2026-02-12'),
+              endDate: new Date('2026-02-16'),
+              status: 'planned',
+              storyPoints: 3,
+              assignedTo: 'Marcus Rivera'
+            },
+            {
+              id: 't4',
+              title: 'Role-Based Access Control (RBAC)',
+              startDate: new Date('2026-02-17'),
+              endDate: new Date('2026-02-24'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Alex Thompson'
+            },
+            {
+              id: 't5',
+              title: 'Session Management System',
+              startDate: new Date('2026-02-24'),
+              endDate: new Date('2026-03-03'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Sarah Chen'
+            },
+            // PTO CONFLICT: Marcus on conference during this task
+            {
+              id: 't6',
+              title: 'Password Policy Enforcement',
+              startDate: new Date('2026-03-03'),
+              endDate: new Date('2026-03-07'),
+              status: 'planned',
+              storyPoints: 3,
+              assignedTo: 'Marcus Rivera'
+            },
+            {
+              id: 't7',
+              title: 'Audit Logging for Security Events',
+              startDate: new Date('2026-03-10'),
+              endDate: new Date('2026-03-17'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'James Wilson'
+            }
+          ]
+        },
+        {
+          id: 'f2',
+          name: 'User Management',
+          tickets: [
+            {
+              id: 't8',
+              title: 'User Profile CRUD API',
+              startDate: new Date('2026-02-10'),
+              endDate: new Date('2026-02-17'),
+              status: 'in-progress',
+              storyPoints: 8,
+              assignedTo: 'Priya Patel'
+            },
+            {
+              id: 't9',
+              title: 'Profile UI Components',
+              startDate: new Date('2026-02-17'),
+              endDate: new Date('2026-02-24'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Elena Zhang'
+            },
+            // CONFLICT: Elena has overlapping work
+            {
+              id: 't10',
+              title: 'Avatar Upload & Management',
+              startDate: new Date('2026-02-20'),
+              endDate: new Date('2026-02-24'),
+              status: 'planned',
+              storyPoints: 3,
+              assignedTo: 'Elena Zhang'
+            },
+            {
+              id: 't11',
+              title: 'User Settings Dashboard',
+              startDate: new Date('2026-02-24'),
+              endDate: new Date('2026-03-03'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Elena Zhang'
+            },
+            {
+              id: 't12',
+              title: 'Email Preferences & Notifications',
+              startDate: new Date('2026-03-03'),
+              endDate: new Date('2026-03-10'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Yuki Tanaka'
+            }
+          ]
+        },
+        {
+          id: 'f3',
+          name: 'Admin Dashboard',
+          tickets: [
+            {
+              id: 't13',
+              title: 'User Management Admin UI',
+              startDate: new Date('2026-02-24'),
+              endDate: new Date('2026-03-03'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Sofia Martinez'
+            },
+            {
+              id: 't14',
+              title: 'System Metrics Dashboard',
+              startDate: new Date('2026-03-03'),
+              endDate: new Date('2026-03-10'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Priya Patel'
+            },
+            {
+              id: 't15',
+              title: 'Audit Log Viewer',
+              startDate: new Date('2026-03-10'),
+              endDate: new Date('2026-03-17'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Yuki Tanaka'
+            }
+          ]
+        }
+      ],
+      sprints: [
+        {
+          id: 's1',
+          name: 'Sprint 1',
+          startDate: new Date('2026-02-10'),
+          endDate: new Date('2026-02-20')
+        },
+        {
+          id: 's2',
+          name: 'Sprint 2',
+          startDate: new Date('2026-02-23'),
+          endDate: new Date('2026-03-06')
+        },
+        {
+          id: 's3',
+          name: 'Sprint 3',
+          startDate: new Date('2026-03-09'),
+          endDate: new Date('2026-03-20')
+        },
+        {
+          id: 's4',
+          name: 'Sprint 4',
+          startDate: new Date('2026-03-23'),
+          endDate: new Date('2026-03-27')
+        }
+      ]
+    },
+    {
+      id: 'r2',
+      name: 'Q2 2026 - API & Integration Layer',
+      startDate: new Date('2026-04-06'),
+      endDate: new Date('2026-06-26'),
+      features: [
+        {
+          id: 'f4',
+          name: 'REST API Gateway',
+          tickets: [
+            {
+              id: 't16',
+              title: 'API Gateway Architecture',
+              startDate: new Date('2026-04-06'),
+              endDate: new Date('2026-04-13'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'Alex Thompson'
+            },
+            {
+              id: 't17',
+              title: 'Rate Limiting Implementation',
+              startDate: new Date('2026-04-13'),
+              endDate: new Date('2026-04-20'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Alex Thompson'
+            },
+            {
+              id: 't18',
+              title: 'API Versioning Strategy',
+              startDate: new Date('2026-04-20'),
+              endDate: new Date('2026-04-27'),
+              status: 'planned',
+              storyPoints: 3,
+              assignedTo: 'Yuki Tanaka'
+            },
+            {
+              id: 't19',
+              title: 'API Documentation Portal',
+              startDate: new Date('2026-04-27'),
+              endDate: new Date('2026-05-04'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Sofia Martinez'
+            }
+          ]
+        },
+        {
+          id: 'f5',
+          name: 'Third-Party Integrations',
+          tickets: [
+            {
+              id: 't20',
+              title: 'Salesforce Integration',
+              startDate: new Date('2026-04-06'),
+              endDate: new Date('2026-04-20'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'Yuki Tanaka'
+            },
+            {
+              id: 't21',
+              title: 'Slack Notifications',
+              startDate: new Date('2026-04-20'),
+              endDate: new Date('2026-04-27'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Marcus Rivera'
+            },
+            {
+              id: 't22',
+              title: 'Google Workspace SSO',
+              startDate: new Date('2026-04-27'),
+              endDate: new Date('2026-05-04'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Sarah Chen'
+            }
+          ]
+        },
+        {
+          id: 'f6',
+          name: 'Webhook System',
+          tickets: [
+            {
+              id: 't23',
+              title: 'Webhook Infrastructure',
+              startDate: new Date('2026-05-04'),
+              endDate: new Date('2026-05-11'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'James Wilson'
+            },
+            {
+              id: 't24',
+              title: 'Event Subscription Management',
+              startDate: new Date('2026-05-11'),
+              endDate: new Date('2026-05-18'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Yuki Tanaka'
+            }
+          ]
+        }
+      ],
+      sprints: [
+        {
+          id: 's5',
+          name: 'Sprint 5',
+          startDate: new Date('2026-04-06'),
+          endDate: new Date('2026-04-17')
+        },
+        {
+          id: 's6',
+          name: 'Sprint 6',
+          startDate: new Date('2026-04-20'),
+          endDate: new Date('2026-05-01')
+        },
+        {
+          id: 's7',
+          name: 'Sprint 7',
+          startDate: new Date('2026-05-04'),
+          endDate: new Date('2026-05-15')
+        },
+        {
+          id: 's8',
+          name: 'Sprint 8',
+          startDate: new Date('2026-05-18'),
+          endDate: new Date('2026-05-29')
+        },
+        {
+          id: 's9',
+          name: 'Sprint 9',
+          startDate: new Date('2026-06-01'),
+          endDate: new Date('2026-06-12')
+        },
+        {
+          id: 's10',
+          name: 'Sprint 10',
+          startDate: new Date('2026-06-15'),
+          endDate: new Date('2026-06-26')
+        }
+      ]
+    }
+  ]
+};
+
+// ===========================================
+// PRODUCT 2: Mobile App Suite
+// ===========================================
+const product2: Product = {
+  id: 'p2',
+  name: 'Mobile App Suite',
+  releases: [
+    {
+      id: 'r3',
+      name: 'v3.0 - iOS & Android Rebuild',
+      startDate: new Date('2026-02-10'),
+      endDate: new Date('2026-04-24'),
+      features: [
+        {
+          id: 'f7',
+          name: 'Mobile Core',
+          tickets: [
+            {
+              id: 't25',
+              title: 'React Native Setup & Config',
+              startDate: new Date('2026-02-10'),
+              endDate: new Date('2026-02-14'),
+              status: 'completed',
+              storyPoints: 5,
+              assignedTo: 'Maria Garcia'
+            },
+            {
+              id: 't26',
+              title: 'Navigation Architecture',
+              startDate: new Date('2026-02-17'),
+              endDate: new Date('2026-02-24'),
+              status: 'in-progress',
+              storyPoints: 8,
+              assignedTo: 'Maria Garcia'
+            },
+            {
+              id: 't27',
+              title: 'Offline Data Sync',
+              startDate: new Date('2026-02-24'),
+              endDate: new Date('2026-03-10'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'Sarah Chen'
+            },
+            // PTO CONFLICT: Sarah on Spring Break
+            {
+              id: 't28',
+              title: 'Push Notification Integration',
+              startDate: new Date('2026-03-24'),
+              endDate: new Date('2026-03-31'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Sarah Chen'
+            }
+          ]
+        },
+        {
+          id: 'f8',
+          name: 'Mobile UI',
+          tickets: [
+            {
+              id: 't29',
+              title: 'Design System Implementation',
+              startDate: new Date('2026-02-10'),
+              endDate: new Date('2026-02-17'),
+              status: 'completed',
+              storyPoints: 8,
+              assignedTo: 'Sofia Martinez'
+            },
+            {
+              id: 't30',
+              title: 'Onboarding Flow',
+              startDate: new Date('2026-02-17'),
+              endDate: new Date('2026-02-24'),
+              status: 'in-progress',
+              storyPoints: 5,
+              assignedTo: 'David Kim'
+            },
+            {
+              id: 't31',
+              title: 'Dashboard UI Components',
+              startDate: new Date('2026-02-24'),
+              endDate: new Date('2026-03-03'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Sofia Martinez'
+            },
+            {
+              id: 't32',
+              title: 'Settings & Profile Screens',
+              startDate: new Date('2026-03-03'),
+              endDate: new Date('2026-03-10'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'David Kim'
+            }
+          ]
+        },
+        {
+          id: 'f9',
+          name: 'Mobile Testing',
+          tickets: [
+            {
+              id: 't33',
+              title: 'iOS Testing - Core Features',
+              startDate: new Date('2026-03-17'),
+              endDate: new Date('2026-03-24'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Lisa Park'
+            },
+            {
+              id: 't34',
+              title: 'Android Testing - Core Features',
+              startDate: new Date('2026-03-17'),
+              endDate: new Date('2026-03-24'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Tom Zhang'
+            },
+            {
+              id: 't35',
+              title: 'Performance Testing',
+              startDate: new Date('2026-03-24'),
+              endDate: new Date('2026-03-31'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Tom Zhang'
+            },
+            {
+              id: 't36',
+              title: 'App Store Submission',
+              startDate: new Date('2026-04-14'),
+              endDate: new Date('2026-04-21'),
+              status: 'planned',
+              storyPoints: 3,
+              assignedTo: 'Maria Garcia'
+            }
+          ]
+        }
+      ],
+      sprints: [
+        {
+          id: 's11',
+          name: 'Mobile Sprint 1',
+          startDate: new Date('2026-02-10'),
+          endDate: new Date('2026-02-24')
+        },
+        {
+          id: 's12',
+          name: 'Mobile Sprint 2',
+          startDate: new Date('2026-02-24'),
+          endDate: new Date('2026-03-10')
+        },
+        {
+          id: 's13',
+          name: 'Mobile Sprint 3',
+          startDate: new Date('2026-03-10'),
+          endDate: new Date('2026-03-24')
+        },
+        {
+          id: 's14',
+          name: 'Mobile Sprint 4',
+          startDate: new Date('2026-03-24'),
+          endDate: new Date('2026-04-07')
+        },
+        {
+          id: 's15',
+          name: 'Mobile Sprint 5',
+          startDate: new Date('2026-04-07'),
+          endDate: new Date('2026-04-21')
+        }
+      ]
+    },
+    {
+      id: 'r4',
+      name: 'v4.0 - Advanced Features',
+      startDate: new Date('2026-05-04'),
+      endDate: new Date('2026-07-17'),
+      features: [
+        {
+          id: 'f10',
+          name: 'Advanced Mobile Features',
+          tickets: [
+            {
+              id: 't37',
+              title: 'Biometric Authentication',
+              startDate: new Date('2026-05-04'),
+              endDate: new Date('2026-05-11'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Sarah Chen'
+            },
+            // PTO CONFLICT: Maria on vacation
+            {
+              id: 't38',
+              title: 'Camera & Media Integration',
+              startDate: new Date('2026-05-25'),
+              endDate: new Date('2026-06-01'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Maria Garcia'
+            },
+            {
+              id: 't39',
+              title: 'AR Features - Proof of Concept',
+              startDate: new Date('2026-06-01'),
+              endDate: new Date('2026-06-15'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'Maria Garcia'
+            }
+          ]
+        },
+        {
+          id: 'f11',
+          name: 'Mobile Analytics',
+          tickets: [
+            {
+              id: 't40',
+              title: 'Event Tracking System',
+              startDate: new Date('2026-05-04'),
+              endDate: new Date('2026-05-11'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Priya Patel'
+            },
+            {
+              id: 't41',
+              title: 'Crash Reporting Integration',
+              startDate: new Date('2026-05-11'),
+              endDate: new Date('2026-05-18'),
+              status: 'planned',
+              storyPoints: 3,
+              assignedTo: 'Yuki Tanaka'
+            }
+          ]
+        }
+      ],
+      sprints: [
+        {
+          id: 's16',
+          name: 'Mobile Sprint 6',
+          startDate: new Date('2026-05-04'),
+          endDate: new Date('2026-05-18')
+        },
+        {
+          id: 's17',
+          name: 'Mobile Sprint 7',
+          startDate: new Date('2026-05-18'),
+          endDate: new Date('2026-06-01')
+        },
+        {
+          id: 's18',
+          name: 'Mobile Sprint 8',
+          startDate: new Date('2026-06-01'),
+          endDate: new Date('2026-06-15')
+        },
+        {
+          id: 's19',
+          name: 'Mobile Sprint 9',
+          startDate: new Date('2026-06-15'),
+          endDate: new Date('2026-06-29')
+        },
+        {
+          id: 's20',
+          name: 'Mobile Sprint 10',
+          startDate: new Date('2026-06-29'),
+          endDate: new Date('2026-07-13')
+        }
+      ]
+    }
+  ]
+};
+
+// ===========================================
+// PRODUCT 3: Analytics & BI Dashboard
+// ===========================================
+const product3: Product = {
+  id: 'p3',
+  name: 'Analytics & BI Dashboard',
+  releases: [
+    {
+      id: 'r5',
+      name: '2026 Redesign & Feature Expansion',
+      startDate: new Date('2026-03-02'),
+      endDate: new Date('2026-06-13'),
+      features: [
+        {
+          id: 'f12',
+          name: 'Data Visualization',
+          tickets: [
+            {
+              id: 't42',
+              title: 'Chart Library Integration',
+              startDate: new Date('2026-03-02'),
+              endDate: new Date('2026-03-09'),
+              status: 'in-progress',
+              storyPoints: 8,
+              assignedTo: 'Elena Zhang'
+            },
+            {
+              id: 't43',
+              title: 'Real-time Data Streaming',
+              startDate: new Date('2026-03-09'),
+              endDate: new Date('2026-03-16'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'Priya Patel'
+            },
+            // PTO CONFLICT: Priya has family event
+            {
+              id: 't44',
+              title: 'Dashboard Builder UI',
+              startDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-23'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'Priya Patel'
+            },
+            {
+              id: 't45',
+              title: 'Custom Report Engine',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-30'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'Yuki Tanaka'
+            }
+          ]
+        },
+        {
+          id: 'f13',
+          name: 'Data Processing',
+          tickets: [
+            {
+              id: 't46',
+              title: 'ETL Pipeline Architecture',
+              startDate: new Date('2026-03-02'),
+              endDate: new Date('2026-03-16'),
+              status: 'in-progress',
+              storyPoints: 13,
+              assignedTo: 'James Wilson'
+            },
+            // CRITICAL: James has medical PTO during deployment
+            {
+              id: 't47',
+              title: 'Data Warehouse Integration',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-30'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'James Wilson'
+            },
+            {
+              id: 't48',
+              title: 'Query Optimization',
+              startDate: new Date('2026-03-30'),
+              endDate: new Date('2026-04-06'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Alex Thompson'
+            }
+          ]
+        },
+        {
+          id: 'f14',
+          name: 'Analytics Features',
+          tickets: [
+            {
+              id: 't49',
+              title: 'Predictive Analytics Module',
+              startDate: new Date('2026-04-06'),
+              endDate: new Date('2026-04-20'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'Priya Patel'
+            },
+            {
+              id: 't50',
+              title: 'AI-Powered Insights',
+              startDate: new Date('2026-04-20'),
+              endDate: new Date('2026-05-04'),
+              status: 'planned',
+              storyPoints: 13,
+              assignedTo: 'Priya Patel'
+            },
+            {
+              id: 't51',
+              title: 'Automated Alerting System',
+              startDate: new Date('2026-05-04'),
+              endDate: new Date('2026-05-11'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Yuki Tanaka'
+            },
+            {
+              id: 't52',
+              title: 'Export & Sharing Features',
+              startDate: new Date('2026-05-11'),
+              endDate: new Date('2026-05-18'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Elena Zhang'
+            }
+          ]
+        },
+        {
+          id: 'f15',
+          name: 'Analytics Testing & QA',
+          tickets: [
+            {
+              id: 't53',
+              title: 'Data Accuracy Validation',
+              startDate: new Date('2026-05-18'),
+              endDate: new Date('2026-05-25'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Lisa Park'
+            },
+            {
+              id: 't54',
+              title: 'Performance Load Testing',
+              startDate: new Date('2026-05-25'),
+              endDate: new Date('2026-06-01'),
+              status: 'planned',
+              storyPoints: 8,
+              assignedTo: 'Tom Zhang'
+            },
+            {
+              id: 't55',
+              title: 'UAT & Final Testing',
+              startDate: new Date('2026-06-01'),
+              endDate: new Date('2026-06-08'),
+              status: 'planned',
+              storyPoints: 5,
+              assignedTo: 'Lisa Park'
+            }
+          ]
+        }
+      ],
+      sprints: [
+        {
+          id: 's21',
+          name: 'Analytics Sprint 1',
+          startDate: new Date('2026-03-02'),
+          endDate: new Date('2026-03-13')
+        },
+        {
+          id: 's22',
+          name: 'Analytics Sprint 2',
+          startDate: new Date('2026-03-16'),
+          endDate: new Date('2026-03-27')
+        },
+        {
+          id: 's23',
+          name: 'Analytics Sprint 3',
+          startDate: new Date('2026-03-30'),
+          endDate: new Date('2026-04-10')
+        },
+        {
+          id: 's24',
+          name: 'Analytics Sprint 4',
+          startDate: new Date('2026-04-13'),
+          endDate: new Date('2026-04-24')
+        },
+        {
+          id: 's25',
+          name: 'Analytics Sprint 5',
+          startDate: new Date('2026-04-27'),
+          endDate: new Date('2026-05-08')
+        },
+        {
+          id: 's26',
+          name: 'Analytics Sprint 6',
+          startDate: new Date('2026-05-11'),
+          endDate: new Date('2026-05-22')
+        },
+        {
+          id: 's27',
+          name: 'Analytics Sprint 7',
+          startDate: new Date('2026-05-25'),
+          endDate: new Date('2026-06-05')
+        },
+        {
+          id: 's28',
+          name: 'Analytics Sprint 8',
+          startDate: new Date('2026-06-08'),
+          endDate: new Date('2026-06-19')
+        }
+      ]
+    }
+  ]
+};
+
+// Combine all products
+export const mockProducts: Product[] = [product1, product2, product3];
 
 // Helper function to find a release by ID across all products
 export function findReleaseById(releaseId: string): { product: Product; release: Release } | null {
@@ -432,161 +912,171 @@ export function findReleaseById(releaseId: string): { product: Product; release:
   return null;
 }
 
+// ===========================================
+// TEAM MEMBERS (12 total)
+// ===========================================
 export const mockTeamMembers: TeamMember[] = [
   {
     id: 'tm1',
-    name: 'Marcus Rivera',
+    name: 'Sarah Chen',
     role: 'Developer',
-    notes: 'Backend Engineer - Python, Node.js, ML Infrastructure',
+    notes: 'Senior Full-Stack Engineer, Mobile Expert',
     pto: [
       {
         id: 'pto1',
-        name: 'Family Vacation',
-        startDate: new Date('2026-03-16'),
-        endDate: new Date('2026-03-20')
+        name: 'Spring Break',
+        startDate: new Date('2026-03-24'),
+        endDate: new Date('2026-03-31')
       }
     ]
   },
   {
     id: 'tm2',
-    name: 'Elena Zhang',
+    name: 'Marcus Rivera',
     role: 'Developer',
-    notes: 'Frontend Engineer - React, TypeScript, Design Systems',
-    pto: []
-  },
-  {
-    id: 'tm3',
-    name: 'Priya Patel',
-    role: 'Developer',
-    notes: 'Full-Stack Engineer - API Design, Database Architecture',
+    notes: 'Backend Specialist, Security Focus',
     pto: [
       {
         id: 'pto2',
-        name: 'Medical Appointment',
-        startDate: new Date('2026-02-27'),
-        endDate: new Date('2026-02-27')
+        name: 'Tech Conference',
+        startDate: new Date('2026-03-05'),
+        endDate: new Date('2026-03-07')
       }
     ]
   },
   {
-    id: 'tm4',
-    name: 'Jin Park',
+    id: 'tm3',
+    name: 'Elena Zhang',
     role: 'Developer',
-    notes: 'Mobile Engineer - iOS, Android, React Native',
+    notes: 'Frontend Lead, UI/UX Integration',
     pto: []
   },
   {
-    id: 'tm5',
-    name: 'Sofia Torres',
+    id: 'tm4',
+    name: 'James Wilson',
     role: 'Developer',
-    notes: 'Mobile Engineer - Flutter, Native Mobile Development',
+    notes: 'DevOps & Infrastructure Lead',
     pto: [
       {
         id: 'pto3',
-        name: 'Conference',
-        startDate: new Date('2026-03-30'),
-        endDate: new Date('2026-04-03')
+        name: 'Medical Appointment',
+        startDate: new Date('2026-03-27'),
+        endDate: new Date('2026-03-28')
+      }
+    ]
+  },
+  {
+    id: 'tm5',
+    name: 'Priya Patel',
+    role: 'Developer',
+    notes: 'Data Engineering & Analytics',
+    pto: [
+      {
+        id: 'pto4',
+        name: 'Family Celebration',
+        startDate: new Date('2026-03-19'),
+        endDate: new Date('2026-03-21')
       }
     ]
   },
   {
     id: 'tm6',
-    name: 'Kenji Nakamura',
+    name: 'Alex Thompson',
     role: 'Developer',
-    notes: 'ML Engineer - NLP, LLM Fine-tuning, Vector Databases',
+    notes: 'API & Microservices Architecture',
     pto: []
   },
   {
     id: 'tm7',
-    name: 'Aisha Williams',
-    role: 'Designer',
-    notes: 'Product Designer - UI/UX, Design Systems, User Research',
+    name: 'Yuki Tanaka',
+    role: 'Developer',
+    notes: 'Full-Stack, Integration Specialist',
+    pto: []
+  },
+  {
+    id: 'tm8',
+    name: 'Maria Garcia',
+    role: 'Developer',
+    notes: 'Mobile Development Lead (iOS & Android)',
     pto: [
       {
-        id: 'pto4',
-        name: 'Workshop',
-        startDate: new Date('2026-02-16'),
-        endDate: new Date('2026-02-17')
+        id: 'pto5',
+        name: 'Vacation',
+        startDate: new Date('2026-05-25'),
+        endDate: new Date('2026-05-29')
       }
     ]
   },
   {
-    id: 'tm8',
-    name: 'Omar Hassan',
-    role: 'QA',
-    notes: 'QA Engineer - Automation, Performance Testing',
-    pto: []
-  },
-  {
     id: 'tm9',
-    name: 'Yuki Tanaka',
-    role: 'QA',
-    notes: 'QA Engineer - Security Testing, Compliance Validation',
+    name: 'Sofia Martinez',
+    role: 'Designer',
+    notes: 'Senior Product Designer, Design Systems',
     pto: [
       {
-        id: 'pto5',
-        name: 'Personal Day',
-        startDate: new Date('2026-03-13'),
-        endDate: new Date('2026-03-13')
+        id: 'pto6',
+        name: 'Design Workshop',
+        startDate: new Date('2026-04-14'),
+        endDate: new Date('2026-04-16')
       }
     ]
   },
   {
     id: 'tm10',
-    name: 'Chen Wei',
-    role: 'Developer',
-    notes: 'DevOps Engineer - CI/CD, Cloud Infrastructure, Monitoring',
+    name: 'David Kim',
+    role: 'Designer',
+    notes: 'UX Researcher & Interaction Designer',
+    pto: []
+  },
+  {
+    id: 'tm11',
+    name: 'Lisa Park',
+    role: 'QA',
+    notes: 'QA Lead, Test Automation',
+    pto: [
+      {
+        id: 'pto7',
+        name: 'Training Course',
+        startDate: new Date('2026-04-21'),
+        endDate: new Date('2026-04-23')
+      }
+    ]
+  },
+  {
+    id: 'tm12',
+    name: 'Tom Zhang',
+    role: 'QA',
+    notes: 'Performance & Security Testing',
     pto: []
   }
 ];
 
+// ===========================================
+// COMPANY HOLIDAYS (4 key dates)
+// ===========================================
 export const mockHolidays: Holiday[] = [
   {
     id: 'h1',
-    name: 'New Year\'s Day',
-    startDate: new Date('2026-01-01'),
-    endDate: new Date('2026-01-01')
-  },
-  {
-    id: 'h2',
-    name: 'Martin Luther King Jr. Day',
-    startDate: new Date('2026-01-19'),
-    endDate: new Date('2026-01-19')
-  },
-  {
-    id: 'h3',
     name: 'Presidents\' Day',
     startDate: new Date('2026-02-16'),
     endDate: new Date('2026-02-16')
   },
   {
-    id: 'h4',
+    id: 'h2',
+    name: 'Good Friday',
+    startDate: new Date('2026-04-03'),
+    endDate: new Date('2026-04-03')
+  },
+  {
+    id: 'h3',
     name: 'Memorial Day',
     startDate: new Date('2026-05-25'),
     endDate: new Date('2026-05-25')
   },
   {
-    id: 'h5',
-    name: 'Independence Day',
-    startDate: new Date('2026-07-04'),
-    endDate: new Date('2026-07-04')
-  },
-  {
-    id: 'h6',
-    name: 'Labor Day',
-    startDate: new Date('2026-09-07'),
-    endDate: new Date('2026-09-07')
-  },
-  {
-    id: 'h7',
-    name: 'Thanksgiving',
-    startDate: new Date('2026-11-26'),
-    endDate: new Date('2026-11-27')
-  },
-  {
-    id: 'h8',
-    name: 'Year-End Shutdown',
-    startDate: new Date('2026-12-24'),
-    endDate: new Date('2026-12-31')
+    id: 'h4',
+    name: 'Company All-Hands Meeting',
+    startDate: new Date('2026-03-13'),
+    endDate: new Date('2026-03-13')
   }
 ];

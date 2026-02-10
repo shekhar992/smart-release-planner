@@ -1,11 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, User, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { mockTeamMembers, TeamMember } from '../data/mockData';
+import { loadTeamMembers } from '../lib/localStorage';
 
 export function TeamRoster() {
   const navigate = useNavigate();
-  const [teamMembers, setTeamMembers] = useState(mockTeamMembers);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  
+  // Load team members from localStorage on mount
+  useEffect(() => {
+    const storedTeamMembers = loadTeamMembers();
+    setTeamMembers(storedTeamMembers || mockTeamMembers);
+  }, []);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
 
