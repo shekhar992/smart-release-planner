@@ -1,11 +1,20 @@
 import { useState } from 'react';
-import { X, Upload, Calendar, Users, CheckCircle, Download, FileText, List, UsersRound, Coffee, PartyPopper } from 'lucide-react';
+import { X, Upload, CheckCircle, Download, FileText, List, UsersRound, Coffee, PartyPopper, AlertCircle } from 'lucide-react';
 import { Product } from '../data/mockData';
+import { parseCSV, validateAndTransformCSV, CSVParseResult } from '../lib/csvParser';
+import { ticketImportMapping, teamMemberImportMapping, ptoImportMapping, holidayImportMapping } from '../lib/importMappings';
+
+export interface ImportedReleaseData {
+  tickets: Array<{ id: string; title: string; assignedTo: string; startDate: string; endDate: string; storyPoints: number; status: string }>;
+  team: Array<{ id: string; name: string; role: string }>;
+  pto: Array<{ id: string; name: string; startDate: string; endDate: string }>;
+  holidays: Array<{ id: string; name: string; startDate: string; endDate: string }>;
+}
 
 interface ImportReleaseWizardProps {
   onClose: () => void;
   products: Product[];
-  onCreate: (productId: string, name: string, startDate: Date, endDate: Date) => void;
+  onCreate: (productId: string, name: string, startDate: Date, endDate: Date, importedData: ImportedReleaseData) => void;
 }
 
 type Step = 'templates' | 'upload' | 'review';
@@ -34,8 +43,8 @@ export function ImportReleaseWizard({ onClose, products, onCreate }: ImportRelea
     teamCount: number;
     ptoCount: number;
     holidayCount: number;
-    tickets: Array<{ name: string; assignedTo: string; startDate: string; endDate: string; storyPoints: string }>;
-    team: Array<{ name: string; role: string }>;
+    tickets: Array<{ id: string; title: string; assignedTo: string; startDate: string; endDate: string; storyPoints: number; status: string }>;
+    team: Array<{ id: string; name: string; role: string }>;
   }>({
     ticketCount: 0,
     teamCount: 0,
@@ -45,63 +54,99 @@ export function ImportReleaseWizard({ onClose, products, onCreate }: ImportRelea
     team: []
   });
 
+  // Validation results
+  const [validationErrors, setValidationErrors] = useState<{
+    tickets: CSVParseResult<any> | null;
+    team: CSVParseResult<any> | null;
+    pto: CSVParseResult<any> | null;
+    holidays: CSVParseResult<any> | null;
+  }>({
+    tickets: null,
+    team: null,
+    pto: null,
+    holidays: null
+  });
+
   const handleFileUpload = async (type: 'tickets' | 'team' | 'pto' | 'holidays', file: File | null) => {
     setUploadedFiles(prev => ({
       ...prev,
       [type]: file
     }));
 
-    // Parse the file to extract data for preview
+    // Parse and validate the file
     if (file) {
       const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
+      const { headers, rows } = parseCSV(text);
       
+      // Get appropriate mapping for validation
+      let mapping;
+      switch (type) {
+        case 'tickets':
+          mapping = ticketImportMapping;
+          break;
+        case 'team':
+          mapping = teamMemberImportMapping;
+          break;
+        case 'pto':
+          mapping = ptoImportMapping;
+          break;
+        case 'holidays':
+          mapping = holidayImportMapping;
+          break;
+      }
+      
+      // Validate and transform data
+      const result = validateAndTransformCSV(headers, rows, mapping);
+      
+      // Store validation results
+      setValidationErrors(prev => ({
+        ...prev,
+        [type]: result
+      }));
+      
+      // Update parsed data counts
       if (type === 'tickets') {
-        const dataLines = lines.slice(1); // Skip header
-        const tickets = dataLines.map(line => {
-          const parts = line.split(',');
-          return {
-            name: parts[0] || '',
-            storyPoints: parts[1] || '',
-            assignedTo: parts[2] || '',
-            startDate: parts[3] || '',
-            endDate: parts[4] || ''
-          };
-        });
         setParsedData(prev => ({
           ...prev,
-          ticketCount: tickets.length,
-          tickets: tickets.slice(0, 5) // Show first 5 for preview
+          ticketCount: result.data.length,
+          tickets: result.data.slice(0, 5).map((t: any) => ({
+            id: t.id,
+            title: t.title,
+            storyPoints: t.storyPoints,
+            assignedTo: t.assignedTo,
+            startDate: t.startDate instanceof Date ? t.startDate.toISOString().split('T')[0] : t.startDate,
+            endDate: t.endDate instanceof Date ? t.endDate.toISOString().split('T')[0] : t.endDate,
+            status: t.status
+          }))
         }));
       } else if (type === 'team') {
-        const dataLines = lines.slice(1);
-        const team = dataLines.map(line => {
-          const parts = line.split(',');
-          return {
-            name: parts[0] || '',
-            role: parts[1] || ''
-          };
-        });
         setParsedData(prev => ({
           ...prev,
-          teamCount: team.length,
-          team
+          teamCount: result.data.length,
+          team: result.data.map((t: any) => ({
+            id: t.id,
+            name: t.name,
+            role: t.role
+          }))
         }));
       } else if (type === 'pto') {
-        const dataLines = lines.slice(1);
         setParsedData(prev => ({
           ...prev,
-          ptoCount: dataLines.length
+          ptoCount: result.data.length
         }));
       } else if (type === 'holidays') {
-        const dataLines = lines.slice(1);
         setParsedData(prev => ({
           ...prev,
-          holidayCount: dataLines.length
+          holidayCount: result.data.length
         }));
       }
     } else {
-      // File removed, reset counts
+      // File removed, reset counts and errors
+      setValidationErrors(prev => ({
+        ...prev,
+        [type]: null
+      }));
+      
       if (type === 'tickets') {
         setParsedData(prev => ({ ...prev, ticketCount: 0, tickets: [] }));
       } else if (type === 'team') {
@@ -116,7 +161,42 @@ export function ImportReleaseWizard({ onClose, products, onCreate }: ImportRelea
 
   const handleComplete = () => {
     if (selectedProductId && releaseName && startDate && endDate) {
-      onCreate(selectedProductId, releaseName, new Date(startDate), new Date(endDate));
+      // Gather all validated data from the CSV uploads
+      const allTickets = validationErrors.tickets?.data || [];
+      const allTeam = validationErrors.team?.data || [];
+      const allPto = validationErrors.pto?.data || [];
+      const allHolidays = validationErrors.holidays?.data || [];
+
+      const importedData: ImportedReleaseData = {
+        tickets: allTickets.map((t: any) => ({
+          id: t.id || `t-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          title: t.title,
+          assignedTo: t.assignedTo,
+          startDate: t.startDate instanceof Date ? t.startDate.toISOString().split('T')[0] : String(t.startDate),
+          endDate: t.endDate instanceof Date ? t.endDate.toISOString().split('T')[0] : String(t.endDate),
+          storyPoints: Number(t.storyPoints) || 0,
+          status: t.status || 'planned',
+        })),
+        team: allTeam.map((m: any) => ({
+          id: m.id || `tm-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          name: m.name,
+          role: m.role,
+        })),
+        pto: allPto.map((p: any) => ({
+          id: p.id || `pto-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          name: p.name || p.developerName || '',
+          startDate: p.startDate instanceof Date ? p.startDate.toISOString().split('T')[0] : String(p.startDate),
+          endDate: p.endDate instanceof Date ? p.endDate.toISOString().split('T')[0] : String(p.endDate),
+        })),
+        holidays: allHolidays.map((h: any) => ({
+          id: h.id || `hol-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          name: h.name,
+          startDate: h.startDate instanceof Date ? h.startDate.toISOString().split('T')[0] : String(h.startDate),
+          endDate: h.endDate instanceof Date ? h.endDate.toISOString().split('T')[0] : String(h.endDate),
+        })),
+      };
+
+      onCreate(selectedProductId, releaseName, new Date(startDate), new Date(endDate), importedData);
       onClose();
     }
   };
@@ -171,6 +251,7 @@ export function ImportReleaseWizard({ onClose, products, onCreate }: ImportRelea
             <UploadStep
               uploadedFiles={uploadedFiles}
               onFileUpload={handleFileUpload}
+              validationErrors={validationErrors}
             />
           )}
           {currentStep === 'review' && (
@@ -221,7 +302,7 @@ export function ImportReleaseWizard({ onClose, products, onCreate }: ImportRelea
                 }
               }
             }}
-            disabled={!canProceed(currentStep, selectedProductId, releaseName, startDate, endDate, uploadedFiles)}
+            disabled={!canProceed(currentStep, selectedProductId, releaseName, startDate, endDate, uploadedFiles, validationErrors)}
             className="px-5 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {currentStep === 'review' ? 'Create Release' : 'Next'}
@@ -239,11 +320,11 @@ function TemplatesStep() {
       name: 'Tickets Template',
       description: 'Your planned work items including features and tasks with dates and assignments',
       required: true,
-      columns: ['Ticket Name', 'Story Points', 'Assigned To', 'Start Date', 'End Date', 'Feature'],
+      columns: ['id', 'title', 'startDate', 'endDate', 'status', 'storyPoints', 'assignedTo'],
       exampleData: [
-        ['User Authentication', '5', 'Alice Chen', '2024-03-01', '2024-03-05', 'Auth System'],
-        ['Database Schema', '8', 'Bob Smith', '2024-03-04', '2024-03-08', 'Backend'],
-        ['Dashboard UI', '3', 'Carol White', '2024-03-06', '2024-03-10', 'Frontend']
+        ['t1', 'User Authentication', '2026-03-01', '2026-03-05', 'planned', '5', 'Alice Chen'],
+        ['t2', 'Database Schema', '2026-03-04', '2026-03-08', 'planned', '8', 'Bob Smith'],
+        ['t3', 'Dashboard UI', '2026-03-06', '2026-03-10', 'planned', '3', 'Carol White']
       ]
     },
     {
@@ -251,11 +332,11 @@ function TemplatesStep() {
       name: 'Team Roster Template',
       description: 'List of team members who will be working on this release',
       required: true,
-      columns: ['Name', 'Role'],
+      columns: ['id', 'name', 'role', 'notes'],
       exampleData: [
-        ['Alice Chen', 'Engineer'],
-        ['Bob Smith', 'Engineer'],
-        ['Carol White', 'Designer']
+        ['tm1', 'Alice Chen', 'Developer', 'Full-stack engineer'],
+        ['tm2', 'Bob Smith', 'Developer', 'Backend specialist'],
+        ['tm3', 'Carol White', 'Designer', 'UI/UX designer']
       ]
     },
     {
@@ -263,10 +344,10 @@ function TemplatesStep() {
       name: 'PTO Template',
       description: 'Planned time off for team members during the release period',
       required: false,
-      columns: ['Team Member', 'Start Date', 'End Date', 'Reason'],
+      columns: ['id', 'name', 'startDate', 'endDate'],
       exampleData: [
-        ['Alice Chen', '2024-03-15', '2024-03-17', 'Vacation'],
-        ['Bob Smith', '2024-03-20', '2024-03-20', 'Personal Day']
+        ['pto1', 'Alice Chen', '2026-03-15', '2026-03-17'],
+        ['pto2', 'Bob Smith', '2026-03-20', '2026-03-20']
       ]
     },
     {
@@ -274,10 +355,10 @@ function TemplatesStep() {
       name: 'Holidays Template',
       description: 'Company holidays and non-working days during the release',
       required: false,
-      columns: ['Holiday Name', 'Start Date', 'End Date'],
+      columns: ['id', 'name', 'startDate', 'endDate'],
       exampleData: [
-        ['Memorial Day', '2024-05-27', '2024-05-27'],
-        ['Independence Day', '2024-07-04', '2024-07-04']
+        ['h1', 'Memorial Day', '2026-05-27', '2026-05-27'],
+        ['h2', 'Independence Day', '2026-07-04', '2026-07-04']
       ]
     }
   ];
@@ -367,7 +448,8 @@ function TemplatesStep() {
 
 function UploadStep({
   uploadedFiles,
-  onFileUpload
+  onFileUpload,
+  validationErrors
 }: {
   uploadedFiles: {
     tickets: File | null;
@@ -376,6 +458,12 @@ function UploadStep({
     holidays: File | null;
   };
   onFileUpload: (type: 'tickets' | 'team' | 'pto' | 'holidays', file: File | null) => void;
+  validationErrors: {
+    tickets: CSVParseResult<any> | null;
+    team: CSVParseResult<any> | null;
+    pto: CSVParseResult<any> | null;
+    holidays: CSVParseResult<any> | null;
+  };
 }) {
   const fileTypes = [
     {
@@ -403,6 +491,12 @@ function UploadStep({
       description: 'Company holidays and non-working days'
     }
   ];
+
+  const hasValidationErrors = 
+    (validationErrors.tickets && validationErrors.tickets.errors.length > 0) ||
+    (validationErrors.team && validationErrors.team.errors.length > 0) ||
+    (validationErrors.pto && validationErrors.pto.errors.length > 0) ||
+    (validationErrors.holidays && validationErrors.holidays.errors.length > 0);
 
   const handleFileChange = (type: 'tickets' | 'team' | 'pto' | 'holidays', e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -462,20 +556,58 @@ function UploadStep({
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mb-3">{fileType.description}</p>
-
-                {uploadedFiles[fileType.id] ? (
-                  <div className="flex items-center gap-2 bg-accent/50 rounded-lg px-3 py-2">
-                    <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
-                    <span className="text-xs font-medium text-foreground truncate flex-1">
-                      {uploadedFiles[fileType.id]!.name}
-                    </span>
-                    <button
-                      onClick={() => handleRemoveFile(fileType.id)}
-                      className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                    >
-                      Remove
-                    </button>
+              </div>
+              {uploadedFiles[fileType.id] ? (
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2 bg-accent/50 rounded-lg px-3 py-2">
+                      <CheckCircle className="w-4 h-4 text-primary flex-shrink-0" />
+                      <span className="text-xs font-medium text-foreground truncate flex-1">
+                        {uploadedFiles[fileType.id]!.name}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveFile(fileType.id)}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                    
+                    {/* Show validation status */}
+                    {validationErrors[fileType.id] && (
+                      <div>
+                        {validationErrors[fileType.id]!.errors.length > 0 ? (
+                          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                            <div className="flex items-start gap-2 mb-2">
+                              <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                              <span className="text-xs font-medium text-red-900">
+                                {validationErrors[fileType.id]!.errors.length} validation error(s) found
+                              </span>
+                            </div>
+                            <div className="space-y-1 max-h-32 overflow-y-auto">
+                              {validationErrors[fileType.id]!.errors.slice(0, 3).map((error, idx) => (
+                                <p key={idx} className="text-xs text-red-800">
+                                  Row {error.row}: {error.message}
+                                </p>
+                              ))}
+                              {validationErrors[fileType.id]!.errors.length > 3 && (
+                                <p className="text-xs text-red-700 italic">
+                                  ...and {validationErrors[fileType.id]!.errors.length - 3} more errors
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                              <span className="text-xs text-green-800 font-medium">
+                                ✓ {validationErrors[fileType.id]!.data.length} rows validated successfully
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -497,11 +629,27 @@ function UploadStep({
                 )}
               </div>
             </div>
-          </div>
         ))}
       </div>
 
-      {/* Validation message */}
+      {/* Validation errors blocking message */}
+      {hasRequiredFiles && hasValidationErrors && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-medium text-red-900 mb-1">
+                Cannot proceed with validation errors
+              </p>
+              <p className="text-xs text-red-800 leading-relaxed">
+                Please fix the errors shown above in your CSV files before continuing. Download the templates again if needed.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Required files message */}
       {!hasRequiredFiles && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
           <div className="flex items-start gap-3">
@@ -529,7 +677,8 @@ function ReviewStep({
   onSetReleaseName,
   onSetStartDate,
   onSetEndDate,
-  uploadedFiles,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  uploadedFiles: _uploadedFiles,
   parsedData
 }: {
   products: Product[];
@@ -552,8 +701,8 @@ function ReviewStep({
     teamCount: number;
     ptoCount: number;
     holidayCount: number;
-    tickets: Array<{ name: string; assignedTo: string; startDate: string; endDate: string; storyPoints: string }>;
-    team: Array<{ name: string; role: string }>;
+    tickets: Array<{ id: string; title: string; assignedTo: string; startDate: string; endDate: string; storyPoints: number; status: string }>;
+    team: Array<{ id: string; name: string; role: string }>;
   };
 }) {
   return (
@@ -702,10 +851,17 @@ function ReviewStep({
                         {ticket.storyPoints}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">{ticket.name}</p>
+                        <p className="font-medium text-foreground truncate">{ticket.title}</p>
                         <p className="text-muted-foreground">
                           {ticket.assignedTo} • {ticket.startDate} → {ticket.endDate}
                         </p>
+                        <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-medium ${
+                          ticket.status === 'completed' ? 'bg-green-100 text-green-700' :
+                          ticket.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {ticket.status}
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -766,12 +922,31 @@ function canProceed(
     team: File | null;
     pto: File | null;
     holidays: File | null;
+  },
+  validationErrors?: {
+    tickets: CSVParseResult<any> | null;
+    team: CSVParseResult<any> | null;
+    pto: CSVParseResult<any> | null;
+    holidays: CSVParseResult<any> | null;
   }
 ): boolean {
   if (step === 'templates') return true;
   if (step === 'upload') {
     // Require both tickets and team files to proceed
-    return uploadedFiles ? (uploadedFiles.tickets !== null && uploadedFiles.team !== null) : false;
+    const hasRequiredFiles = uploadedFiles ? (uploadedFiles.tickets !== null && uploadedFiles.team !== null) : false;
+    
+    // Check for validation errors in uploaded files
+    if (validationErrors && hasRequiredFiles) {
+      const hasErrors = 
+        (validationErrors.tickets && validationErrors.tickets.errors.length > 0) ||
+        (validationErrors.team && validationErrors.team.errors.length > 0) ||
+        (validationErrors.pto && validationErrors.pto.errors.length > 0) ||
+        (validationErrors.holidays && validationErrors.holidays.errors.length > 0);
+      
+      return !hasErrors; // Can only proceed if no validation errors
+    }
+    
+    return hasRequiredFiles;
   }
   if (step === 'review') {
     // Require all fields to be filled to create release

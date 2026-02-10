@@ -1,0 +1,21 @@
+id,title,startDate,endDate,status,storyPoints,assignedTo
+t1,Implement OAuth2 authentication,2026-02-15,2026-02-22,planned,8,Sarah Chen
+t2,Design database schema for users,2026-02-10,2026-02-14,in-progress,5,Marcus Rivera
+t3,Create JWT token management,2026-02-15,2026-02-19,planned,3,Alex Thompson
+t4,Build role-based access control,2026-02-20,2026-02-27,planned,8,James Wilson
+t5,Implement session management,2026-02-24,2026-03-03,planned,5,Sarah Chen
+t6,Add password policy enforcement,2026-03-03,2026-03-07,planned,3,Marcus Rivera
+t7,Create audit logging system,2026-03-10,2026-03-17,planned,5,James Wilson
+t8,Build user profile management UI,2026-02-15,2026-02-24,planned,8,Emily Rodriguez
+t9,Implement user invitation flow,2026-02-25,2026-03-04,planned,5,David Park
+t10,Add bulk user import feature,2026-03-05,2026-03-12,planned,8,Sarah Chen
+t11,Create user permission editor,2026-03-13,2026-03-20,planned,5,Alex Thompson
+t12,Build user activity dashboard,2026-03-18,2026-03-28,planned,8,Marcus Rivera
+t13,Design admin console mockups,2026-02-10,2026-02-14,completed,5,Emily Rodriguez
+t14,Implement admin user management,2026-02-17,2026-02-24,planned,8,David Park
+t15,Create system settings panel,2026-02-25,2026-03-03,planned,5,James Wilson
+t16,Build notification preferences UI,2026-03-04,2026-03-10,planned,3,Emily Rodriguez
+t17,Add email notification templates,2026-03-11,2026-03-17,planned,5,Sarah Chen
+t18,Implement push notification system,2026-03-18,2026-03-25,planned,8,David Park
+t19,Create notification history view,2026-03-26,2026-04-01,planned,3,Alex Thompson
+t20,Build notification settings API,2026-02-15,2026-02-20,planned,5,James Wilson

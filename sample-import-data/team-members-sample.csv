@@ -1,0 +1,13 @@
+id,name,role,notes
+tm1,Sarah Chen,Developer,Senior full-stack engineer specializing in React and Node.js
+tm2,Marcus Rivera,Developer,Backend specialist with expertise in Python and databases
+tm3,Alex Thompson,Developer,Frontend engineer focusing on UI/UX implementation
+tm4,James Wilson,QA,Lead QA engineer with automation testing experience
+tm5,Emily Rodriguez,Designer,Product designer handling UI mockups and user research
+tm6,David Park,Developer,DevOps engineer managing CI/CD and infrastructure
+tm7,Lisa Anderson,Developer,Junior developer learning full-stack development
+tm8,Michael Kim,QA,QA analyst focusing on manual testing and bug reports
+tm9,Rachel Green,Designer,UX designer conducting user interviews and wireframing
+tm10,Tom Bradley,Developer,Mobile app developer working on iOS and Android
+tm11,Nina Patel,Developer,Data engineer building analytics pipelines
+tm12,Chris Martinez,QA,Performance testing specialist

@@ -5,7 +5,8 @@ import { mockProducts, Product, Release, mockHolidays, mockTeamMembers } from '.
 import { CreateProductModal } from './CreateProductModal';
 import { CreateReleaseModal } from './CreateReleaseModal';
 import { ImportReleaseWizard } from './ImportReleaseWizard';
-import { loadProducts, initializeStorage } from '../lib/localStorage';
+import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers, saveHolidays, loadHolidays } from '../lib/localStorage';
+import type { ImportedReleaseData } from './ImportReleaseWizard';
 
 export function PlanningDashboard() {
   const [showCreateProduct, setShowCreateProduct] = useState(false);
@@ -24,10 +25,6 @@ export function PlanningDashboard() {
     setProducts(storedProducts || mockProducts);
   }, []);
 
-  const formatDateRange = (start: Date, end: Date) => {
-    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-  };
-  
   const countTickets = (release: Release) => 
     release.features.reduce((sum, feature) => sum + feature.tickets.length, 0);
 
@@ -40,9 +37,100 @@ export function PlanningDashboard() {
     setProducts([...products, newProduct]);
   };
 
-  const handleCreateRelease = (_productId: string, _name: string, _startDate: Date, _endDate: Date) => {
-    // Release creation logic will be implemented when needed
+  const handleCreateRelease = (productId: string, name: string, startDate: Date, endDate: Date, importedData?: ImportedReleaseData) => {
+    const releaseId = `r-${Date.now()}`;
+
+    // Convert imported tickets into features/tickets structure
+    const tickets: import('../data/mockData').Ticket[] = (importedData?.tickets || []).map(t => ({
+      id: t.id,
+      title: t.title,
+      startDate: new Date(t.startDate),
+      endDate: new Date(t.endDate),
+      status: (t.status as 'planned' | 'in-progress' | 'completed') || 'planned',
+      storyPoints: t.storyPoints,
+      assignedTo: t.assignedTo,
+    }));
+
+    // Group all tickets under a single "Imported" feature
+    const feature: import('../data/mockData').Feature = {
+      id: `f-${Date.now()}`,
+      name: 'Imported Tickets',
+      tickets,
+    };
+
+    const newRelease: Release = {
+      id: releaseId,
+      name,
+      startDate,
+      endDate,
+      features: tickets.length > 0 ? [feature] : [],
+      sprints: [],
+    };
+
+    // Update products state
+    const updatedProducts = products.map(p => {
+      if (p.id === productId) {
+        return { ...p, releases: [...p.releases, newRelease] };
+      }
+      return p;
+    });
+    setProducts(updatedProducts);
+    saveProducts(updatedProducts);
+
+    // Save imported team members
+    if (importedData?.team && importedData.team.length > 0) {
+      const existingTeam = loadTeamMembers() || [];
+      const newMembers: import('../data/mockData').TeamMember[] = importedData.team
+        .filter(m => !existingTeam.some(e => e.name === m.name))
+        .map(m => ({
+          id: m.id,
+          name: m.name,
+          role: m.role as 'Developer' | 'Designer' | 'QA',
+          pto: [],
+        }));
+      if (newMembers.length > 0) {
+        saveTeamMembers([...existingTeam, ...newMembers]);
+      }
+    }
+
+    // Save imported holidays
+    if (importedData?.holidays && importedData.holidays.length > 0) {
+      const existingHolidays = loadHolidays() || [];
+      const newHolidays: import('../data/mockData').Holiday[] = importedData.holidays
+        .filter(h => !existingHolidays.some(e => e.name === h.name))
+        .map(h => ({
+          id: h.id,
+          name: h.name,
+          startDate: new Date(h.startDate),
+          endDate: new Date(h.endDate),
+        }));
+      if (newHolidays.length > 0) {
+        saveHolidays([...existingHolidays, ...newHolidays]);
+      }
+    }
+
+    // Save PTO entries to team members
+    if (importedData?.pto && importedData.pto.length > 0) {
+      const teamMembers = loadTeamMembers() || [];
+      const updatedTeam = teamMembers.map(member => {
+        const memberPto = importedData.pto
+          .filter(p => p.name === member.name)
+          .map(p => ({
+            id: p.id,
+            name: p.name,
+            startDate: new Date(p.startDate),
+            endDate: new Date(p.endDate),
+          }));
+        if (memberPto.length > 0) {
+          return { ...member, pto: [...(member.pto || []), ...memberPto] };
+        }
+        return member;
+      });
+      saveTeamMembers(updatedTeam);
+    }
+
     setShowCreateRelease(false);
+    setShowImportWizard(false);
   };
 
   // Calculate planning metrics
