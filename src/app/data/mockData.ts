@@ -1,6 +1,7 @@
 export interface Ticket {
   id: string;
   title: string;
+  description?: string;
   startDate: Date;
   endDate: Date;
   status: 'in-progress' | 'planned' | 'completed';

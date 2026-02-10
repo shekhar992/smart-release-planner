@@ -1,13 +1,14 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw } from 'lucide-react';
+import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { WorkloadModal } from './WorkloadModal';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
-import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, Holiday, TeamMember } from '../data/mockData';
+import { TicketCreationModal } from './TicketCreationModal';
+import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers } from '../data/mockData';
 import { detectConflicts, getConflictSummary } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
-import { loadProducts, saveRelease, initializeStorage, clearStorage, getLastUpdated, loadHolidays, loadTeamMembers, forceRefreshStorage } from '../lib/localStorage';
+import { loadProducts, saveRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembers, forceRefreshStorage } from '../lib/localStorage';
 
 export function ReleasePlanningCanvas() {
   const { releaseId } = useParams();
@@ -59,6 +60,7 @@ export function ReleasePlanningCanvas() {
   const [release, setRelease] = useState(currentRelease);
   const [showWorkloadModal, setShowWorkloadModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<{ featureId: string; ticketId: string } | null>(null);
+  const [showTicketCreation, setShowTicketCreation] = useState<{ featureId?: string } | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
 
   // Sync release state when currentRelease changes (e.g., after data loads)
@@ -138,37 +140,29 @@ export function ReleasePlanningCanvas() {
     }
   };
 
-  const handleSelectTicket = (featureId: string, ticketId: string) => {
-    setSelectedTicket({ featureId, ticketId });
-  };
-
-  const handleAddFeature = () => {
+  const handleAddFeatureWithName = (name: string): string => {
+    const id = `f${Date.now()}`;
     const newFeature: Feature = {
-      id: `f${Date.now()}`,
-      name: 'New Feature',
+      id,
+      name,
       tickets: []
     };
     setRelease(prev => ({
       ...prev,
       features: [...prev.features, newFeature]
     }));
+    return id;
   };
 
-  const handleAddTicket = (featureId: string) => {
+  const handleAddTicketFull = (featureId: string, ticketData: Omit<Ticket, 'id'>) => {
     const newTicket: Ticket = {
-      id: `t${Date.now()}`,
-      title: 'New Ticket',
-      startDate: new Date(),
-      endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days later
-      status: 'planned',
-      storyPoints: 3,
-      assignedTo: 'Unassigned'
+      id: `t${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      ...ticketData
     };
-    
     setRelease(prev => ({
       ...prev,
-      features: prev.features.map(f => 
-        f.id === featureId 
+      features: prev.features.map(f =>
+        f.id === featureId
           ? { ...f, tickets: [...f.tickets, newTicket] }
           : f
       )
@@ -214,33 +208,39 @@ export function ReleasePlanningCanvas() {
     }));
   };
 
-  const handleBulkAddTickets = (featureId: string, ticketNames: string[], storyPoints: number, assignedTo: string) => {
-    const baseDate = new Date();
-    const ticketDuration = 5 * 24 * 60 * 60 * 1000; // 5 days
-    
-    const newTickets: Ticket[] = ticketNames.map((title, index) => {
-      const startDate = new Date(baseDate.getTime() + (index * ticketDuration));
-      const endDate = new Date(startDate.getTime() + ticketDuration);
-      
-      return {
-        id: `t${Date.now()}-${index}`,
-        title,
-        startDate,
-        endDate,
-        status: 'planned',
-        storyPoints,
-        assignedTo
-      };
-    });
-    
+  const handleDeleteTicket = (featureId: string, ticketId: string) => {
     setRelease(prev => ({
       ...prev,
       features: prev.features.map(f => 
         f.id === featureId 
-          ? { ...f, tickets: [...f.tickets, ...newTickets] }
+          ? { ...f, tickets: f.tickets.filter(t => t.id !== ticketId) }
           : f
       )
     }));
+    setSelectedTicket(null);
+  };
+
+  const handleMoveTicketToFeature = (fromFeatureId: string, ticketId: string, toFeatureId: string) => {
+    setRelease(prev => {
+      const fromFeature = prev.features.find(f => f.id === fromFeatureId);
+      const ticket = fromFeature?.tickets.find(t => t.id === ticketId);
+      if (!ticket) return prev;
+
+      return {
+        ...prev,
+        features: prev.features.map(f => {
+          if (f.id === fromFeatureId) {
+            return { ...f, tickets: f.tickets.filter(t => t.id !== ticketId) };
+          }
+          if (f.id === toFeatureId) {
+            return { ...f, tickets: [...f.tickets, ticket] };
+          }
+          return f;
+        })
+      };
+    });
+    // Update selected ticket to point to new feature
+    setSelectedTicket({ featureId: toFeatureId, ticketId });
   };
 
   const handleCreateSprint = (name: string, startDate: Date, endDate: Date) => {
@@ -253,7 +253,23 @@ export function ReleasePlanningCanvas() {
     
     setRelease(prev => ({
       ...prev,
-      sprints: [...prev.sprints, newSprint].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+      sprints: [...(prev.sprints || []), newSprint].sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+    }));
+  };
+
+  const handleUpdateSprint = (sprintId: string, name: string, startDate: Date, endDate: Date) => {
+    setRelease(prev => ({
+      ...prev,
+      sprints: (prev.sprints || []).map(s => 
+        s.id === sprintId ? { ...s, name, startDate, endDate } : s
+      ).sort((a, b) => a.startDate.getTime() - b.startDate.getTime())
+    }));
+  };
+
+  const handleDeleteSprint = (sprintId: string) => {
+    setRelease(prev => ({
+      ...prev,
+      sprints: (prev.sprints || []).filter(s => s.id !== sprintId)
     }));
   };
 
@@ -296,6 +312,14 @@ export function ReleasePlanningCanvas() {
             <RotateCcw className="w-3.5 h-3.5" />
             Reset
           </button>
+
+          <button
+            onClick={() => setShowTicketCreation({})}
+            className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm hover:shadow-md"
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Ticket</span>
+          </button>
           
           <button
             onClick={() => navigate(`/release/${releaseId}/team`)}
@@ -324,6 +348,8 @@ export function ReleasePlanningCanvas() {
           onResizeTicket={handleResizeTicket}
           onSelectTicket={(featureId, ticketId) => setSelectedTicket({ featureId, ticketId })}
           onCreateSprint={handleCreateSprint}
+          onUpdateSprint={handleUpdateSprint}
+          onDeleteSprint={handleDeleteSprint}
           conflicts={conflicts}
           conflictSummary={conflictSummary}
           sprintCapacities={sprintCapacities}
@@ -341,11 +367,26 @@ export function ReleasePlanningCanvas() {
       {/* Ticket Details Panel */}
       {selectedTicket && (
         <TicketDetailsPanel 
-          ticket={release.features.find(f => f.id === selectedTicket.featureId)?.tickets.find(t => t.id === selectedTicket.ticketId) || {}}
+          ticket={release.features.find(f => f.id === selectedTicket.featureId)?.tickets.find(t => t.id === selectedTicket.ticketId) || ({} as Ticket)}
           featureId={selectedTicket.featureId}
           release={release}
+          teamMembers={teamMembers}
           onClose={() => setSelectedTicket(null)}
           onUpdate={handleUpdateTicket}
+          onDelete={handleDeleteTicket}
+          onMoveToFeature={handleMoveTicketToFeature}
+        />
+      )}
+
+      {/* Ticket Creation Modal */}
+      {showTicketCreation && (
+        <TicketCreationModal
+          release={release}
+          teamMembers={teamMembers}
+          preselectedFeatureId={showTicketCreation.featureId}
+          onClose={() => setShowTicketCreation(null)}
+          onAddFeature={handleAddFeatureWithName}
+          onAddTicket={handleAddTicketFull}
         />
       )}
     </div>

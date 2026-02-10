@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { Release, Sprint } from '../data/mockData';
+import { Release } from '../data/mockData';
 
 interface WorkloadModalProps {
   release: Release;
@@ -29,7 +29,7 @@ export function WorkloadModal({ release, onClose }: WorkloadModalProps) {
     release.features.forEach(feature => {
       feature.tickets.forEach(ticket => {
         // Determine which sprint this ticket belongs to
-        const sprintId = release.sprints.find(sprint => 
+        const sprintId = (release.sprints || []).find(sprint => 
           ticket.startDate >= sprint.startDate && ticket.startDate <= sprint.endDate
         )?.id;
 
@@ -98,7 +98,7 @@ export function WorkloadModal({ release, onClose }: WorkloadModalProps) {
               className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 outline-none focus:ring-2 focus:ring-blue-400/50 bg-white transition-all"
             >
               <option value="all">All Sprints</option>
-              {release.sprints.map(sprint => (
+              {(release.sprints || []).map(sprint => (
                 <option key={sprint.id} value={sprint.id}>
                   {sprint.name}
                 </option>
