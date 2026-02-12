@@ -4,12 +4,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { mockProducts, Product, Release, mockHolidays, mockTeamMembers, TeamMember } from '../data/mockData';
 import { CreateProductModal } from './CreateProductModal';
 import { CreateReleaseModal } from './CreateReleaseModal';
+import { AutoReleaseModal } from './AutoReleaseModal';
 import { PageShell } from './PageShell';
 import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers } from '../lib/localStorage';
 
 export function PlanningDashboard() {
   const [showCreateProduct, setShowCreateProduct] = useState(false);
   const [showCreateRelease, setShowCreateRelease] = useState<string | null>(null);
+  const [showAutoRelease, setShowAutoRelease] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   
   // Initialize and load products from localStorage
@@ -193,15 +195,37 @@ export function PlanningDashboard() {
               <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
               Holidays
             </Link>
+            
+            {/* Auto Release Planner */}
+            <button
+              onClick={() => setShowAutoRelease(true)}
+              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-accent hover:border-primary/20 transition-all"
+            >
+              <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />
+              Auto Generate Release (Beta)
+            </button>
           </div>
         </div>
       )}
 
-      {/* ── Modals (unchanged) ── */}
+      {/* ── Modals ── */}
       {showCreateProduct && (
         <CreateProductModal
           onClose={() => setShowCreateProduct(false)}
           onCreate={handleCreateProduct}
+        />
+      )}
+
+      {showAutoRelease && (
+        <AutoReleaseModal
+          products={products}
+          onClose={() => setShowAutoRelease(false)}
+          onSuccess={() => {
+            // Refresh products from localStorage
+            const storedProducts = loadProducts();
+            setProducts(storedProducts || []);
+            setShowAutoRelease(false);
+          }}
         />
       )}
 

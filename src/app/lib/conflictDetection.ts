@@ -30,6 +30,25 @@ export interface ConflictSummary {
   totalConflicts: number;
   affectedDevelopers: string[];
   conflictsByDeveloper: Record<string, number>;
+  overlapConflicts?: number;
+  developerOverloadConflicts?: number;
+  sprintOverCapacityConflicts?: number;
+}
+
+// Enhanced Conflict Type with Suggestions
+export interface Conflict {
+  ticketId: string;
+  developer: string;
+  type: "overlap" | "developerOverload" | "sprintOverCapacity";
+  severity: "high" | "medium" | "low";
+  message: string;
+  impactedDays?: number;
+  conflictingTickets?: string[];
+  suggestions?: {
+    possibleReassignments?: string[];
+    possibleSprintMoves?: string[];
+    possibleShiftDays?: number[];
+  };
 }
 
 /**
@@ -135,7 +154,10 @@ export function getConflictSummary(conflicts: Map<string, TicketConflict>, ticke
   return {
     totalConflicts: conflicts.size,
     affectedDevelopers: Array.from(affectedDevelopers),
-    conflictsByDeveloper: conflictsByDev
+    conflictsByDeveloper: conflictsByDev,
+    overlapConflicts: conflicts.size, // All current conflicts are overlaps
+    developerOverloadConflicts: 0,
+    sprintOverCapacityConflicts: 0
   };
 }
 
@@ -186,4 +208,164 @@ export function getTicketConflicts(ticketId: string, conflicts: Map<string, Tick
   });
   
   return allConflicts;
+}
+
+/**
+ * Detect enhanced conflicts with suggestions
+ * Returns detailed conflict information including possible resolutions
+ */
+export function detectEnhancedConflicts(
+  tickets: Ticket[],
+  sprints?: Array<{ id: string; startDate: Date; endDate: Date }>,
+  teamMembers?: Array<{ name: string }>
+): Conflict[] {
+  const conflicts: Conflict[] = [];
+  
+  // Group tickets by developer
+  const ticketsByDeveloper = new Map<string, Ticket[]>();
+  tickets.forEach(ticket => {
+    if (!ticket.assignedTo || ticket.assignedTo === 'Unassigned') return;
+    const devTickets = ticketsByDeveloper.get(ticket.assignedTo) || [];
+    devTickets.push(ticket);
+    ticketsByDeveloper.set(ticket.assignedTo, devTickets);
+  });
+  
+  // Check for overlaps within each developer's workload
+  ticketsByDeveloper.forEach((devTickets, developer) => {
+    for (let i = 0; i < devTickets.length; i++) {
+      const ticket1 = devTickets[i];
+      const conflictingIds: string[] = [];
+      let totalOverlapDays = 0;
+      
+      for (let j = i + 1; j < devTickets.length; j++) {
+        const ticket2 = devTickets[j];
+        
+        if (datesOverlap(ticket1.startDate, ticket1.endDate, ticket2.startDate, ticket2.endDate)) {
+          const overlapDays = calculateOverlapDays(
+            ticket1.startDate,
+            ticket1.endDate,
+            ticket2.startDate,
+            ticket2.endDate
+          );
+          conflictingIds.push(ticket2.id);
+          totalOverlapDays += overlapDays;
+        }
+      }
+      
+      if (conflictingIds.length > 0) {
+        // Compute suggestions
+        const suggestions = computeSuggestions(
+          ticket1,
+          conflictingIds,
+          tickets,
+          ticketsByDeveloper,
+          sprints,
+          teamMembers
+        );
+        
+        // Determine severity based on overlap days and number of conflicts
+        const severity: "high" | "medium" | "low" = 
+          totalOverlapDays > 5 || conflictingIds.length > 2 ? "high" :
+          totalOverlapDays > 2 ? "medium" : "low";
+        
+        conflicts.push({
+          ticketId: ticket1.id,
+          developer,
+          type: "overlap",
+          severity,
+          message: `${ticket1.title} overlaps with ${conflictingIds.length} other task${conflictingIds.length > 1 ? 's' : ''}`,
+          impactedDays: totalOverlapDays,
+          conflictingTickets: conflictingIds,
+          suggestions
+        });
+      }
+    }
+  });
+  
+  return conflicts;
+}
+
+/**
+ * Compute suggestions for resolving a conflict
+ */
+function computeSuggestions(
+  ticket: Ticket,
+  conflictingTicketIds: string[],
+  allTickets: Ticket[],
+  ticketsByDeveloper: Map<string, Ticket[]>,
+  sprints?: Array<{ id: string; startDate: Date; endDate: Date }>,
+  teamMembers?: Array<{ name: string }>
+): {
+  possibleReassignments?: string[];
+  possibleSprintMoves?: string[];
+  possibleShiftDays?: number[];
+} {
+  const suggestions: {
+    possibleReassignments?: string[];
+    possibleSprintMoves?: string[];
+    possibleShiftDays?: number[];
+  } = {};
+  
+  // 1. Find developers with available capacity (less overlapping work)
+  if (teamMembers && teamMembers.length > 0) {
+    const lessLoadedDevs = teamMembers
+      .filter(tm => {
+        const devTickets = ticketsByDeveloper.get(tm.name) || [];
+        // Check if this developer has capacity during the ticket's timeframe
+        const hasOverlap = devTickets.some(t => 
+          datesOverlap(ticket.startDate, ticket.endDate, t.startDate, t.endDate)
+        );
+        return !hasOverlap && tm.name !== ticket.assignedTo;
+      })
+      .map(tm => tm.name)
+      .slice(0, 3); // Limit to top 3 suggestions
+    
+    if (lessLoadedDevs.length > 0) {
+      suggestions.possibleReassignments = lessLoadedDevs;
+    }
+  }
+  
+  // 2. Find sprints where this ticket could fit
+  if (sprints && sprints.length > 0) {
+    const currentSprintIndex = sprints.findIndex(s => 
+      ticket.startDate >= s.startDate && ticket.startDate <= s.endDate
+    );
+    
+    if (currentSprintIndex >= 0 && currentSprintIndex < sprints.length - 1) {
+      // Suggest next sprint
+      suggestions.possibleSprintMoves = [sprints[currentSprintIndex + 1].id];
+    }
+  }
+  
+  // 3. Check if shifting by +1 day resolves conflicts
+  const shiftOptions: number[] = [];
+  for (let shiftDays = 1; shiftDays <= 5; shiftDays++) {
+    const shiftedStart = new Date(ticket.startDate);
+    shiftedStart.setDate(shiftedStart.getDate() + shiftDays);
+    const shiftedEnd = new Date(ticket.endDate);
+    shiftedEnd.setDate(shiftedEnd.getDate() + shiftDays);
+    
+    // Check if shifted ticket still conflicts
+    const stillConflicts = conflictingTicketIds.some(cId => {
+      const conflictingTicket = allTickets.find(t => t.id === cId);
+      if (!conflictingTicket) return false;
+      return datesOverlap(
+        shiftedStart,
+        shiftedEnd,
+        conflictingTicket.startDate,
+        conflictingTicket.endDate
+      );
+    });
+    
+    if (!stillConflicts) {
+      shiftOptions.push(shiftDays);
+      break; // Only suggest the minimum shift needed
+    }
+  }
+  
+  if (shiftOptions.length > 0) {
+    suggestions.possibleShiftDays = shiftOptions;
+  }
+  
+  return suggestions;
 }

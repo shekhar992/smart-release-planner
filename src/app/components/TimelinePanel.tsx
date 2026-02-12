@@ -21,6 +21,7 @@ interface TimelinePanelProps {
   conflicts: Map<string, TicketConflict>;
   conflictSummary: ConflictSummary;
   sprintCapacities: Map<string, SprintCapacity>;
+  onViewConflictDetails?: () => void;
 }
 
 const DAY_WIDTH = 40;
@@ -28,7 +29,7 @@ const ROW_HEIGHT = 48;
 const FEATURE_HEADER_HEIGHT = 40;
 const SIDEBAR_WIDTH = 320; // Fixed left sidebar width
 
-export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, conflictSummary, sprintCapacities }: TimelinePanelProps) {
+export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, conflictSummary, sprintCapacities, onViewConflictDetails }: TimelinePanelProps) {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [showSprintCreation, setShowSprintCreation] = useState(false);
   const [showHolidays, setShowHolidays] = useState(true);
@@ -188,6 +189,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             showConflictSummary={showConflictSummary}
             onToggleConflictSummary={setShowConflictSummary}
             onAddSprint={() => setShowSprintCreation(true)}
+            onViewConflictDetails={onViewConflictDetails}
           />
         </div>
 
@@ -1177,7 +1179,8 @@ function TimelineSidebarHeader({
   conflictSummary,
   showConflictSummary,
   onToggleConflictSummary,
-  onAddSprint
+  onAddSprint,
+  onViewConflictDetails
 }: {
   showHolidays: boolean;
   showPTO: boolean;
@@ -1187,6 +1190,7 @@ function TimelineSidebarHeader({
   showConflictSummary: boolean;
   onToggleConflictSummary: (value: boolean) => void;
   onAddSprint: () => void;
+  onViewConflictDetails?: () => void;
 }) {
   return (
     <div className="h-full flex flex-col">
@@ -1261,7 +1265,7 @@ function TimelineSidebarHeader({
                   <div style={{ fontSize: designTokens.typography.fontSize.xs, fontWeight: designTokens.typography.fontWeight.medium, color: designTokens.colors.neutral[800], marginBottom: '8px' }}>
                     Scheduling Conflicts
                   </div>
-                  <ul className="space-y-1">
+                  <ul className="space-y-1 mb-2">
                     {conflictSummary.affectedDevelopers.map(dev => (
                       <li key={dev} className="flex items-center justify-between" style={{ fontSize: designTokens.typography.fontSize.xs }}>
                         <span style={{ color: designTokens.colors.neutral[700], fontWeight: designTokens.typography.fontWeight.medium }}>{dev}</span>
@@ -1271,6 +1275,17 @@ function TimelineSidebarHeader({
                       </li>
                     ))}
                   </ul>
+                  {onViewConflictDetails && (
+                    <button
+                      onClick={() => {
+                        onViewConflictDetails();
+                        onToggleConflictSummary(false);
+                      }}
+                      className="w-full px-2 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 rounded transition-colors"
+                    >
+                      View Conflict Details →
+                    </button>
+                  )}
                 </div>
               </>
             )}

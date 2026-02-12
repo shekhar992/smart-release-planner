@@ -6,8 +6,9 @@ import { WorkloadModal } from './WorkloadModal';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
 import { TicketCreationModal } from './TicketCreationModal';
 import { BulkTicketImportModal } from './BulkTicketImportModal';
+import { ConflictResolutionPanel } from './ConflictResolutionPanel';
 import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct } from '../data/mockData';
-import { detectConflicts, getConflictSummary } from '../lib/conflictDetection';
+import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
 import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage } from '../lib/localStorage';
 
@@ -55,6 +56,7 @@ export function ReleasePlanningCanvas() {
   const [selectedTicket, setSelectedTicket] = useState<{ featureId: string; ticketId: string } | null>(null);
   const [showTicketCreation, setShowTicketCreation] = useState<{ featureId?: string } | null>(null);
   const [showBulkImport, setShowBulkImport] = useState<{ featureId?: string } | null>(null);
+  const [showConflictResolution, setShowConflictResolution] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
   const [editingRelease, setEditingRelease] = useState(false);
   const [confirmDeleteRelease, setConfirmDeleteRelease] = useState(false);
@@ -86,6 +88,51 @@ export function ReleasePlanningCanvas() {
     if (!releaseData || !release) return;
     deleteRelease(releaseData.id, release.id);
     navigate('/');
+  };
+
+  // Conflict resolution handlers
+  const handleReassignTicket = (ticketId: string, newAssignee: string) => {
+    const featureWithTicket = release?.features.find(f => 
+      f.tickets.some(t => t.id === ticketId)
+    );
+    if (featureWithTicket) {
+      handleUpdateTicket(featureWithTicket.id, ticketId, { assignedTo: newAssignee });
+    }
+  };
+
+  const handleMoveTicketToSprintById = (ticketId: string, sprintId: string) => {
+    const sprint = release?.sprints.find(s => s.id === sprintId);
+    if (!sprint) return;
+    
+    const featureWithTicket = release?.features.find(f => 
+      f.tickets.some(t => t.id === ticketId)
+    );
+    const ticket = featureWithTicket?.tickets.find(t => t.id === ticketId);
+    
+    if (featureWithTicket && ticket) {
+      // Move ticket to start of the target sprint
+      handleMoveTicket(featureWithTicket.id, ticketId, new Date(sprint.startDate));
+    }
+  };
+
+  const handleShiftTicket = (ticketId: string, shiftDays: number) => {
+    const featureWithTicket = release?.features.find(f => 
+      f.tickets.some(t => t.id === ticketId)
+    );
+    const ticket = featureWithTicket?.tickets.find(t => t.id === ticketId);
+    
+    if (featureWithTicket && ticket) {
+      const newStartDate = new Date(ticket.startDate);
+      newStartDate.setDate(newStartDate.getDate() + shiftDays);
+      handleMoveTicket(featureWithTicket.id, ticketId, newStartDate);
+    }
+  };
+
+  const handleIgnoreConflict = (ticketId: string) => {
+    // In a real app, you might want to mark this conflict as ignored in the state
+    console.log('Ignoring conflict for ticket:', ticketId);
+    // For now, just close the panel
+    setShowConflictResolution(false);
   };
 
   // Sync release state when currentRelease changes (e.g., after data loads)
@@ -145,6 +192,15 @@ export function ReleasePlanningCanvas() {
   const conflictSummary = useMemo(() => {
     return getConflictSummary(conflicts, allTickets);
   }, [conflicts, allTickets]);
+
+  // Enhanced conflicts with suggestions
+  const enhancedConflicts = useMemo(() => {
+    return detectEnhancedConflicts(
+      allTickets,
+      release?.sprints,
+      teamMembers
+    );
+  }, [allTickets, release?.sprints, teamMembers]);
 
   // Calculate sprint capacities
   const sprintCapacities = useMemo(() => {
@@ -457,6 +513,7 @@ export function ReleasePlanningCanvas() {
           conflicts={conflicts}
           conflictSummary={conflictSummary}
           sprintCapacities={sprintCapacities}
+          onViewConflictDetails={() => setShowConflictResolution(true)}
         />
       </div>
 
@@ -502,6 +559,21 @@ export function ReleasePlanningCanvas() {
           onAddFeature={handleAddFeatureWithName}
           onAddTicket={handleAddTicketFull}
         />
+      )}
+
+      {/* Conflict Resolution Panel */}
+      {showConflictResolution && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/20">
+          <ConflictResolutionPanel
+            conflicts={enhancedConflicts}
+            tickets={allTickets}
+            onClose={() => setShowConflictResolution(false)}
+            onReassignTicket={handleReassignTicket}
+            onMoveTicketToSprint={handleMoveTicketToSprintById}
+            onShiftTicket={handleShiftTicket}
+            onIgnoreConflict={handleIgnoreConflict}
+          />
+        </div>
       )}
 
       {/* Edit Release Dialog */}
