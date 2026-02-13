@@ -8,11 +8,27 @@ import { AutoReleaseModal } from './AutoReleaseModal';
 import { PageShell } from './PageShell';
 import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers } from '../lib/localStorage';
 
-export function PlanningDashboard() {
-  const [showCreateProduct, setShowCreateProduct] = useState(false);
+interface PlanningDashboardProps {
+  openCreateProduct?: () => void;
+  showCreateProduct?: boolean;
+  onCloseCreateProduct?: () => void;
+}
+
+export function PlanningDashboard({ 
+  openCreateProduct, 
+  showCreateProduct, 
+  onCloseCreateProduct 
+}: PlanningDashboardProps = {}) {
+  // Local state fallback for when rendered via router (without props)
+  const [localShowCreateProduct, setLocalShowCreateProduct] = useState(false);
   const [showCreateRelease, setShowCreateRelease] = useState<string | null>(null);
-  const [showAutoRelease, setShowAutoRelease] = useState(false);
+  const [showAutoRelease, setShowAutoRelease] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+
+  // Use props if provided, otherwise use local state
+  const effectiveShowCreateProduct = showCreateProduct ?? localShowCreateProduct;
+  const effectiveOpenCreateProduct = openCreateProduct ?? (() => setLocalShowCreateProduct(true));
+  const effectiveCloseCreateProduct = onCloseCreateProduct ?? (() => setLocalShowCreateProduct(false));
   
   // Initialize and load products from localStorage
   useEffect(() => {
@@ -22,6 +38,12 @@ export function PlanningDashboard() {
     // Load products from localStorage
     const storedProducts = loadProducts();
     setProducts(storedProducts || mockProducts);
+
+    // Check if we should open product modal (from FreshLanding transition)
+    if (sessionStorage.getItem('openProductModalOnLoad') === 'true') {
+      sessionStorage.removeItem('openProductModalOnLoad');
+      setLocalShowCreateProduct(true);
+    }
   }, []);
 
   const countTickets = (release: Release) => 
@@ -147,7 +169,7 @@ export function PlanningDashboard() {
             Products group your releases and teams together. Create one to start planning your roadmap.
           </p>
           <button
-            onClick={() => setShowCreateProduct(true)}
+            onClick={effectiveOpenCreateProduct}
             className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary-hover transition-all shadow-sm hover:shadow-md"
           >
             <FolderPlus className="w-4 h-4" />
@@ -166,6 +188,7 @@ export function PlanningDashboard() {
                 product={product}
                 teamCount={teamCounts[product.id] || 0}
                 onNewRelease={() => setShowCreateRelease(product.id)}
+                onAutoGenerate={() => setShowAutoRelease(product.id)}
                 onRename={(name) => handleRenameProduct(product.id, name)}
                 onDelete={() => handleDeleteProduct(product.id)}
               />
@@ -173,7 +196,7 @@ export function PlanningDashboard() {
 
             {/* Ghost card */}
             <button
-              onClick={() => setShowCreateProduct(true)}
+              onClick={effectiveOpenCreateProduct}
               className="group flex flex-col items-center justify-center gap-3 min-h-[260px] rounded-xl border-2 border-dashed border-border hover:border-primary/40 bg-card/50 hover:bg-primary/[0.02] transition-all duration-200 cursor-pointer"
             >
               <div className="w-11 h-11 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
@@ -195,39 +218,33 @@ export function PlanningDashboard() {
               <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
               Holidays
             </Link>
-            
-            {/* Auto Release Planner */}
-            <button
-              onClick={() => setShowAutoRelease(true)}
-              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-accent hover:border-primary/20 transition-all"
-            >
-              <BarChart3 className="w-3.5 h-3.5 text-muted-foreground" />
-              Auto Generate Release (Beta)
-            </button>
           </div>
         </div>
       )}
 
       {/* ── Modals ── */}
-      {showCreateProduct && (
+      {effectiveShowCreateProduct && (
         <CreateProductModal
-          onClose={() => setShowCreateProduct(false)}
+          onClose={effectiveCloseCreateProduct}
           onCreate={handleCreateProduct}
         />
       )}
 
-      {showAutoRelease && (
-        <AutoReleaseModal
-          products={products}
-          onClose={() => setShowAutoRelease(false)}
-          onSuccess={() => {
-            // Refresh products from localStorage
-            const storedProducts = loadProducts();
-            setProducts(storedProducts || []);
-            setShowAutoRelease(false);
-          }}
-        />
-      )}
+      {showAutoRelease && (() => {
+        const targetProduct = products.find(p => p.id === showAutoRelease);
+        if (!targetProduct) return null;
+        return (
+          <AutoReleaseModal
+            product={targetProduct}
+            onClose={() => {
+              // Refresh products from localStorage
+              const storedProducts = loadProducts();
+              setProducts(storedProducts || []);
+              setShowAutoRelease(null);
+            }}
+          />
+        );
+      })()}
 
       {showCreateRelease && products.length > 0 && (
         <CreateReleaseModal
@@ -268,12 +285,14 @@ function ProductCard({
   product,
   teamCount,
   onNewRelease,
+  onAutoGenerate,
   onRename,
   onDelete,
 }: {
   product: Product;
   teamCount: number;
   onNewRelease: () => void;
+  onAutoGenerate: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
 }) {
@@ -436,6 +455,14 @@ function ProductCard({
           <Users className="w-3.5 h-3.5" />
           Team
         </Link>
+        <button
+          onClick={onAutoGenerate}
+          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-950/20 hover:bg-indigo-100 dark:hover:bg-indigo-950/30 rounded-lg transition-colors"
+          title="Auto Generate Release"
+        >
+          <BarChart3 className="w-3.5 h-3.5" />
+          AI
+        </button>
         <button
           onClick={onNewRelease}
           className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-primary bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"

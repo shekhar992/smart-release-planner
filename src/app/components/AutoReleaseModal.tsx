@@ -10,25 +10,23 @@ import { DatePicker } from './DatePicker';
 import { FeasibilityMeter } from './FeasibilityMeter';
 import { ReviewStatsGrid } from './ReviewStatsGrid';
 import { DataInsightsPanel } from './DataInsightsPanel';
+import { CsvPreviewTable } from './CsvPreviewTable';
 import { generatePlanningInsights } from '../lib/planningAdvisor';
 import { detectEnhancedConflicts } from '../lib/conflictDetection';
 
 interface AutoReleaseModalProps {
-  products: Product[];
+  product: Product;
   onClose: () => void;
-  onSuccess: () => void;
 }
 
-export function AutoReleaseModal({ products, onClose, onSuccess }: AutoReleaseModalProps) {
+export function AutoReleaseModal({ product, onClose }: AutoReleaseModalProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [selectedProductId, setSelectedProductId] = useState(products[0]?.id || '');
   const [releaseName, setReleaseName] = useState('AI Generated Release');
   const [releaseStart, setReleaseStart] = useState(new Date());
   const [releaseEnd, setReleaseEnd] = useState(
     new Date(Date.now() + 1000 * 60 * 60 * 24 * 30)
   );
-  const [sprintLength, setSprintLength] = useState(14);
-  const [numberOfDevelopers, setNumberOfDevelopers] = useState(3);
+  const [sprintLengthWeeks, setSprintLengthWeeks] = useState(2);
   const [csvInput, setCsvInput] = useState(`title,epic,effort,priority,assigned
 User Authentication,Core,5,High,Sarah Chen
 Payment Integration,Core,8,High,Marcus Rivera
@@ -52,7 +50,6 @@ Security Audit,Security,5,High,James Wilson`);
   // Assignment analytics (display only, doesn't affect capacity)
   const [uniqueAssignedDevelopers, setUniqueAssignedDevelopers] = useState<string[]>([]);
   const [ticketsWithoutAssignment, setTicketsWithoutAssignment] = useState(0);
-  const [assignedDeveloperCount, setAssignedDeveloperCount] = useState(0);
 
   // File upload ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,7 +57,6 @@ Security Audit,Security,5,High,James Wilson`);
   // Auto-update assignment analytics when parsedTickets changes
   useEffect(() => {
     if (!parsedTickets) {
-      setAssignedDeveloperCount(0);
       setUniqueAssignedDevelopers([]);
       setTicketsWithoutAssignment(0);
       return;
@@ -78,7 +74,6 @@ Security Audit,Security,5,High,James Wilson`);
       t => !t.assignedToRaw || !t.assignedToRaw.trim()
     ).length;
     
-    setAssignedDeveloperCount(uniqueAssigned.length);
     setUniqueAssignedDevelopers(uniqueAssigned as string[]);
     setTicketsWithoutAssignment(unassignedCount);
   }, [parsedTickets]);
@@ -149,7 +144,7 @@ Audit Logs,Security,2,Low,`;
     
     try {
       // Check team members first
-      const teamMembers = loadTeamMembersByProduct(selectedProductId) || [];
+      const teamMembers = loadTeamMembersByProduct(product.id) || [];
       
       if (teamMembers.length === 0) {
         setError('No team members found. Please configure your team roster and PTO plan before generating a release.');
@@ -228,8 +223,8 @@ Audit Logs,Security,2,Low,`;
       const config: ReleaseConfig = {
         releaseStart: releaseStart,
         releaseEnd: releaseEnd,
-        sprintLengthDays: sprintLength,
-        numberOfDevelopers: numberOfDevelopers,
+        sprintLengthDays: sprintLengthWeeks * 7,
+        numberOfDevelopers: teamMembers.length,
         holidays: [],
         ptoDates: []
       };
@@ -249,13 +244,13 @@ Audit Logs,Security,2,Low,`;
   };
 
   const handleConfirmCreate = () => {
-    if (!plannerPreview || !selectedProductId) return;
+    if (!plannerPreview) return;
 
     setIsCreating(true);
 
     try {
       // Load team members for assignment validation
-      const teamMembers = loadTeamMembersByProduct(selectedProductId) || [];
+      const teamMembers = loadTeamMembersByProduct(product.id) || [];
       
       // Map domain plan to app release (includes features, sprints, and validated assignments)
       const appRelease = mapReleasePlanToAppRelease(
@@ -275,7 +270,7 @@ Audit Logs,Security,2,Low,`;
       }
 
       const updatedProducts = currentProducts.map(p => {
-        if (p.id === selectedProductId) {
+        if (p.id === product.id) {
           return { ...p, releases: [...p.releases, appRelease] };
         }
         return p;
@@ -284,8 +279,7 @@ Audit Logs,Security,2,Low,`;
       // Save to localStorage
       saveProducts(updatedProducts);
 
-      // Notify parent to refresh and close
-      onSuccess();
+      // Close modal
       onClose();
     } catch (error) {
       setError('Failed to create release. Please try again.');
@@ -437,6 +431,14 @@ Audit Logs,Security,2,Low,`;
                   <span className="font-medium ml-2">Assigned:</span> Must match team roster names or leave empty
                 </p>
               </div>
+
+              {/* CSV Preview Table */}
+              {parsedTickets && parsedTickets.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Parsed Tickets Preview</label>
+                  <CsvPreviewTable tickets={parsedTickets} />
+                </div>
+              )}
             </div>
           )}
 
@@ -450,60 +452,9 @@ Audit Logs,Security,2,Low,`;
                 </p>
               </div>
 
-              {/* Team Analytics Summary */}
-              {parsedTickets && parsedTickets.length > 0 && (() => {
-                const teamMembers = loadTeamMembersByProduct(selectedProductId) || [];
-                const totalTeamSize = teamMembers.length;
-                
-                return (
-                  <div className="border border-border rounded-lg p-4 bg-muted/30">
-                    <h4 className="text-sm font-semibold mb-3 text-foreground">Team & Assignment Overview</h4>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">Total Team Members</div>
-                        <div className="text-2xl font-bold text-foreground">{totalTeamSize}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">Developers Assigned in CSV</div>
-                        <div className="text-2xl font-bold text-blue-600">{assignedDeveloperCount}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground mb-1">Unassigned Tickets</div>
-                        <div className="text-2xl font-bold text-amber-600">{ticketsWithoutAssignment}</div>
-                      </div>
-                    </div>
-                    {assignedDeveloperCount > 0 && (
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <div className="text-xs text-muted-foreground mb-1">Assigned Developers:</div>
-                        <div className="text-xs text-foreground">
-                          {uniqueAssignedDevelopers.slice(0, 5).join(', ')}
-                          {uniqueAssignedDevelopers.length > 5 && ` +${uniqueAssignedDevelopers.length - 5} more`}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Product Selection */}
-              <div>
-                <label className="block text-sm font-medium mb-1.5">Target Product</label>
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => setSelectedProductId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background"
-                >
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Release Configuration */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                <div className="col-span-2">
                   <label className="block text-sm font-medium mb-1.5">Release Name</label>
                   <input
                     type="text"
@@ -511,17 +462,6 @@ Audit Logs,Security,2,Low,`;
                     onChange={(e) => setReleaseName(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background"
                     placeholder="Q1 2026 Release"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1.5">Number of Developers</label>
-                  <input
-                    type="number"
-                    value={numberOfDevelopers}
-                    onChange={(e) => setNumberOfDevelopers(parseInt(e.target.value) || 1)}
-                    min="1"
-                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background"
                   />
                 </div>
                 
@@ -542,14 +482,20 @@ Audit Logs,Security,2,Low,`;
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Sprint Length (days)</label>
-                  <input
-                    type="number"
-                    value={sprintLength}
-                    onChange={(e) => setSprintLength(parseInt(e.target.value) || 7)}
-                    min="1"
+                  <label className="block text-sm font-medium mb-1.5">Sprint Length</label>
+                  <select
+                    value={sprintLengthWeeks}
+                    onChange={(e) => setSprintLengthWeeks(parseInt(e.target.value))}
                     className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background"
-                  />
+                  >
+                    <option value="1">1 Week</option>
+                    <option value="2">2 Weeks</option>
+                    <option value="3">3 Weeks</option>
+                    <option value="4">4 Weeks</option>
+                  </select>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    Sprint Length: {sprintLengthWeeks} Week{sprintLengthWeeks !== 1 ? 's' : ''} ({sprintLengthWeeks * 7} Days)
+                  </p>
                 </div>
               </div>
             </div>
@@ -557,7 +503,7 @@ Audit Logs,Security,2,Low,`;
 
           {/* Step 3: Review */}
           {step === 3 && plannerPreview && (() => {
-            const teamMembers = loadTeamMembersByProduct(selectedProductId) || [];
+            const teamMembers = loadTeamMembersByProduct(product.id) || [];
             const totalTeamSize = teamMembers.length;
             const assignedDevsCount = uniqueAssignedDevelopers.length;
 
@@ -594,7 +540,7 @@ Audit Logs,Security,2,Low,`;
             const aiInsights = generatePlanningInsights(
               plannerPreview,
               enhancedConflicts,
-              numberOfDevelopers
+              totalTeamSize
             );
 
             return (
@@ -641,19 +587,36 @@ Audit Logs,Security,2,Low,`;
                     </span>
                   </div>
 
-                  {/* Summary */}
+                  {/* Assessment */}
                   <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                    {aiInsights.summary}
+                    {aiInsights.sections.assessment}
                   </p>
 
+                  {/* Impact */}
+                  {aiInsights.sections.impact.length > 0 && (
+                    <div className="mb-4">
+                      <h5 className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">
+                        Impact
+                      </h5>
+                      <ul className="space-y-2">
+                        {aiInsights.sections.impact.map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
+                            <span className="text-amber-600 mt-0.5 flex-shrink-0">⚠</span>
+                            <span className="flex-1">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {/* Recommendations */}
-                  {aiInsights.recommendations.length > 0 && (
+                  {aiInsights.sections.recommendations.length > 0 && (
                     <div>
                       <h5 className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">
                         Recommendations
                       </h5>
                       <ul className="space-y-2">
-                        {aiInsights.recommendations.map((rec, idx) => (
+                        {aiInsights.sections.recommendations.map((rec, idx) => (
                           <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
                             <span className="text-blue-600 mt-0.5 flex-shrink-0">•</span>
                             <span className="flex-1">{rec}</span>
