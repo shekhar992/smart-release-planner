@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { Release } from '../data/mockData';
+import { resolveEffortDays } from '../lib/effortResolver';
 
 interface WorkloadModalProps {
   release: Release;
@@ -12,11 +13,11 @@ interface DeveloperWorkload {
   tickets: Array<{ 
     id: string; 
     title: string; 
-    storyPoints: number; 
+    effortDays: number; // Changed from storyPoints to effortDays
     featureName: string;
     sprintId?: string;
   }>;
-  totalStoryPoints: number;
+  totalEffortDays: number; // Changed from totalStoryPoints
 }
 
 export function WorkloadModal({ release, onClose }: WorkloadModalProps) {
@@ -44,19 +45,21 @@ export function WorkloadModal({ release, onClose }: WorkloadModalProps) {
           workloadMap.set(devName, {
             name: devName,
             tickets: [],
-            totalStoryPoints: 0
+            totalEffortDays: 0
           });
         }
 
         const workload = workloadMap.get(devName)!;
+        const ticketEffort = resolveEffortDays(ticket);
+        
         workload.tickets.push({
           id: ticket.id,
           title: ticket.title,
-          storyPoints: ticket.storyPoints,
+          effortDays: ticketEffort,
           featureName: feature.name,
           sprintId
         });
-        workload.totalStoryPoints += ticket.storyPoints;
+        workload.totalEffortDays += ticketEffort;
       });
     });
 
@@ -66,7 +69,7 @@ export function WorkloadModal({ release, onClose }: WorkloadModalProps) {
   };
 
   const developers = calculateWorkload();
-  const totalStoryPoints = developers.reduce((sum, dev) => sum + dev.totalStoryPoints, 0);
+  const totalEffortDays = developers.reduce((sum, dev) => sum + dev.totalEffortDays, 0);
 
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50" onClick={onClose}>
@@ -109,7 +112,7 @@ export function WorkloadModal({ release, onClose }: WorkloadModalProps) {
           <div className="flex-1" />
 
           <div className="text-sm text-gray-600 leading-relaxed">
-            Total: <span className="font-normal text-gray-900">{totalStoryPoints} SP</span>
+            Total: <span className="font-normal text-gray-900">{totalEffortDays.toFixed(1)} days</span>
           </div>
         </div>
 
@@ -134,7 +137,7 @@ export function WorkloadModal({ release, onClose }: WorkloadModalProps) {
                       </span>
                       <span className="text-xs text-gray-400">•</span>
                       <span className="text-sm font-normal text-gray-900">
-                        {developer.totalStoryPoints} SP
+                        {developer.totalEffortDays.toFixed(1)} days
                       </span>
                     </div>
                   </div>
@@ -146,7 +149,7 @@ export function WorkloadModal({ release, onClose }: WorkloadModalProps) {
                         <tr className="border-b border-gray-200">
                           <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-600">Ticket</th>
                           <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-600">Feature</th>
-                          <th className="text-right px-3 py-2.5 text-xs font-medium text-gray-600">SP</th>
+                          <th className="text-right px-3 py-2.5 text-xs font-medium text-gray-600">Days</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
@@ -154,7 +157,7 @@ export function WorkloadModal({ release, onClose }: WorkloadModalProps) {
                           <tr key={ticket.id} className="hover:bg-gray-100/50 transition-colors">
                             <td className="px-3 py-2.5 text-gray-900 leading-relaxed">{ticket.title}</td>
                             <td className="px-3 py-2.5 text-gray-600 leading-relaxed">{ticket.featureName}</td>
-                            <td className="px-3 py-2.5 text-right text-gray-900 font-normal">{ticket.storyPoints}</td>
+                            <td className="px-3 py-2.5 text-right text-gray-900 font-normal">{ticket.effortDays.toFixed(1)}</td>
                           </tr>
                         ))}
                       </tbody>

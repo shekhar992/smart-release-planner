@@ -37,3 +37,22 @@ export function deserializeDate(dateString: string): Date {
 export function storyPointsToDuration(storyPoints: number, conversionRate: number): number {
   return storyPoints * conversionRate;
 }
+
+/**
+ * Calculate end date from start date and effort days (calendar days)
+ * Makes effortDays the single source of truth for duration
+ */
+export function calculateEndDateFromEffort(startDate: Date, effortDays: number): Date {
+  const end = new Date(startDate);
+  end.setDate(end.getDate() + effortDays - 1);
+  return end;
+}
+
+/**
+ * Calculate effort days from start and end dates (calendar days)
+ * Used when timeline bar is resized
+ */
+export function calculateEffortFromDates(startDate: Date, endDate: Date): number {
+  const diff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  return diff + 1;
+}

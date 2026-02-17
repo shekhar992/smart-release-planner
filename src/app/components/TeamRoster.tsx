@@ -50,6 +50,15 @@ export function TeamRoster() {
     }
   };
 
+  const getExperienceLevelColor = (level?: string) => {
+    switch (level) {
+      case 'Senior': return 'bg-purple-100 text-purple-700';
+      case 'Mid': return 'bg-blue-100 text-blue-700';
+      case 'Junior': return 'bg-gray-100 text-gray-700';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
   return (
     <div className="h-full flex flex-col bg-gray-50">
       {/* Header */}
@@ -107,20 +116,25 @@ export function TeamRoster() {
                     <User className="w-5 h-5 text-gray-600" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-900">{member.name}</h3>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${getRoleColor(member.role)}`}>
-                        {member.role}
-                      </span>
+                    <h3 className="text-sm font-semibold text-gray-900">{member.name}</h3>
+                    <p className="text-sm text-gray-500 mt-0.5">{member.role}</p>
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      {member.experienceLevel && (
+                        <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${getExperienceLevelColor(member.experienceLevel)}`}>
+                          {member.experienceLevel}
+                        </span>
+                      )}
+                      {member.velocityMultiplier !== undefined && (
+                        <span className="text-xs text-gray-600">
+                          • {member.velocityMultiplier.toFixed(1)}x velocity
+                        </span>
+                      )}
                       {member.pto.length > 0 && (
                         <span className="text-xs text-gray-500">
                           • {member.pto.length} PTO {member.pto.length === 1 ? 'entry' : 'entries'}
                         </span>
                       )}
                     </div>
-                    {member.notes && (
-                      <p className="text-xs text-gray-500 mt-2 line-clamp-2">{member.notes}</p>
-                    )}
                   </div>
                 </div>
               </div>
@@ -177,7 +191,10 @@ interface AddTeamMemberModalProps {
 function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalProps) {
   const [name, setName] = useState('');
   const [role, setRole] = useState<'Developer' | 'Designer' | 'QA'>('Developer');
-  const [notes, setNotes] = useState('');
+  const [experienceLevel, setExperienceLevel] = useState<'Junior' | 'Mid' | 'Senior'>('Mid');
+
+  // Automatically calculate velocity multiplier based on experience level
+  const velocityMultiplier = experienceLevel === 'Junior' ? 0.7 : experienceLevel === 'Senior' ? 1.3 : 1.0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -187,7 +204,8 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
       id: `tm${Date.now()}`,
       name: name.trim(),
       role,
-      notes: notes.trim() || undefined,
+      experienceLevel,
+      velocityMultiplier,
       pto: [],
       productId
     };
@@ -244,15 +262,23 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
 
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-2">
-                Notes (optional)
+                Experience Level
               </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g., Lead designer for customer portal"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
-                rows={3}
-              />
+              <select
+                value={experienceLevel}
+                onChange={(e) => setExperienceLevel(e.target.value as 'Junior' | 'Mid' | 'Senior')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              >
+                <option value="Junior">Junior</option>
+                <option value="Mid">Mid</option>
+                <option value="Senior">Senior</option>
+              </select>
+              <p className="mt-1.5 text-xs text-gray-500">
+                Velocity: <span className="font-medium text-gray-700">{velocityMultiplier.toFixed(1)}x</span>
+                {experienceLevel === 'Junior' && ' (slower pace)'}
+                {experienceLevel === 'Mid' && ' (standard pace)'}
+                {experienceLevel === 'Senior' && ' (faster pace)'}
+              </p>
             </div>
           </div>
 

@@ -6,7 +6,7 @@
 import { Product, Release, Ticket, Holiday, TeamMember } from '../data/mockData';
 
 // Data version - increment this to force refresh of all localStorage data
-const DATA_VERSION = '3.0.0';
+const DATA_VERSION = '4.0.0'; // Updated for new FinTech + Life Sciences mock data
 
 const STORAGE_KEYS = {
   PRODUCTS: 'timeline_view_products',
@@ -120,6 +120,7 @@ export function saveTeamMembers(teamMembers: TeamMember[]): void {
 
 /**
  * Load team members from localStorage
+ * Ensures backward compatibility by providing defaults for missing fields
  */
 export function loadTeamMembers(): TeamMember[] | null {
   try {
@@ -127,7 +128,14 @@ export function loadTeamMembers(): TeamMember[] | null {
     if (!stored) return null;
     
     const parsed = JSON.parse(stored);
-    return reviveDates(parsed);
+    const teamMembers = reviveDates(parsed);
+    
+    // Ensure backward compatibility: add default values for optional fields
+    return teamMembers.map((member: TeamMember) => ({
+      ...member,
+      experienceLevel: member.experienceLevel || 'Mid',
+      velocityMultiplier: member.velocityMultiplier ?? 1.0,
+    }));
   } catch (error) {
     console.error('Failed to load team members from localStorage:', error);
     return null;

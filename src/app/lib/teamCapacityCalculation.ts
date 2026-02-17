@@ -1,5 +1,5 @@
 import { Sprint, Ticket, TeamMember, Holiday, StoryPointMapping } from '../data/mockData';
-import { storyPointsToDays } from '../data/mockData';
+import { calculateTotalEffort, getAdjustedDuration } from './effortResolver';
 
 export interface TeamMemberSprintCapacity {
   sprintId: string;
@@ -44,7 +44,7 @@ export interface TeamMemberCapacity {
 /**
  * Calculate the number of working days (Mon-Fri) between two dates, inclusive
  */
-function calculateWorkingDays(startDate: Date, endDate: Date): number {
+export function calculateWorkingDays(startDate: Date, endDate: Date): number {
   let count = 0;
   const current = new Date(startDate);
   current.setHours(0, 0, 0, 0);
@@ -92,7 +92,7 @@ function calculateHolidayOverlap(
   let count = 0;
 
   for (const holiday of holidays) {
-    const holidayDate = new Date(holiday.date);
+    const holidayDate = new Date(holiday.startDate);
 
     // Check if single-day holiday falls in sprint
     if (holidayDate >= sprintStart && holidayDate <= sprintEnd) {
@@ -178,7 +178,7 @@ export function calculateTeamMemberCapacity(
           ptoOverlapDays += overlapDays;
           ptoEntries.push({
             id: `${member.id}-pto-${ptoEntries.length}`,
-            name: pto.reason || 'PTO',
+            name: pto.name || 'PTO',
             startDate: pto.startDate,
             endDate: pto.endDate,
             overlapDays
@@ -197,9 +197,22 @@ export function calculateTeamMemberCapacity(
     // Get tickets assigned to this member in this sprint
     const sprintTickets = getTicketsInSprint(allTickets, member.name, sprintStart, sprintEnd);
 
-    // Calculate assigned work
+    // Calculate assigned work using effort resolver
     const assignedStoryPoints = sprintTickets.reduce((sum, t) => sum + t.storyPoints, 0);
-    const assignedDays = storyPointsToDays(assignedStoryPoints, storyPointMapping);
+    
+    // Use centralized adjusted duration calculation
+    const assignedDays = sprintTickets.reduce((total, ticket) => {
+      return total + getAdjustedDuration(ticket, member);
+    }, 0);
+    
+    // Debug logging for velocity adjustments
+    const baseAssignedDays = calculateTotalEffort(sprintTickets, storyPointMapping);
+    if (baseAssignedDays > 0) {
+      const velocityMultiplier = member.velocityMultiplier ?? 1;
+      console.debug(
+        `[VelocityAdjusted] ${member.name}: ${baseAssignedDays.toFixed(1)}d → ${assignedDays.toFixed(1)}d (÷${velocityMultiplier})`
+      );
+    }
 
     // Calculate utilization
     const utilizationPercent = availableCapacity > 0 

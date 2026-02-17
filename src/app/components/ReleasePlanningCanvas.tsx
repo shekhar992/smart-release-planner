@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload } from 'lucide-react';
+import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { WorkloadModal } from './WorkloadModal';
@@ -7,10 +7,13 @@ import { TicketDetailsPanel } from './TicketDetailsPanel';
 import { TicketCreationModal } from './TicketCreationModal';
 import { BulkTicketImportModal } from './BulkTicketImportModal';
 import { ConflictResolutionPanel } from './ConflictResolutionPanel';
-import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct } from '../data/mockData';
+import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct, storyPointsToDays } from '../data/mockData';
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
 import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage } from '../lib/localStorage';
+import { calculateEffortFromDates } from '../lib/dateUtils';
+import { calculateDurationDays } from '../lib/durationCalculator';
+import { addDays } from 'date-fns';
 
 export function ReleasePlanningCanvas() {
   const { releaseId } = useParams();
@@ -63,6 +66,14 @@ export function ReleasePlanningCanvas() {
   const [draftReleaseName, setDraftReleaseName] = useState('');
   const [draftStartDate, setDraftStartDate] = useState('');
   const [draftEndDate, setDraftEndDate] = useState('');
+
+  // SCENARIO SIMULATION STATE (Phase 1)
+  const [scenarioMode, setScenarioMode] = useState(false);
+  const [scenarioOverrides, setScenarioOverrides] = useState({
+    removedDevelopers: [] as string[],
+    velocityOverrides: {} as Record<string, number>,
+    scopeDeltaDays: 0
+  });
 
   const openEditRelease = () => {
     if (!release) return;
@@ -202,17 +213,64 @@ export function ReleasePlanningCanvas() {
     );
   }, [allTickets, release?.sprints, teamMembers]);
 
-  // Calculate sprint capacities
+  // SCENARIO SIMULATION: Derive team members for capacity calculations
+  const derivedTeamMembers = useMemo(() => {
+    if (!scenarioMode) return teamMembers;
+
+    // Filter out removed developers
+    const filtered = teamMembers.filter(
+      tm => !scenarioOverrides.removedDevelopers.includes(tm.id)
+    );
+
+    // Apply velocity overrides if provided
+    return filtered.map(tm => {
+      const override = scenarioOverrides.velocityOverrides[tm.id];
+      if (override !== undefined) {
+        return { ...tm, velocityMultiplier: override };
+      }
+      return tm;
+    });
+  }, [teamMembers, scenarioMode, scenarioOverrides]);
+
+  // SCENARIO SIMULATION: Derive tickets for capacity calculations
+  const derivedTickets = useMemo(() => {
+    if (!scenarioMode || scenarioOverrides.scopeDeltaDays === 0) return allTickets;
+
+    // Add scope delta to last sprint only
+    const sprints = release?.sprints || [];
+    if (sprints.length === 0) return allTickets;
+
+    const lastSprint = sprints[sprints.length - 1];
+    const lastSprintTickets = allTickets.filter(t => {
+      const ticketStart = t.startDate.getTime();
+      return ticketStart >= lastSprint.startDate.getTime() && ticketStart <= lastSprint.endDate.getTime();
+    });
+
+    if (lastSprintTickets.length === 0) return allTickets;
+
+    // Artificially add effortDays to first ticket in last sprint
+    return allTickets.map(t => {
+      if (t.id === lastSprintTickets[0].id) {
+        return {
+          ...t,
+          effortDays: (t.effortDays || t.storyPoints || 1) + scenarioOverrides.scopeDeltaDays
+        };
+      }
+      return t;
+    });
+  }, [allTickets, scenarioMode, scenarioOverrides.scopeDeltaDays, release?.sprints]);
+
+  // Calculate sprint capacities (using derived data when scenario mode is active)
   const sprintCapacities = useMemo(() => {
     return calculateAllSprintCapacities(
       release?.sprints || [],
-      allTickets,
-      teamMembers,
+      derivedTickets,
+      derivedTeamMembers,
       holidays,
       1, // velocity: 1 story point = 1 day (base rate)
       release?.storyPointMapping
     );
-  }, [release?.sprints, allTickets, teamMembers, holidays, release?.storyPointMapping]);
+  }, [release?.sprints, derivedTickets, derivedTeamMembers, holidays, release?.storyPointMapping]);
 
   const handleUpdateTicket = (featureId: string, ticketId: string, updates: Partial<Ticket>) => {
     setRelease(prev => {
@@ -223,9 +281,38 @@ export function ReleasePlanningCanvas() {
         f.id === featureId 
           ? {
               ...f,
-              tickets: f.tickets.map(t => 
-                t.id === ticketId ? { ...t, ...updates } : t
-              )
+              tickets: f.tickets.map(t => {
+                if (t.id === ticketId) {
+                  // Merge updates into ticket
+                  const updatedTicket = { ...t, ...updates };
+                  
+                  // Auto-recalculate endDate if effort, assignment, or startDate changed
+                  const effortChanged = updates.effortDays !== undefined;
+                  const assignmentChanged = updates.assignedTo !== undefined;
+                  const startDateChanged = updates.startDate !== undefined;
+                  
+                  if (effortChanged || assignmentChanged || startDateChanged) {
+                    const assignedDev = derivedTeamMembers.find(
+                      m => m.name === updatedTicket.assignedTo
+                    );
+                    
+                    const velocity = assignedDev?.velocityMultiplier ?? 1;
+                    
+                    const durationDays = calculateDurationDays(
+                      updatedTicket.effortDays ?? 1,
+                      velocity
+                    );
+                    
+                    const start = new Date(updatedTicket.startDate);
+                    const recalculatedEndDate = addDays(start, durationDays - 1);
+                    
+                    updatedTicket.endDate = recalculatedEndDate;
+                  }
+                  
+                  return updatedTicket;
+                }
+                return t;
+              })
             }
           : f
       )
@@ -257,9 +344,17 @@ export function ReleasePlanningCanvas() {
   };
 
   const handleAddTicketFull = (featureId: string, ticketData: Omit<Ticket, 'id'>) => {
+    // Calculate effortDays from storyPoints using release's storyPointMapping
+    // This ensures new manual tickets have explicit effortDays stored
+    const effortDays = ticketData.effortDays ?? 
+      (ticketData.storyPoints != null 
+        ? storyPointsToDays(ticketData.storyPoints, release?.storyPointMapping)
+        : 1);
+    
     const newTicket: Ticket = {
       id: `t${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      ...ticketData
+      ...ticketData,
+      effortDays // Explicitly store calculated effortDays
     };
     setRelease(prev => {
       if (!prev) return prev;
@@ -308,9 +403,19 @@ export function ReleasePlanningCanvas() {
         if (f.id === featureId) {
           return {
             ...f,
-            tickets: f.tickets.map(t => 
-              t.id === ticketId ? { ...t, endDate: newEndDate } : t
-            )
+            tickets: f.tickets.map(t => {
+              if (t.id === ticketId) {
+                // Recalculate effortDays from new duration (timeline bar resize)
+                const newEffort = calculateEffortFromDates(t.startDate, newEndDate);
+                return {
+                  ...t,
+                  endDate: newEndDate,
+                  effortDays: newEffort,
+                  storyPoints: newEffort // Backward compatibility
+                };
+              }
+              return t;
+            })
           };
         }
         return f;
@@ -387,7 +492,8 @@ export function ReleasePlanningCanvas() {
       startDate: newStart,
       endDate: newEnd,
       status: 'planned',
-      storyPoints: ticket.storyPoints,
+      effortDays: ticket.effortDays,
+      storyPoints: ticket.storyPoints, // Backward compatibility
       assignedTo: ticket.assignedTo,
     });
   };
@@ -497,8 +603,171 @@ export function ReleasePlanningCanvas() {
         </div>
       </div>
 
+      {/* SCENARIO SIMULATION CONTROLS */}
+      <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setScenarioMode(!scenarioMode);
+                if (scenarioMode) {
+                  // Reset overrides when turning off
+                  setScenarioOverrides({
+                    removedDevelopers: [],
+                    velocityOverrides: {},
+                    scopeDeltaDays: 0
+                  });
+                }
+              }}
+              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                scenarioMode
+                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <Beaker className="w-4 h-4" />
+              <span>Scenario Mode</span>
+              {scenarioMode && <span className="ml-1 text-xs">(Active)</span>}
+            </button>
+
+            {scenarioMode && (
+              <div className="flex items-center gap-3 pl-3 border-l border-gray-300">
+                {/* Remove Developers */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-600">Remove Developers</label>
+                  <select
+                    multiple
+                    value={scenarioOverrides.removedDevelopers}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value);
+                      setScenarioOverrides(prev => ({ ...prev, removedDevelopers: selected }));
+                    }}
+                    className="text-xs border border-gray-200 rounded-md px-2 py-1 h-20 w-40"
+                  >
+                    {teamMembers.map(tm => (
+                      <option key={tm.id} value={tm.id}>
+                        {tm.name}
+                      </option>
+                    ))}
+                  </select>
+                  {scenarioOverrides.removedDevelopers.length > 0 && (
+                    <span className="text-xs text-gray-500">
+                      {scenarioOverrides.removedDevelopers.length} removed
+                    </span>
+                  )}
+                </div>
+
+                {/* Scope Delta */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-600">Scope Delta (days)</label>
+                  <input
+                    type="number"
+                    value={scenarioOverrides.scopeDeltaDays}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setScenarioOverrides(prev => ({ ...prev, scopeDeltaDays: val }));
+                    }}
+                    className="text-xs border border-gray-200 rounded-md px-2 py-1.5 w-24"
+                    placeholder="0"
+                    step="0.5"
+                  />
+                  <span className="text-xs text-gray-500">
+                    Last sprint only
+                  </span>
+                </div>
+
+                {/* Velocity Overrides */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-600">Velocity Override</label>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const devId = e.target.value;
+                        if (devId) {
+                          const dev = teamMembers.find(tm => tm.id === devId);
+                          if (dev) {
+                            setScenarioOverrides(prev => ({
+                              ...prev,
+                              velocityOverrides: {
+                                ...prev.velocityOverrides,
+                                [devId]: dev.velocityMultiplier || 1.0
+                              }
+                            }));
+                          }
+                        }
+                        e.target.value = '';
+                      }}
+                      className="text-xs border border-gray-200 rounded-md px-2 py-1.5 w-32"
+                    >
+                      <option value="">Select dev...</option>
+                      {teamMembers.map(tm => (
+                        <option key={tm.id} value={tm.id}>
+                          {tm.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {Object.keys(scenarioOverrides.velocityOverrides).length > 0 && (
+                    <div className="flex flex-col gap-1 mt-1">
+                      {Object.entries(scenarioOverrides.velocityOverrides).map(([devId, velocity]) => {
+                        const dev = teamMembers.find(tm => tm.id === devId);
+                        return (
+                          <div key={devId} className="flex items-center gap-2 bg-white border border-gray-200 rounded px-2 py-1">
+                            <span className="text-xs text-gray-700 truncate flex-1">{dev?.name}</span>
+                            <input
+                              type="number"
+                              value={velocity}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 1.0;
+                                setScenarioOverrides(prev => ({
+                                  ...prev,
+                                  velocityOverrides: {
+                                    ...prev.velocityOverrides,
+                                    [devId]: val
+                                  }
+                                }));
+                              }}
+                              className="text-xs border border-gray-200 rounded px-1 py-0.5 w-16"
+                              step="0.1"
+                              min="0.1"
+                              max="3.0"
+                            />
+                            <button
+                              onClick={() => {
+                                setScenarioOverrides(prev => {
+                                  const newOverrides = { ...prev.velocityOverrides };
+                                  delete newOverrides[devId];
+                                  return { ...prev, velocityOverrides: newOverrides };
+                                });
+                              }}
+                              className="text-gray-400 hover:text-red-500"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {scenarioMode && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-md">
+              <Beaker className="w-3.5 h-3.5 text-yellow-700" />
+              <span className="text-xs font-semibold text-yellow-800">Scenario Simulation Active</span>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Main Canvas */}
-      <div className="flex-1 overflow-hidden">
+      <div className={`flex-1 overflow-hidden ${
+        scenarioMode ? 'ring-2 ring-yellow-300 ring-inset' : ''
+      }`}>
         <TimelinePanel
           release={release}
           holidays={holidays}

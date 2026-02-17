@@ -25,3 +25,17 @@ dist-ssr
 
 # Copilot context files
 .copilot-context.md
+.vercel
+
+# Resume files - never commit personal documents
+generate_resume.py
+*Resume*.pdf
+RES.md
+.venv/
+
+# Testing and documentation files
+audit-mock-data.ts
+*_old_backup.*
+MOCK_DATA_SUMMARY.md
+docs/SENIOR_UIUX_DESIGN_CRITIQUE.md
+docs/TIMELINE_CANVAS_ARCHITECTURE.md

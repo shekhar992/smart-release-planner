@@ -76,17 +76,10 @@ export const ticketImportMapping: ColumnMapping[] = [
 
 /**
  * Team Member Import Mapping
- * Required columns: id, name, role
- * Optional: notes
+ * Required columns: name, role
+ * Optional: experienceLevel (defaults to 'Mid')
  */
 export const teamMemberImportMapping: ColumnMapping[] = [
-  {
-    csvColumn: 'id',
-    dataField: 'id',
-    required: true,
-    transformer: transformers.toString,
-    validator: validators.isNotEmpty
-  },
   {
     csvColumn: 'name',
     dataField: 'name',
@@ -102,12 +95,35 @@ export const teamMemberImportMapping: ColumnMapping[] = [
     validator: (value) => ['Developer', 'Designer', 'QA'].includes(value)
   },
   {
-    csvColumn: 'notes',
-    dataField: 'notes',
+    csvColumn: 'experienceLevel',
+    dataField: 'experienceLevel',
     required: false,
-    transformer: transformers.toString
+    transformer: (value: any): string => {
+      if (!value || !value.trim()) return 'Mid';
+      const normalized = value.trim();
+      const firstChar = normalized.charAt(0).toUpperCase();
+      const rest = normalized.slice(1).toLowerCase();
+      return firstChar + rest; // Capitalize first letter
+    },
+    validator: (value) => ['Junior', 'Mid', 'Senior'].includes(value)
   }
 ];
+
+/**
+ * Derive velocity multiplier from experience level
+ * Used during CSV import to automatically calculate velocity
+ */
+export const deriveVelocityMultiplier = (experienceLevel?: string): number => {
+  switch (experienceLevel?.toLowerCase()) {
+    case 'junior':
+      return 0.7;
+    case 'senior':
+      return 1.3;
+    case 'mid':
+    default:
+      return 1.0;
+  }
+};
 
 /**
  * Feature Import Mapping

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Upload, FileText, AlertTriangle, CheckCircle2, Download, Table2 } from 'lucide-react';
-import { Release, Ticket } from '../data/mockData';
+import { Release, Ticket, storyPointsToDays } from '../data/mockData';
 import { parseCSV, validateAndTransformCSV } from '../lib/csvParser';
 import { ticketImportMapping } from '../lib/importMappings';
 import * as XLSX from 'xlsx';
@@ -140,13 +140,17 @@ export function BulkTicketImportModal({
       }
 
       for (const ticket of tickets) {
+        // Calculate effortDays using release's storyPointMapping (fallback to 1:1 if no mapping)
+        const effortDays = storyPointsToDays(ticket.storyPoints, release.storyPointMapping);
+        
         onAddTicket(targetFeatureId, {
           title: ticket.title,
           description: ticket.description || undefined,
           startDate: new Date(ticket.startDate),
           endDate: new Date(ticket.endDate),
           status: ticket.status,
-          storyPoints: ticket.storyPoints,
+          effortDays, // Calculated from storyPoints using mapping
+          storyPoints: ticket.storyPoints, // Backward compatibility
           assignedTo: ticket.assignedTo,
         });
         count++;

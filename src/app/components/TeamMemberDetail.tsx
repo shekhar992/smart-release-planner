@@ -63,6 +63,15 @@ export function TeamMemberDetail() {
     }
   };
 
+  const getExperienceLevelColor = (level?: string) => {
+    switch (level) {
+      case 'Senior': return 'bg-purple-100 text-purple-700';
+      case 'Mid': return 'bg-blue-100 text-blue-700';
+      case 'Junior': return 'bg-gray-100 text-gray-700';
+      default: return 'bg-gray-100 text-gray-600';
+    }
+  };
+
   const addPTO = (pto: PTOEntry) => {
     const updated = {
       ...member,
@@ -146,6 +155,21 @@ export function TeamMemberDetail() {
                     {member.role}
                   </span>
                 </div>
+                {member.experienceLevel && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Experience Level</label>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${getExperienceLevelColor(member.experienceLevel)}`}>
+                        {member.experienceLevel}
+                      </span>
+                      {member.velocityMultiplier !== undefined && (
+                        <span className="text-xs text-gray-600">
+                          • {member.velocityMultiplier.toFixed(1)}x velocity
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {member.notes && (
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
@@ -228,11 +252,21 @@ interface EditMemberInfoFormProps {
 function EditMemberInfoForm({ member, onSave, onCancel }: EditMemberInfoFormProps) {
   const [name, setName] = useState(member.name);
   const [role, setRole] = useState(member.role);
+  const [experienceLevel, setExperienceLevel] = useState<'Junior' | 'Mid' | 'Senior'>(member.experienceLevel || 'Mid');
   const [notes, setNotes] = useState(member.notes || '');
+
+  // Automatically calculate velocity multiplier based on experience level
+  const velocityMultiplier = experienceLevel === 'Junior' ? 0.7 : experienceLevel === 'Senior' ? 1.3 : 1.0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({ name, role, notes: notes.trim() || undefined });
+    onSave({ 
+      name, 
+      role, 
+      experienceLevel,
+      velocityMultiplier,
+      notes: notes.trim() || undefined 
+    });
   };
 
   return (
@@ -257,6 +291,24 @@ function EditMemberInfoForm({ member, onSave, onCancel }: EditMemberInfoFormProp
           <option value="Designer">Designer</option>
           <option value="QA">QA</option>
         </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-700 mb-1.5">Experience Level</label>
+        <select
+          value={experienceLevel}
+          onChange={(e) => setExperienceLevel(e.target.value as 'Junior' | 'Mid' | 'Senior')}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+        >
+          <option value="Junior">Junior</option>
+          <option value="Mid">Mid</option>
+          <option value="Senior">Senior</option>
+        </select>
+        <p className="mt-1.5 text-xs text-gray-500">
+          Velocity: <span className="font-medium text-gray-700">{velocityMultiplier.toFixed(1)}x</span>
+          {experienceLevel === 'Junior' && ' (slower pace)'}
+          {experienceLevel === 'Mid' && ' (standard pace)'}
+          {experienceLevel === 'Senior' && ' (faster pace)'}
+        </p>
       </div>
       <div>
         <label className="block text-xs font-medium text-gray-700 mb-1.5">Notes</label>
