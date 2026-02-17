@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { X, Upload, CheckCircle, Download, FileText, List, UsersRound, Coffee, PartyPopper, AlertCircle } from 'lucide-react';
 import { Product } from '../data/mockData';
 import { parseCSV, validateAndTransformCSV, CSVParseResult } from '../lib/csvParser';
-import { ticketImportMapping, teamMemberImportMapping, ptoImportMapping, holidayImportMapping } from '../lib/importMappings';
+import { ticketImportMapping, teamMemberImportMapping, ptoImportMapping, holidayImportMapping, deriveVelocityMultiplier } from '../lib/importMappings';
 
 export interface ImportedReleaseData {
   tickets: Array<{ id: string; title: string; assignedTo: string; startDate: string; endDate: string; storyPoints: number; status: string; feature?: string }>;
-  team: Array<{ id: string; name: string; role: string }>;
+  team: Array<{ id: string; name: string; role: string; experienceLevel: string; velocityMultiplier: number }>;
   pto: Array<{ id: string; name: string; startDate: string; endDate: string }>;
   holidays: Array<{ id: string; name: string; startDate: string; endDate: string }>;
 }
@@ -112,7 +112,7 @@ export function ImportReleaseWizard({ onClose, products, onCreate }: ImportRelea
           tickets: result.data.slice(0, 5).map((t: any) => ({
             id: t.id,
             title: t.title,
-            storyPoints: t.storyPoints,
+            storyPoints: t.storyPoints, // Keep for CSV compatibility
             assignedTo: t.assignedTo,
             startDate: t.startDate instanceof Date ? t.startDate.toISOString().split('T')[0] : t.startDate,
             endDate: t.endDate instanceof Date ? t.endDate.toISOString().split('T')[0] : t.endDate,
@@ -123,8 +123,8 @@ export function ImportReleaseWizard({ onClose, products, onCreate }: ImportRelea
         setParsedData(prev => ({
           ...prev,
           teamCount: result.data.length,
-          team: result.data.map((t: any) => ({
-            id: t.id,
+          team: result.data.slice(0, 5).map((t: any) => ({
+            id: `tm-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             name: t.name,
             role: t.role
           }))
@@ -174,14 +174,16 @@ export function ImportReleaseWizard({ onClose, products, onCreate }: ImportRelea
           assignedTo: t.assignedTo,
           startDate: t.startDate instanceof Date ? t.startDate.toISOString().split('T')[0] : String(t.startDate),
           endDate: t.endDate instanceof Date ? t.endDate.toISOString().split('T')[0] : String(t.endDate),
-          storyPoints: Number(t.storyPoints) || 0,
+          storyPoints: Number(t.storyPoints) || 0, // Keep for CSV compatibility and backward compat
           status: t.status || 'planned',
           feature: t.feature || undefined,
         })),
         team: allTeam.map((m: any) => ({
-          id: m.id || `tm-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          id: `tm-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           name: m.name,
           role: m.role,
+          experienceLevel: m.experienceLevel || 'Mid',
+          velocityMultiplier: deriveVelocityMultiplier(m.experienceLevel || 'Mid'),
         })),
         pto: allPto.map((p: any) => ({
           id: p.id || `pto-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -333,11 +335,11 @@ function TemplatesStep() {
       name: 'Team Roster Template',
       description: 'List of team members who will be working on this release',
       required: true,
-      columns: ['id', 'name', 'role', 'notes'],
+      columns: ['name', 'role', 'experienceLevel'],
       exampleData: [
-        ['tm1', 'Alice Chen', 'Developer', 'Full-stack engineer'],
-        ['tm2', 'Bob Smith', 'Developer', 'Backend specialist'],
-        ['tm3', 'Carol White', 'Designer', 'UI/UX designer']
+        ['Alice Chen', 'Developer', 'Senior'],
+        ['Bob Smith', 'Developer', 'Mid'],
+        ['Carol White', 'Designer', 'Mid']
       ]
     },
     {

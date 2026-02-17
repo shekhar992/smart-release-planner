@@ -1,18 +1,30 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Users, Calendar, AlertTriangle, TrendingUp, X } from 'lucide-react';
 import { TeamMemberCapacity } from '../lib/teamCapacityCalculation';
 import { ConflictSummary } from '../lib/conflictDetection';
+import { resolveEffortDays } from '../lib/effortResolver';
+import { calculateDeveloperVelocityInsights } from '../lib/velocityInsights';
+import { Product, TeamMember, Holiday } from '../data/mockData';
 
 interface TeamCapacityPanelProps {
   teamCapacities: TeamMemberCapacity[];
   conflictSummary?: ConflictSummary;
   onClose: () => void;
   onViewConflicts?: () => void;
+  product?: Product;
+  teamMembers?: TeamMember[];
+  holidays?: Holiday[];
 }
 
-export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, onViewConflicts }: TeamCapacityPanelProps) {
+export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, onViewConflicts, product, teamMembers, holidays }: TeamCapacityPanelProps) {
   const [expandedSprints, setExpandedSprints] = useState<Set<string>>(new Set());
   const [expandedMembers, setExpandedMembers] = useState<Set<string>>(new Set());
+
+  // Calculate velocity insights for all developers
+  const velocityInsights = useMemo(() => {
+    if (!product || !teamMembers || !holidays) return [];
+    return calculateDeveloperVelocityInsights(product, teamMembers, holidays);
+  }, [product, teamMembers, holidays]);
 
   const toggleSprint = (sprintId: string) => {
     const newExpanded = new Set(expandedSprints);
@@ -67,6 +79,14 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
       case 'Designer': return 'bg-purple-50 text-purple-700';
       case 'QA': return 'bg-emerald-50 text-emerald-700';
       default: return 'bg-gray-50 text-gray-700';
+    }
+  };
+
+  const getRiskColor = (riskLevel: 'low' | 'medium' | 'high') => {
+    switch (riskLevel) {
+      case 'low': return 'bg-emerald-500';
+      case 'medium': return 'bg-yellow-500';
+      case 'high': return 'bg-red-500';
     }
   };
 
@@ -268,6 +288,27 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
                                     <span className={`text-xs px-1.5 py-0.5 rounded ${getRoleColor(member.role)}`}>
                                       {member.role}
                                     </span>
+                                    {/* Velocity Insight Badge */}
+                                    {velocityInsights.length > 0 && (() => {
+                                      const insight = velocityInsights.find(v => v.memberName === member.memberName);
+                                      if (insight && insight.totalSprintsAnalyzed > 0) {
+                                        return (
+                                          <div className="relative group">
+                                            <div className={`w-2 h-2 rounded-full ${getRiskColor(insight.riskLevel)}`} title="Velocity risk indicator" />
+                                            {/* Tooltip */}
+                                            <div className="absolute left-0 top-full mt-1 hidden group-hover:block z-50 w-56 p-2 bg-gray-900 text-white text-xs rounded shadow-lg">
+                                              <div className="font-semibold mb-1">Historical Velocity</div>
+                                              <div className="space-y-0.5">
+                                                <div>Avg per sprint: {insight.avgAssignedDaysPerSprint.toFixed(1)}d</div>
+                                                <div>Avg utilization: {insight.avgUtilizationPercent.toFixed(0)}%</div>
+                                                <div>Sprints analyzed: {insight.totalSprintsAnalyzed}</div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                     {conflictSummary && conflictSummary.conflictsByDeveloper[member.memberName] > 0 && (
                                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-semibold">
                                         <AlertTriangle className="w-2.5 h-2.5" />
@@ -275,11 +316,23 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
                                       </span>
                                     )}
                                   </div>
+                                  {/* Experience Level & Velocity */}
+                                  {teamMembers && (() => {
+                                    const teamMember = teamMembers.find(tm => tm.name === member.memberName);
+                                    if (teamMember?.experienceLevel) {
+                                      return (
+                                        <div className="text-[11px] text-gray-500 mt-1 mb-2">
+                                          {teamMember.experienceLevel} · {teamMember.velocityMultiplier ?? 1}x
+                                        </div>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                   <div className="text-xs text-gray-600 space-y-0.5">
                                     <div className="flex justify-between">
                                       <span>Assigned:</span>
                                       <span className="font-medium">
-                                        {sprintCapacity.assignedStoryPoints} SP ({sprintCapacity.assignedDays.toFixed(1)}d)
+                                        {sprintCapacity.assignedDays.toFixed(1)}d
                                       </span>
                                     </div>
                                     <div className="flex justify-between">
@@ -330,7 +383,7 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
                                             {ticket.title}
                                           </div>
                                           <div className="text-gray-500 mt-0.5">
-                                            {ticket.storyPoints} SP · {ticket.status}
+                                            {resolveEffortDays(ticket)}d · {ticket.status}
                                           </div>
                                         </div>
                                       ))}

@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check } from 'lucide-react';
 import { Ticket, Release, TeamMember } from '../data/mockData';
+import { resolveEffortDays } from '../lib/effortResolver';
+import { calculateEndDate, calculateEndDateFromEffort, calculateEffortFromDates } from '../lib/dateUtils';
+import { calculateWorkingDays } from '../lib/teamCapacityCalculation';
 
 interface TicketDetailsPanelProps {
   ticket: Ticket;
@@ -64,7 +67,22 @@ export function TicketDetailsPanel({
   }, []);
 
   const handleUpdate = (field: keyof Ticket, value: any) => {
-    onUpdate(featureId, ticket.id, { [field]: value });
+    // When assignedTo changes, recalculate end date with new velocity
+    if (field === 'assignedTo') {
+      const newAssignedDev = teamMembers.find(m => m.name === value);
+      const newVelocity = newAssignedDev?.velocityMultiplier ?? 1;
+      
+      const effort = ticket.effortDays || resolveEffortDays(ticket);
+      const adjustedDuration = Math.ceil(effort / newVelocity);
+      const newEndDate = calculateEndDate(ticket.startDate, adjustedDuration - 1);
+      
+      onUpdate(featureId, ticket.id, {
+        assignedTo: value,
+        endDate: newEndDate
+      });
+    } else {
+      onUpdate(featureId, ticket.id, { [field]: value });
+    }
   };
 
   const handleDelete = () => {
@@ -89,9 +107,7 @@ export function TicketDetailsPanel({
   const otherFeatures = release.features.filter(f => f.id !== featureId);
 
   const getDuration = () => {
-    const diffTime = Math.abs(ticket.endDate.getTime() - ticket.startDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return calculateWorkingDays(ticket.startDate, ticket.endDate);
   };
 
   // Get unique team member names for dropdown
@@ -214,34 +230,80 @@ export function TicketDetailsPanel({
             />
           </div>
 
-          {/* Story Points - Quick Select + Custom */}
+          {/* Effort Days */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-2 leading-relaxed">
-              Story Points
+              Effort (Days)
             </label>
-            <div className="flex gap-2">
-              {[1, 2, 3, 5, 8, 13].map(sp => (
-                <button
-                  key={sp}
-                  onClick={() => handleUpdate('storyPoints', sp)}
-                  className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${
-                    ticket.storyPoints === sp 
-                      ? 'bg-blue-600 text-white shadow-sm' 
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {sp}
-                </button>
-              ))}
-              <input
-                type="number"
-                value={ticket.storyPoints}
-                onChange={(e) => handleUpdate('storyPoints', parseInt(e.target.value) || 0)}
-                min="0"
-                max="100"
-                className="w-16 px-2 py-1 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm text-center bg-gray-50/50"
-              />
-            </div>
+            <input
+              type="number"
+              value={ticket.effortDays || resolveEffortDays(ticket)}
+              onChange={(e) => {
+                const value = parseFloat(e.target.value) || 1;
+                
+                // Get assigned developer's velocity
+                const assignedDev = teamMembers.find(m => m.name === ticket.assignedTo);
+                const velocity = assignedDev?.velocityMultiplier ?? 1;
+                
+                // Calculate velocity-adjusted duration in working days
+                const adjustedDuration = Math.ceil(value / velocity);
+                
+                // Calculate end date using working days (skips weekends)
+                const newEndDate = calculateEndDate(ticket.startDate, adjustedDuration - 1);
+                
+                onUpdate(featureId, ticket.id, {
+                  effortDays: value,
+                  storyPoints: value, // Backward compatibility
+                  endDate: newEndDate
+                });
+              }}
+              min="0.5"
+              step="0.5"
+              max="100"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm bg-gray-50/50"
+              placeholder="e.g., 3"
+            />
+            <p className="text-[10px] text-gray-500 mt-1">Estimated effort in working days</p>
+
+            {/* Effort Breakdown - Read-only calculation display */}
+            {ticket.assignedTo && (() => {
+              const assignedMember = teamMembers.find(m => m.name === ticket.assignedTo);
+              if (!assignedMember) return null;
+              
+              const effort = resolveEffortDays(ticket);
+              const velocityMultiplier = assignedMember.velocityMultiplier ?? 1;
+              const adjustedDuration = Math.max(1, Math.round(effort / velocityMultiplier));
+              
+              return (
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-semibold text-gray-700">Effort Breakdown</h4>
+                    <span 
+                      className="text-[10px] text-gray-500 cursor-help" 
+                      title="Duration = max(1, round(effort ÷ velocityMultiplier))"
+                    >
+                      ⓘ
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Effort:</span>
+                      <span className="font-medium text-gray-900">{effort} days</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Developer:</span>
+                      <span className="font-medium text-gray-900">
+                        {assignedMember.name} {assignedMember.experienceLevel && `(${assignedMember.experienceLevel} · ${velocityMultiplier}x)`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between pt-1.5 border-t border-gray-200">
+                      <span className="font-medium">Calculated Duration:</span>
+                      <span className="font-semibold text-blue-600">{adjustedDuration} working days</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Assigned Developer - Searchable Dropdown */}
@@ -255,9 +317,22 @@ export function TicketDetailsPanel({
                 onClick={() => setShowAssigneeDropdown(!showAssigneeDropdown)}
               >
                 <User className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
-                <span className={`flex-1 text-sm ${ticket.assignedTo === 'Unassigned' ? 'text-gray-400' : 'text-gray-900'}`}>
-                  {ticket.assignedTo}
-                </span>
+                <div className="flex-1">
+                  <span className={`text-sm ${ticket.assignedTo === 'Unassigned' ? 'text-gray-400' : 'text-gray-900'}`}>
+                    {ticket.assignedTo}
+                  </span>
+                  {ticket.assignedTo !== 'Unassigned' && (() => {
+                    const developer = teamMembers.find(m => m.name === ticket.assignedTo);
+                    if (developer?.experienceLevel) {
+                      return (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {developer.experienceLevel} · {developer.velocityMultiplier ?? 1}x velocity
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
                 <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showAssigneeDropdown ? 'rotate-180' : ''}`} />
               </div>
               
@@ -350,7 +425,16 @@ export function TicketDetailsPanel({
               <input
                 type="date"
                 value={ticket.startDate.toISOString().split('T')[0]}
-                onChange={(e) => handleUpdate('startDate', new Date(e.target.value))}
+                onChange={(e) => {
+                  const newStartDate = new Date(e.target.value);
+                  // Recalculate endDate to maintain effort duration
+                  const currentEffort = ticket.effortDays || resolveEffortDays(ticket);
+                  const newEndDate = calculateEndDateFromEffort(newStartDate, currentEffort);
+                  onUpdate(featureId, ticket.id, {
+                    startDate: newStartDate,
+                    endDate: newEndDate
+                  });
+                }}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 leading-relaxed"
               />
             </div>
@@ -361,7 +445,16 @@ export function TicketDetailsPanel({
               <input
                 type="date"
                 value={ticket.endDate.toISOString().split('T')[0]}
-                onChange={(e) => handleUpdate('endDate', new Date(e.target.value))}
+                onChange={(e) => {
+                  const newEndDate = new Date(e.target.value);
+                  // Recalculate effortDays from new duration
+                  const newEffort = calculateEffortFromDates(ticket.startDate, newEndDate);
+                  onUpdate(featureId, ticket.id, {
+                    endDate: newEndDate,
+                    effortDays: newEffort,
+                    storyPoints: newEffort // Backward compatibility
+                  });
+                }}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent text-sm bg-gray-50/50 transition-all duration-200 leading-relaxed"
               />
             </div>

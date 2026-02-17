@@ -6,6 +6,8 @@ import { TicketConflict, ConflictSummary, hasConflict, getTicketConflicts } from
 import { SprintCapacity, getCapacityStatusColor } from '../lib/capacityCalculation';
 import designTokens, { getTicketColors, getConflictColors } from '../lib/designTokens';
 import { TruncatedText } from './Tooltip';
+import { resolveEffortDays, getAdjustedDuration } from '../lib/effortResolver';
+import { calculateWorkingDays } from '../lib/teamCapacityCalculation';
 
 interface TimelinePanelProps {
   release: Release;
@@ -220,12 +222,14 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
 
       {/* Sprint Summary Strip - always visible, no scroll required */}
       {showSprintSummary && (release.sprints || []).length > 0 && (
-        <SprintSummaryStrip 
-          sprints={release.sprints || []}
-          sprintCapacities={sprintCapacities}
-          allTickets={release.features.flatMap(f => f.tickets)}
-          onCollapse={() => setShowSprintSummary(false)}
-        />
+        <div className="mt-2">
+          <SprintSummaryStrip 
+            sprints={release.sprints || []}
+            sprintCapacities={sprintCapacities}
+            allTickets={release.features.flatMap(f => f.tickets)}
+            onCollapse={() => setShowSprintSummary(false)}
+          />
+        </div>
       )}
       
       {/* Collapsed sprint summary toggle */}
@@ -255,7 +259,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             return (
               <div 
                 key={feature.id} 
-                className="border-b border-gray-200"
+                className="border-b border-gray-100"
                 style={{ 
                   backgroundColor: featureIndex % 2 === 0 ? '#ffffff' : '#fafafa'
                 }}
@@ -340,7 +344,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
         {/* Right Timeline - Gantt Chart */}
         <div 
           ref={timelineRef}
-          className="flex-1 overflow-auto bg-[#FAFBFC]"
+          className="flex-1 overflow-auto relative bg-[#FAFBFC]"
           onScroll={handleTimelineScroll}
         >
           <div className="relative" style={{ width: timelineWidth, minHeight: '100%' }}>
@@ -386,6 +390,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                   {!isCollapsed && feature.tickets.map((ticket, ticketIndex) => (
                     <div
                       key={ticket.id}
+                      className="ticket-bar"
                       style={{
                         animation: 'slideInFromLeft 0.25s ease-out forwards',
                         animationDelay: `${ticketIndex * 30}ms`,
@@ -479,7 +484,7 @@ function TimeGrid({
                   width: dayWidth,
                   height: contentHeight,
                   top: 0,
-                  backgroundColor: designTokens.colors.timeline.weekend,
+                  backgroundColor: 'rgba(0, 0, 0, 0.01)',
                   zIndex: 0,
                 }}
               />
@@ -490,14 +495,14 @@ function TimeGrid({
               className="absolute"
               style={{
                 left: i * dayWidth,
-                width: isMonthStart ? '2px' : '1px',
+                width: isMonthStart ? '1px' : '1px',
                 height: contentHeight,
                 top: 0,
                 backgroundColor: isMonthStart 
-                  ? designTokens.colors.timeline.weekBoundary
+                  ? 'rgba(0, 0, 0, 0.08)'
                   : isWeekBoundary 
-                    ? 'rgba(0, 0, 0, 0.08)' 
-                    : designTokens.colors.timeline.gridLine,
+                    ? 'rgba(0, 0, 0, 0.03)' 
+                    : 'rgba(0, 0, 0, 0.02)',
                 zIndex: 1,
               }}
             />
@@ -616,10 +621,10 @@ function SprintBands({
               left,
               width,
               background: index % 2 === 0 
-                ? `linear-gradient(to bottom, ${designTokens.colors.sprint.background}, ${designTokens.colors.sprint.backgroundAlt})`
+                ? 'rgba(59, 130, 246, 0.02)'
                 : 'transparent',
-              borderLeft: `1px solid ${designTokens.colors.sprint.border}`,
-              borderRight: `1px solid ${designTokens.colors.sprint.border}`,
+              borderLeft: `1px solid rgba(59, 130, 246, 0.08)`,
+              borderRight: `1px solid rgba(59, 130, 246, 0.08)`,
             }}
           >
             {/* Current sprint progress overlay */}
@@ -650,42 +655,9 @@ function SprintBands({
                 </div>
               </div>
             )}
-            
-            {/* Sprint label - repeated for long sprints */}
-            {width > 400 && (
-              <div className="flex flex-col gap-2">
-                <SprintLabel sprint={sprint} position="start" />
-                <SprintLabel sprint={sprint} position="middle" shift={width / 2} />
-              </div>
-            )}
           </div>
         );
       })}
-    </div>
-  );
-}
-
-// Sprint label component for repeated labels in long sprints
-function SprintLabel({ 
-  sprint, 
-  position, 
-  shift = 0 
-}: { 
-  sprint: any; 
-  position: 'start' | 'middle'; 
-  shift?: number; 
-}) {
-  return (
-    <div
-      className="absolute top-1 text-[8px] font-semibold opacity-30 pointer-events-none"
-      style={{
-        left: shift,
-        color: designTokens.colors.sprint.primary,
-        writingMode: position === 'middle' ? 'vertical-rl' : 'horizontal-tb',
-        transform: position === 'middle' ? 'rotate(180deg)' : 'none',
-      }}
-    >
-      {sprint.name}
     </div>
   );
 }
@@ -896,7 +868,7 @@ function SprintHeaderRow({
       {sprints.map((sprint) => {
         const left = getPositionFromDate(sprint.startDate);
         const width = getDaysDifference(sprint.startDate, sprint.endDate) * dayWidth;
-        const capacity = sprintCapacities.get(sprint.id);
+        const capacity = sprintCapacities?.get(sprint.id);
         const status = capacity ? getStatusBadge(capacity.utilizationPercent) : null;
         
         return (
@@ -920,18 +892,18 @@ function SprintHeaderRow({
                   className="font-semibold"
                   style={{
                     fontSize: designTokens.typography.fontSize.xs,
-                    color: designTokens.colors.neutral[700],  // 1.3.2: Better contrast
+                    color: designTokens.colors.neutral[700],
                     wordWrap: 'break-word',
-                    overflowWrap: 'break-word'
+                    overflowWrap: 'break-word',
+                    letterSpacing: '0.025em'  // tracking-wide
                   }}
                 >
                   {sprint.name}
                 </div>
                 <div 
+                  className="text-gray-500 text-xs"
                   style={{
-                    fontSize: '10px',
                     fontWeight: designTokens.typography.fontWeight.medium,
-                    color: designTokens.colors.neutral[600],  // 1.3.2: Better contrast
                     marginTop: '2px'
                   }}
                 >
@@ -961,9 +933,9 @@ function SprintHeaderRow({
               <div className="space-y-1">
                 {/* Progress bar with dots */}
                 <div className="flex items-center gap-1">
-                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden relative">
+                  <div className="flex-1 h-2.5 bg-gray-200 rounded-full overflow-hidden relative">
                     <div 
-                      className="h-full transition-all duration-300 rounded-full"
+                      className="h-full rounded-full transition-all duration-300"
                       style={{ 
                         width: `${Math.min(capacity.utilizationPercent, 100)}%`,
                         backgroundColor: getCapacityStatusColor(capacity.utilizationPercent)
@@ -990,9 +962,9 @@ function SprintHeaderRow({
 
                 {/* Story points / days summary */}
                 <div className="text-[10px]" style={{ color: designTokens.colors.neutral[600], fontWeight: designTokens.typography.fontWeight.medium }}>
-                  <span className="font-semibold">{capacity.plannedStoryPoints} SP</span>
+                  <span className="font-semibold">{Math.round(capacity.plannedDays * 10) / 10}d planned</span>
                   <span style={{ color: designTokens.colors.neutral[400] }}> · </span>
-                  <span>{Math.round(capacity.plannedDays * 10) / 10}d / {capacity.totalTeamDays}d</span>
+                  <span>{capacity.totalTeamDays}d capacity</span>
                 </div>
 
                 {/* Detailed hover tooltip */}
@@ -1036,7 +1008,7 @@ function SprintHeaderRow({
                       </div>
                       <div className="flex justify-between font-semibold text-gray-800">
                         <span>Planned work:</span>
-                        <span>{capacity.plannedStoryPoints} SP ({Math.round(capacity.plannedDays * 10) / 10} days)</span>
+                        <span>{Math.round(capacity.plannedDays * 10) / 10} days</span>
                       </div>
                       {capacity.overCapacity && (
                         <div className="mt-2 pt-2 border-t border-red-200 text-red-600 font-semibold flex items-center gap-1">
@@ -1068,9 +1040,9 @@ function SprintSummaryStrip({
   allTickets: any[];
   onCollapse: () => void;
 }) {
-  const totalPlanned = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.plannedStoryPoints, 0);
-  const totalPlannedDays = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.plannedDays, 0);
-  const totalTeamDays = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.totalTeamDays, 0);
+  const totalPlannedDays = sprintCapacities ? Array.from(sprintCapacities.values()).reduce((sum, c) => sum + (c.plannedDays ?? 0), 0) : 0;
+  const totalTeamDays = sprintCapacities ? Array.from(sprintCapacities.values()).reduce((sum, c) => sum + (c.totalTeamDays ?? 0), 0) : 0;
+  const totalPlannedStoryPoints = sprintCapacities ? Array.from(sprintCapacities.values()).reduce((sum, c) => sum + (c.plannedStoryPoints ?? 0), 0) : 0;
   const overallUtil = totalTeamDays > 0 ? Math.round((totalPlannedDays / totalTeamDays) * 100) : 0;
 
   return (
@@ -1082,7 +1054,7 @@ function SprintSummaryStrip({
           <div className="flex items-center gap-2 text-[11px] text-gray-500">
             <span>{sprints.length} sprint{sprints.length > 1 ? 's' : ''}</span>
             <span className="text-gray-300">|</span>
-            <span>{totalPlanned} SP · {Math.round(totalPlannedDays * 10) / 10}d / {totalTeamDays}d</span>
+            <span>{totalPlannedStoryPoints} SP · {Math.round(totalPlannedDays * 10) / 10}d / {totalTeamDays}d</span>
             <span className="text-gray-300">|</span>
             <span 
               className="font-semibold"
@@ -1104,10 +1076,10 @@ function SprintSummaryStrip({
       {/* Sprint cards row */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {sprints.map(sprint => {
-          const capacity = sprintCapacities.get(sprint.id);
+          const capacity = sprintCapacities?.get(sprint.id);
           if (!capacity) return null;
 
-          const util = capacity.utilizationPercent;
+          const util = capacity?.utilizationPercent ?? 0;
           const statusColor = getCapacityStatusColor(util);
           const ticketsInSprint = allTickets.filter(t => {
             const ticketStart = t.startDate.getTime();
@@ -1146,7 +1118,7 @@ function SprintSummaryStrip({
 
               <div className="flex items-center justify-between text-[10px] text-gray-500">
                 <span>
-                  <span className="font-semibold text-gray-700">{capacity.plannedStoryPoints} SP</span> · {Math.round(capacity.plannedDays * 10) / 10}d / {capacity.totalTeamDays}d
+                  <span className="font-semibold text-gray-700">{Math.round((capacity?.plannedDays ?? 0) * 10) / 10}d</span> / {capacity?.totalTeamDays ?? 0}d capacity
                 </span>
                 <span>{ticketsInSprint.length} ticket{ticketsInSprint.length !== 1 ? 's' : ''}</span>
               </div>
@@ -1155,7 +1127,7 @@ function SprintSummaryStrip({
                 <span>{sprint.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                 <span>-</span>
                 <span>{sprint.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                {capacity.overCapacity && (
+                {capacity?.overCapacity && (
                   <span className="ml-auto text-red-500 font-medium flex items-center gap-0.5">
                     <AlertTriangle className="w-2.5 h-2.5" />
                     Over by {Math.round((capacity.plannedDays - capacity.totalTeamDays) * 10) / 10}d
@@ -1195,124 +1167,117 @@ function TimelineSidebarHeader({
   return (
     <div className="h-full flex flex-col">
       {/* Control Bar */}
-      <div className="flex flex-col gap-2 px-4 py-2 border-b border-gray-200">
-        <div className="flex items-center gap-3 text-xs">
-          <label className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity">
-            <input
-              type="checkbox"
-              checked={showHolidays}
-              onChange={(e) => onToggleHolidays(e.target.checked)}
-              className="w-3 h-3"
-            />
-            <span 
-              style={{
-                fontSize: designTokens.typography.fontSize.xs,
-                fontWeight: designTokens.typography.fontWeight.medium,
-                color: designTokens.colors.neutral[700]  // 1.3.2: Better contrast
-              }}
-            >
-              Holidays
-            </span>
-          </label>
-          
-          <label className="flex items-center gap-1.5 cursor-pointer hover:opacity-70 transition-opacity">
-            <input
-              type="checkbox"
-              checked={showPTO}
-              onChange={(e) => onTogglePTO(e.target.checked)}
-              className="w-3 h-3"
-            />
-            <span 
-              style={{
-                fontSize: designTokens.typography.fontSize.xs,
-                fontWeight: designTokens.typography.fontWeight.medium,
-                color: designTokens.colors.neutral[700]  // 1.3.2: Better contrast
-              }}
-            >
-              PTO
-            </span>
-          </label>
-        </div>
-
-        {/* Conflict Summary Badge */}
-        {conflictSummary.totalConflicts > 0 && (
-          <div className="relative">
-            <button
-              onClick={() => onToggleConflictSummary(!showConflictSummary)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded transition-all hover:shadow-sm text-xs w-full"
-              style={{
-                backgroundColor: 'rgba(251, 192, 45, 0.15)',
-                border: '1px solid rgba(251, 192, 45, 0.3)',
-                color: '#b45309',
-              }}
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span className="font-medium">
-                {conflictSummary.totalConflicts} Conflict{conflictSummary.totalConflicts > 1 ? 's' : ''}
+      <div className="bg-white border-b border-gray-200 px-4 py-2">
+        <div className="flex items-center justify-between w-full gap-4">
+          {/* LEFT SIDE - Toggles & Conflict Badge */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 transition-colors text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={showHolidays}
+                onChange={(e) => onToggleHolidays(e.target.checked)}
+                className="w-3 h-3"
+              />
+              <span className="text-xs font-medium">
+                Holidays
               </span>
-            </button>
+            </label>
             
-            {showConflictSummary && (
-              <>
-                <div 
-                  className="fixed inset-0 z-40"
-                  onClick={() => onToggleConflictSummary(false)}
-                />
-                <div 
-                  className="absolute left-0 bg-white border border-gray-200 rounded-lg shadow-xl p-3 min-w-[280px] z-50"
-                  style={{ top: 'calc(100% + 8px)' }}
+            <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 transition-colors text-sm text-gray-600">
+              <input
+                type="checkbox"
+                checked={showPTO}
+                onChange={(e) => onTogglePTO(e.target.checked)}
+                className="w-3 h-3"
+              />
+              <span className="text-xs font-medium">
+                PTO
+              </span>
+            </label>
+
+            {/* Conflict Summary Badge */}
+            {conflictSummary.totalConflicts > 0 && (
+              <div className="relative max-w-fit">
+                <button
+                  onClick={() => onToggleConflictSummary(!showConflictSummary)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded transition-all hover:shadow-sm text-xs whitespace-nowrap"
+                  style={{
+                    backgroundColor: 'rgba(251, 192, 45, 0.15)',
+                    border: '1px solid rgba(251, 192, 45, 0.3)',
+                    color: '#b45309',
+                  }}
                 >
-                  <div style={{ fontSize: designTokens.typography.fontSize.xs, fontWeight: designTokens.typography.fontWeight.medium, color: designTokens.colors.neutral[800], marginBottom: '8px' }}>
-                    Scheduling Conflicts
-                  </div>
-                  <ul className="space-y-1 mb-2">
-                    {conflictSummary.affectedDevelopers.map(dev => (
-                      <li key={dev} className="flex items-center justify-between" style={{ fontSize: designTokens.typography.fontSize.xs }}>
-                        <span style={{ color: designTokens.colors.neutral[700], fontWeight: designTokens.typography.fontWeight.medium }}>{dev}</span>
-                        <span style={{ color: '#d97706', fontWeight: designTokens.typography.fontWeight.medium }}>
-                          {conflictSummary.conflictsByDeveloper[dev]} conflict{conflictSummary.conflictsByDeveloper[dev] > 1 ? 's' : ''}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  {onViewConflictDetails && (
-                    <button
-                      onClick={() => {
-                        onViewConflictDetails();
-                        onToggleConflictSummary(false);
-                      }}
-                      className="w-full px-2 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 rounded transition-colors"
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span className="font-medium">
+                    {conflictSummary.totalConflicts} Conflict{conflictSummary.totalConflicts > 1 ? 's' : ''}
+                  </span>
+                </button>
+                
+                {showConflictSummary && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-40"
+                      onClick={() => onToggleConflictSummary(false)}
+                    />
+                    <div 
+                      className="absolute left-0 bg-white border border-gray-200 rounded-lg shadow-xl p-3 min-w-[280px] z-50"
+                      style={{ top: 'calc(100% + 8px)' }}
                     >
-                      View Conflict Details →
-                    </button>
-                  )}
-                </div>
-              </>
+                      <div style={{ fontSize: designTokens.typography.fontSize.xs, fontWeight: designTokens.typography.fontWeight.medium, color: designTokens.colors.neutral[800], marginBottom: '8px' }}>
+                        Scheduling Conflicts
+                      </div>
+                      <ul className="space-y-1 mb-2">
+                        {conflictSummary.affectedDevelopers.map(dev => (
+                          <li key={dev} className="flex items-center justify-between" style={{ fontSize: designTokens.typography.fontSize.xs }}>
+                            <span style={{ color: designTokens.colors.neutral[700], fontWeight: designTokens.typography.fontWeight.medium }}>{dev}</span>
+                            <span style={{ color: '#d97706', fontWeight: designTokens.typography.fontWeight.medium }}>
+                              {conflictSummary.conflictsByDeveloper[dev]} conflict{conflictSummary.conflictsByDeveloper[dev] > 1 ? 's' : ''}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      {onViewConflictDetails && (
+                        <button
+                          onClick={() => {
+                            onViewConflictDetails();
+                            onToggleConflictSummary(false);
+                          }}
+                          className="w-full px-2 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 rounded transition-colors"
+                        >
+                          View Conflict Details →
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
-        )}
 
-        {/* Add Sprint Button (Enhanced with 1.2.1 hover scale) */}
-        <button
-          onClick={onAddSprint}
-          className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded transition-all duration-150 ease-out hover:scale-[1.02] active:scale-[0.98] w-full"
-          style={{
-            backgroundColor: '#64748b',
-            color: 'white',
-            boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#475569';
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#64748b';
-            e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-          }}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add Sprint
-        </button>
+          {/* RIGHT SIDE - Add Sprint Button */}
+          <div className="flex items-center shrink-0">
+            <button
+              onClick={onAddSprint}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded transition-all duration-150 ease-out hover:scale-[1.02] active:scale-[0.98] shrink-0 whitespace-nowrap"
+              style={{
+                backgroundColor: '#64748b',
+                color: 'white',
+                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#475569';
+                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#64748b';
+                e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Sprint
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Ticket Name Header */}
@@ -1351,13 +1316,13 @@ function TicketSidebarRow({
   
   return (
     <div 
-      className="flex items-center px-4 cursor-pointer transition-all duration-150 ease-out border-b border-gray-100 relative group"
+      className="flex items-center px-5 cursor-pointer transition-all duration-150 ease-out border-b border-gray-100 relative group"
       style={{ 
         height: rowHeight,
         backgroundColor: isSelected ? '#eff6ff' : isHovering ? '#fafafa' : 'transparent',
         borderLeft: hasConflict ? '4px solid #f59e0b' : isSelected ? '4px solid #3b82f6' : 'none',
-        paddingLeft: hasConflict || isSelected ? '12px' : '16px',
-        borderBottom: isLastInFeature ? 'none' : '1px solid rgba(0, 0, 0, 0.05)',
+        paddingLeft: hasConflict || isSelected ? '16px' : '20px',
+        borderBottom: isLastInFeature ? 'none' : '1px solid rgba(0, 0, 0, 0.04)',
         // 1.2.2: Enhanced selection with glow
         boxShadow: isSelected ? '0 0 0 1px rgba(59, 130, 246, 0.2) inset' : 'none',
         transform: isHovering && !isSelected ? 'translateX(2px)' : 'none',
@@ -1397,13 +1362,13 @@ function TicketSidebarRow({
           className="flex items-center gap-3"
           style={{
             fontSize: designTokens.typography.fontSize.xs,
-            fontWeight: designTokens.typography.fontWeight.medium,  // 1.3.2: Better readability
-            color: designTokens.colors.neutral[600]  // 1.3.2: Better contrast (was gray-500)
+            fontWeight: 400,
+            color: '#6b7280'
           }}
         >
           <span className="truncate">{ticket.assignedTo}</span>
           <span className="flex-shrink-0">•</span>
-          <span className="flex-shrink-0">{ticket.storyPoints} SP</span>
+          <span className="flex-shrink-0">{resolveEffortDays(ticket)}d</span>
         </div>
       </div>
     </div>
@@ -1451,121 +1416,86 @@ function TicketTimelineBar({
   isLastInFeature?: boolean;
 }) {
   const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState<'left' | 'right' | null>(null);
-  const [showConflictTooltip, setShowConflictTooltip] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const ticketRef = useRef<HTMLDivElement>(null);
 
   const assignedMember = teamMembers.find(m => m.name === ticket.assignedTo);
   const ptoEntries = assignedMember?.pto || [];
 
   const ticketLeft = getPositionFromDate(ticket.startDate);
-  const ticketWidth = getDaysDifference(ticket.startDate, ticket.endDate) * dayWidth;
+  const ticketWidth = Math.max(1, getDaysDifference(ticket.startDate, ticket.endDate) + 1) * dayWidth;
 
-  // Calculate PTO impact on ticket duration
+  // Calculate adjusted duration (Phase 1: debug only, not affecting width yet)
+  const adjustedDuration = getAdjustedDuration(ticket, assignedMember);
+  console.debug(
+    `[AdjustedDuration] ${ticket.title}: raw=${resolveEffortDays(ticket)} adjusted=${adjustedDuration.toFixed(2)}`
+  );
+
+  // Calculate PTO impact for display
   const calculatePTOImpact = () => {
     let ptoDaysInTicket = 0;
     ptoEntries.forEach(pto => {
       if (pto.endDate < ticket.startDate || pto.startDate > ticket.endDate) return;
       const overlapStart = pto.startDate < ticket.startDate ? ticket.startDate : pto.startDate;
       const overlapEnd = pto.endDate > ticket.endDate ? ticket.endDate : pto.endDate;
-      ptoDaysInTicket += getDaysDifference(overlapStart, overlapEnd);
+      ptoDaysInTicket += Math.max(1, getDaysDifference(overlapStart, overlapEnd) + 1);
     });
     return ptoDaysInTicket;
   };
   
   const ptoDays = showPTO ? calculatePTOImpact() : 0;
-  const ticketDuration = getDaysDifference(ticket.startDate, ticket.endDate);
-  const effectiveDays = ticketDuration - ptoDays;
-  const ptoImpactPercent = ticketDuration > 0 ? (ptoDays / ticketDuration) * 100 : 0;
 
-  // Get conflict details for tooltip
-  const ticketConflicts = hasConflict ? getTicketConflicts(ticket.id, conflicts) : [];
-
-  const handleMouseDown = (e: React.MouseEvent, action: 'drag' | 'resize-left' | 'resize-right') => {
+  const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (action === 'drag') {
-      const startX = e.clientX;
-      const startY = e.clientY;
-      const initialLeft = ticketLeft;
-      let hasMoved = false;
-      const DRAG_THRESHOLD = 5; // pixels
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const initialLeft = ticketLeft;
+    let hasMoved = false;
+    const DRAG_THRESHOLD = 5; // pixels
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        const deltaX = moveEvent.clientX - startX;
-        const deltaY = moveEvent.clientY - startY;
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+      const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+      
+      // Only start dragging if moved beyond threshold
+      if (distance > DRAG_THRESHOLD) {
+        hasMoved = true;
+        setIsDragging(true);
         
-        // Only start dragging if moved beyond threshold
-        if (distance > DRAG_THRESHOLD) {
-          hasMoved = true;
-          setIsDragging(true);
-          
-          const newLeft = Math.max(0, initialLeft + deltaX);
-          const daysMoved = Math.round((newLeft - initialLeft) / dayWidth);
-          
-          if (ticketRef.current) {
-            ticketRef.current.style.left = `${initialLeft + (daysMoved * dayWidth)}px`;
-          }
-        }
-      };
-
-      const handleMouseUp = (moveEvent: MouseEvent) => {
-        if (hasMoved) {
-          setIsDragging(false);
-          const deltaX = moveEvent.clientX - startX;
-          const daysMoved = Math.round(deltaX / dayWidth);
-          
-          if (daysMoved !== 0) {
-            const newStartDate = new Date(ticket.startDate);
-            newStartDate.setDate(newStartDate.getDate() + daysMoved);
-            onMove(newStartDate);
-          }
-        } else {
-          // It was a click, not a drag - open details panel
-          onSelect();
-        }
-        
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    } else if (action === 'resize-right') {
-      setIsResizing('right');
-      const startX = e.clientX;
-      const initialWidth = ticketWidth;
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        const deltaX = moveEvent.clientX - startX;
-        const newWidth = Math.max(dayWidth, initialWidth + deltaX);
+        const newLeft = Math.max(0, initialLeft + deltaX);
+        const daysMoved = Math.round((newLeft - initialLeft) / dayWidth);
         
         if (ticketRef.current) {
-          ticketRef.current.style.width = `${newWidth}px`;
+          ticketRef.current.style.left = `${initialLeft + (daysMoved * dayWidth)}px`;
         }
-      };
+      }
+    };
 
-      const handleMouseUp = (moveEvent: MouseEvent) => {
-        setIsResizing(null);
+    const handleMouseUp = (moveEvent: MouseEvent) => {
+      if (hasMoved) {
+        setIsDragging(false);
         const deltaX = moveEvent.clientX - startX;
-        const daysDelta = Math.round(deltaX / dayWidth);
+        const daysMoved = Math.round(deltaX / dayWidth);
         
-        if (daysDelta !== 0) {
-          const newEndDate = new Date(ticket.endDate);
-          newEndDate.setDate(newEndDate.getDate() + daysDelta);
-          onResize(newEndDate);
+        if (daysMoved !== 0) {
+          const newStartDate = new Date(ticket.startDate);
+          newStartDate.setDate(newStartDate.getDate() + daysMoved);
+          onMove(newStartDate);
         }
-        
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
+      } else {
+        // It was a click, not a drag - open details panel
+        onSelect();
+      }
+      
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
 
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   return (
@@ -1613,7 +1543,7 @@ function TicketTimelineBar({
       {/* LAYER 5: TICKET BAR (Enhanced with 1.2 interactions) */}
       <div
         ref={ticketRef}
-        className="absolute group relative transition-all duration-200"
+        className="absolute group relative transition-all duration-200 shadow-sm hover:shadow-md"
         style={{
           left: ticketLeft,
           width: ticketWidth,
@@ -1633,53 +1563,39 @@ function TicketTimelineBar({
             ? `1px solid ${getConflictColors('warning').border}`
             : isSelected 
               ? `2px solid ${getTicketColors(ticket.status).border}`
-              : `1px solid ${getTicketColors(ticket.status).border}`,
+              : `1px solid rgba(0, 0, 0, 0.08)`,
           borderTop: hasConflict
             ? `1px solid ${getConflictColors('warning').border}`
             : isSelected 
               ? `2px solid ${getTicketColors(ticket.status).border}`
-              : `1px solid ${getTicketColors(ticket.status).border}`,
+              : `1px solid rgba(0, 0, 0, 0.08)`,
           borderBottom: hasConflict
             ? `1px solid ${getConflictColors('warning').border}`
             : isSelected 
               ? `2px solid ${getTicketColors(ticket.status).border}`
-              : `1px solid ${getTicketColors(ticket.status).border}`,
+              : `1px solid rgba(0, 0, 0, 0.08)`,
           borderRadius: designTokens.borderRadius.md,
-          zIndex: isSelected ? 10 : 5,
-          opacity: isDragging || isResizing ? 0.7 : 1,
-          // 1.2.2: Enhanced shadow with glow for selection
+          zIndex: isSelected ? 2 : 1,
+          opacity: isDragging ? 0.7 : 1,
+          // Enhanced shadow with glow for selection (overrides base shadow-sm)
           boxShadow: hasConflict 
-            ? `${designTokens.shadows.conflictWarning}, 0 0 0 3px rgba(251, 192, 45, 0.1)`
+            ? `0 1px 3px rgba(251, 192, 45, 0.3), 0 0 0 3px rgba(251, 192, 45, 0.1)`
             : isSelected 
-              ? `${designTokens.shadows.glow}, 0 0 0 3px rgba(59, 130, 246, 0.15)`
-              : isHovering && !isDragging && !isResizing
-                ? `${designTokens.shadows.hover}, 0 1px 0 0 rgba(0, 0, 0, 0.05)`
-                : designTokens.shadows.sm,
-          // 1.2.1: Enhanced hover lift with scale
-          transform: (isHovering && !isDragging && !isResizing) 
-            ? 'translateY(-2px) scale(1.01)' 
-            : isDragging 
+              ? `0 1px 3px rgba(59, 130, 246, 0.2), 0 0 0 3px rgba(59, 130, 246, 0.15)`
+              : undefined,  // Let Tailwind shadow-sm handle default
+          // Enhanced hover lift with scale
+          transform: isDragging 
               ? 'translateY(-1px) rotate(1deg)' 
-              : isResizing
-                ? 'translateY(-1px)'
-                : 'none',
-          transition: 'all 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-          // 1.2.4: Cursor feedback
+              : 'none',
+          transitionProperty: 'all, box-shadow',
+          transitionDuration: '0.15s, 0.2s',
+          transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+          // Cursor feedback
           cursor: isDragging ? 'grabbing' : 'grab',
         }}
-        onMouseDown={(e) => {
-          if (!(e.target as HTMLElement).classList.contains('resize-handle')) {
-            handleMouseDown(e, 'drag');
-          }
-        }}
-        onMouseEnter={() => {
-          setIsHovering(true);
-          setShowConflictTooltip(true);
-        }}
-        onMouseLeave={() => {
-          setIsHovering(false);
-          setShowConflictTooltip(false);
-        }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onMouseDown={handleMouseDown}
       >
         {/* 1.2.4: Drag handle affordance (visible on hover) */}
         <div 
@@ -1702,197 +1618,77 @@ function TicketTimelineBar({
           />
         </div>
         
-        <div className="flex items-center gap-2 px-2 h-full">
-          {/* 1.2.1: Pulse animation for conflict icon */}
-          {hasConflict && (
-            <AlertTriangle 
-              className="flex-shrink-0 w-3.5 h-3.5 animate-pulse" 
-              style={{ 
-                color: getConflictColors('warning').text,
-                animationDuration: '2s'
-              }}
-            />
-          )}
-          {ptoDays > 0 && (
-            <span className="flex-shrink-0 text-[10px]" title={`${ptoDays} PTO days during ticket`}>📅</span>
-          )}
-          <div 
-            className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-medium"
-            style={{
-              backgroundColor: hasConflict 
-                ? getConflictColors('warning').border 
-                : getTicketColors(ticket.status).accent,
-              color: '#ffffff',
-            }}
-          >
-            {ticket.storyPoints}
-          </div>
-          <span 
-            className="truncate font-medium" 
-            style={{ 
-              fontSize: designTokens.typography.fontSize.xs,
-              fontWeight: designTokens.typography.fontWeight.medium,  // 1.3.2: Better readability
-              color: hasConflict 
-                ? getConflictColors('warning').text 
-                : getTicketColors(ticket.status).text 
-            }}
-          >
+        <div className="flex flex-col justify-center h-full px-2 overflow-hidden">
+          
+          {/* Title */}
+          <div className="text-[12px] font-semibold truncate leading-tight text-gray-900">
             {ticket.title}
-          </span>
-          {ptoDays > 0 && ptoImpactPercent > 30 && (
-            <span 
-              className="flex-shrink-0 text-[9px] font-medium px-1 py-0.5 rounded"
-              style={{
-                backgroundColor: 'rgba(194, 135, 65, 0.15)',
-                color: '#92400e'
-              }}
-            >
-              +{ptoDays}d
+          </div>
+
+          {/* Metadata Row */}
+          <div className="flex items-center gap-2 text-[10px] text-gray-600 mt-[2px] truncate">
+            
+            {/* Assignee */}
+            {ticket.assignedTo && (
+              <span className="truncate">
+                {ticket.assignedTo}
+              </span>
+            )}
+
+            {/* Effort */}
+            <span className="text-gray-500">
+              · {ticket.effortDays ?? ticket.storyPoints ?? 1}d
             </span>
-          )}
-          {/* Clone ticket button - visible on hover */}
-          {onClone && (
-            <button
-              className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-150 p-0.5 rounded hover:bg-black/10"
-              style={{ marginLeft: 'auto' }}
-              title="Clone ticket"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClone();
-              }}
-            >
-              <Copy className="w-3 h-3" style={{ color: hasConflict ? getConflictColors('warning').text : getTicketColors(ticket.status).text }} />
-            </button>
-          )}
+
+            {/* Experience + Velocity */}
+            {assignedMember && assignedMember.experienceLevel && (
+              <span className="inline-flex items-center px-1.5 py-[1px] rounded bg-gray-100 text-gray-700 text-[9px] font-medium">
+                {assignedMember.experienceLevel}
+                {assignedMember.velocityMultiplier && assignedMember.velocityMultiplier !== 1 && (
+                  <span className="ml-1 text-gray-500">
+                    ({assignedMember.velocityMultiplier}x)
+                  </span>
+                )}
+              </span>
+            )}
+
+          </div>
+
         </div>
 
-        {/* 1.2.4: Right resize handle with improved affordance */}
-        <div
-          className="resize-handle absolute right-0 top-0 bottom-0 w-3 cursor-ew-resize opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-          style={{ 
-            backgroundColor: hasConflict
-              ? 'rgba(251, 192, 45, 0.15)'
-              : `${getTicketColors(ticket.status).accent}20`,
-            borderLeft: `1px solid ${hasConflict ? getConflictColors('warning').border : getTicketColors(ticket.status).accent}50`
-          }}
-          onMouseDown={(e) => handleMouseDown(e, 'resize-right')}
-        />
-
-        {/* Enhanced Tooltip - Shows ticket details, conflicts and PTO impact */}
-        {showConflictTooltip && (
-          <div 
-            className="absolute left-0 top-full mt-2 bg-white border rounded-lg shadow-xl p-3 min-w-[280px] z-50"
-            style={{ 
-              pointerEvents: 'none',
-              borderColor: hasConflict ? 'rgb(252, 211, 77)' : 'rgb(209, 213, 219)'
-            }}
+        {/* Inline Tooltip */}
+        {isHovered && (
+          <div
+            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 bg-white border border-gray-200 rounded-md shadow-xl p-3 text-sm z-[100]"
           >
-            {/* Basic Ticket Info Section */}
-            <div className={hasConflict || ptoDays > 0 ? 'mb-3 pb-3 border-b border-gray-200' : ''}>
-              <div className="text-xs font-semibold text-gray-900 mb-2 leading-relaxed">{ticket.title}</div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Story Points</span>
-                  <span className="font-medium text-gray-800">{ticket.storyPoints}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Status</span>
-                  <span className={`font-medium ${
-                    ticket.status === 'completed' ? 'text-green-700' :
-                    ticket.status === 'in-progress' ? 'text-blue-700' : 'text-gray-600'
-                  }`}>
-                    {ticket.status === 'in-progress' ? 'In Progress' : ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Assignee</span>
-                  <span className="font-medium text-gray-800">{ticket.assignedTo}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Feature</span>
-                  <span className="font-medium text-gray-800 truncate ml-1">{featureName}</span>
-                </div>
-                <div className="col-span-2 flex justify-between">
-                  <span className="text-gray-500">Dates</span>
-                  <span className="font-medium text-gray-800">
-                    {ticket.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {ticket.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </span>
-                </div>
-              </div>
+            <div className="font-semibold text-sm mb-1">
+              {ticket.title}
             </div>
-            {/* Conflict Section */}
-            {hasConflict && ticketConflicts.length > 0 && (
-              <div className="mb-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
-                  <span 
-                    style={{
-                      fontSize: designTokens.typography.fontSize.xs,
-                      fontWeight: designTokens.typography.fontWeight.semibold,
-                      color: '#78350f'  // Amber-900
-                    }}
-                  >
-                    Scheduling Conflict
-                  </span>
-                </div>
-                <div 
-                  style={{
-                    fontSize: designTokens.typography.fontSize.xs,
-                    fontWeight: designTokens.typography.fontWeight.medium,
-                    color: designTokens.colors.neutral[600],  // 1.3.2: Better contrast
-                    marginBottom: '8px'
-                  }}
-                >
-                  {ticket.assignedTo} has overlapping tasks:
-                </div>
-                <ul className="space-y-1.5">
-                  {ticketConflicts.map((conflict, idx) => (
-                    <li key={idx} style={{ fontSize: designTokens.typography.fontSize.xs }}>
-                      <div className="flex items-start gap-1.5">
-                        <span className="text-amber-600">•</span>
-                        <div>
-                          <div style={{ fontWeight: designTokens.typography.fontWeight.medium, color: designTokens.colors.neutral[800] }}>{conflict.ticketTitle}</div>
-                          <div style={{ color: designTokens.colors.neutral[600], fontWeight: designTokens.typography.fontWeight.medium }}>
-                            {conflict.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {conflict.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            {' '}({conflict.overlapDays} day{conflict.overlapDays > 1 ? 's' : ''} overlap)
-                          </div>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+
+            {assignedMember && (
+              <div className="text-xs text-gray-600 mb-2">
+                {assignedMember.name}
+                {assignedMember.experienceLevel
+                  ? ` (${assignedMember.experienceLevel} · ${assignedMember.velocityMultiplier ?? 1}x)`
+                  : ''}
               </div>
             )}
-            
-            {/* PTO Impact Section */}
-            {ptoDays > 0 && (
-              <div className={hasConflict ? 'border-t border-gray-200 pt-3' : ''}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs">📅</span>
-                  <span className="text-xs font-semibold text-gray-800">
-                    PTO Impact Analysis
-                  </span>
-                </div>
-                <div className="space-y-1 text-xs">
-                  <div className="flex justify-between text-gray-700">
-                    <span>Planned duration:</span>
-                    <span className="font-medium">{ticketDuration} days</span>
-                  </div>
-                  <div className="flex justify-between text-amber-700">
-                    <span>PTO days:</span>
-                    <span className="font-medium">-{ptoDays} days</span>
-                  </div>
-                  <div className="flex justify-between border-t border-gray-200 pt-1 mt-1 font-semibold text-gray-800">
-                    <span>Effective working days:</span>
-                    <span>{effectiveDays} days</span>
-                  </div>
-                  {ptoImpactPercent > 30 && (
-                    <div className="mt-2 pt-2 border-t border-amber-200 text-amber-700 font-medium flex items-center gap-1">
-                      <span>⚠️</span>
-                      <span>Consider extending timeline or reassigning</span>
-                    </div>
-                  )}
-                </div>
+
+            <div className="text-xs mb-1">
+              Effort: {ticket.effortDays ?? ticket.storyPoints ?? 1}d
+            </div>
+
+            <div className="text-xs mb-1">
+              Duration: {calculateWorkingDays(ticket.startDate, ticket.endDate)} working days
+            </div>
+
+            <div className="text-xs text-gray-500">
+              {ticket.startDate.toLocaleDateString()} – {ticket.endDate.toLocaleDateString()}
+            </div>
+
+            {hasConflict && (
+              <div className="text-xs text-amber-600 mt-2">
+                ⚠ Overallocated in sprint
               </div>
             )}
           </div>

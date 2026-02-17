@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus, ChevronDown, Check, User } from 'lucide-react';
+import { X, Plus, ChevronDown, Check, User, Sparkles } from 'lucide-react';
 import { Release, Ticket, TeamMember } from '../data/mockData';
+import { suggestEffortDays } from '../lib/effortSuggestion';
+import { calculateEndDateFromEffort, calculateEffortFromDates } from '../lib/dateUtils';
 
 interface TicketCreationModalProps {
   release: Release;
@@ -30,7 +32,7 @@ export function TicketCreationModal({
   // Ticket form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [storyPoints, setStoryPoints] = useState(3);
+  const [effortDays, setEffortDays] = useState(3);
   const [assignedTo, setAssignedTo] = useState('Unassigned');
   const [status, setStatus] = useState<Ticket['status']>('planned');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
@@ -118,7 +120,8 @@ export function TicketCreationModal({
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       status,
-      storyPoints,
+      effortDays,
+      storyPoints: effortDays, // Backward compatibility
       assignedTo
     });
     onClose();
@@ -132,13 +135,14 @@ export function TicketCreationModal({
       startDate: new Date(startDate),
       endDate: new Date(endDate),
       status,
-      storyPoints,
+      effortDays,
+      storyPoints: effortDays, // Backward compatibility
       assignedTo
     });
     // Reset ticket fields for next one
     setTitle('');
     setDescription('');
-    setStoryPoints(3);
+    setEffortDays(3);
     setStartDate(endDate); // Next ticket starts where this one ends
     const nextEnd = new Date(new Date(endDate).getTime() + 5 * 24 * 60 * 60 * 1000);
     setEndDate(nextEnd.toISOString().split('T')[0]);
@@ -294,27 +298,65 @@ export function TicketCreationModal({
                 />
               </div>
 
-              {/* Story Points + Assignee Row */}
+              {/* Effort Days + Status Row */}
               <div className="grid grid-cols-2 gap-4">
-                {/* Story Points */}
+                {/* Effort Days */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-2">Story Points</label>
-                  <div className="flex gap-1.5">
-                    {[1, 2, 3, 5, 8, 13].map(sp => (
-                      <button
-                        key={sp}
-                        type="button"
-                        onClick={() => setStoryPoints(sp)}
-                        className={`w-8 h-8 rounded-lg text-xs font-medium transition-all ${
-                          storyPoints === sp
-                            ? 'bg-blue-600 text-white shadow-sm'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        {sp}
-                      </button>
-                    ))}
-                  </div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">Effort (Days)</label>
+                  <input
+                    type="number"
+                    min="0.5"
+                    step="0.5"
+                    value={effortDays}
+                    onChange={(e) => {
+                      const newEffort = parseFloat(e.target.value) || 1;
+                      setEffortDays(newEffort);
+                      // Recalculate endDate from effortDays (single source of truth)
+                      const newEndDate = calculateEndDateFromEffort(new Date(startDate), newEffort);
+                      setEndDate(newEndDate.toISOString().split('T')[0]);
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm bg-gray-50/50"
+                    placeholder="e.g., 3"
+                  />
+                  {/* Effort Suggestion Engine */}
+                  {title.trim() && (() => {
+                    const assigneeRole = teamMembers.find(m => m.name === assignedTo)?.role;
+                    const suggestion = suggestEffortDays(title, assigneeRole);
+                    return (
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <Sparkles className="w-3 h-3 text-violet-500" />
+                            <span className="text-[10px] text-gray-600">Engine Suggestion: </span>
+                            <span className="text-[10px] font-semibold text-gray-900">{suggestion.suggestedDays}d</span>
+                            <span className={
+                              `text-[9px] px-1.5 py-0.5 rounded ${
+                                suggestion.confidence === 'high' ? 'bg-green-100 text-green-700' :
+                                suggestion.confidence === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`
+                            }>{suggestion.confidence}</span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setEffortDays(suggestion.suggestedDays);
+                              // Recalculate endDate from suggested effort
+                              const newEndDate = calculateEndDateFromEffort(new Date(startDate), suggestion.suggestedDays);
+                              setEndDate(newEndDate.toISOString().split('T')[0]);
+                            }}
+                            className="text-[10px] text-violet-600 hover:text-violet-700 font-medium hover:bg-violet-50 px-2 py-0.5 rounded transition-colors"
+                          >
+                            Apply
+                          </button>
+                        </div>
+                        {suggestion.factors.length > 0 && (
+                          <p className="text-[9px] text-gray-500">
+                            {suggestion.factors.join(' • ')}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Status */}
@@ -395,7 +437,12 @@ export function TicketCreationModal({
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => {
+                      setStartDate(e.target.value);
+                      // Recalculate endDate to maintain effort duration
+                      const newEndDate = calculateEndDateFromEffort(new Date(e.target.value), effortDays);
+                      setEndDate(newEndDate.toISOString().split('T')[0]);
+                    }}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm bg-gray-50/50"
                   />
                 </div>
@@ -404,7 +451,12 @@ export function TicketCreationModal({
                   <input
                     type="date"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={(e) => {
+                      setEndDate(e.target.value);
+                      // Recalculate effortDays from new duration
+                      const newEffort = calculateEffortFromDates(new Date(startDate), new Date(e.target.value));
+                      setEffortDays(newEffort);
+                    }}
                     className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm bg-gray-50/50"
                   />
                 </div>

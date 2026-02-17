@@ -2,10 +2,12 @@ import { useState, useRef, useCallback } from 'react';
 import { X, ArrowRight, ArrowLeft, Plus, Trash2, Users, Package, UserPlus, Upload, Download, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { TeamMember } from '../data/mockData';
 import { parseCSV } from '../lib/csvParser';
+import { deriveVelocityMultiplier } from '../lib/importMappings';
 
 interface TeamMemberDraft {
   name: string;
   role: 'Developer' | 'Designer' | 'QA';
+  experienceLevel: 'Junior' | 'Mid' | 'Senior';
   notes: string;
 }
 
@@ -22,7 +24,7 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
   const [step, setStep] = useState<Step>('product-info');
   const [productName, setProductName] = useState('');
   const [members, setMembers] = useState<TeamMemberDraft[]>([
-    { name: '', role: 'Developer', notes: '' }
+    { name: '', role: 'Developer', experienceLevel: 'Mid', notes: '' }
   ]);
   const [inputMode, setInputMode] = useState<TeamInputMode>('manual');
   const [csvError, setCsvError] = useState<string | null>(null);
@@ -31,7 +33,7 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addMember = () => {
-    setMembers(prev => [...prev, { name: '', role: 'Developer', notes: '' }]);
+    setMembers(prev => [...prev, { name: '', role: 'Developer', experienceLevel: 'Mid', notes: '' }]);
   };
 
   const removeMember = (index: number) => {
@@ -51,6 +53,8 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
     const teamData = validMembers.map(m => ({
       name: m.name.trim(),
       role: m.role,
+      experienceLevel: m.experienceLevel,
+      velocityMultiplier: deriveVelocityMultiplier(m.experienceLevel),
       notes: m.notes.trim() || undefined,
       pto: [],
     }));
@@ -91,15 +95,24 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
       const headerLower = headers.map(h => h.toLowerCase().trim());
       const nameIdx = headerLower.findIndex(h => ['name', 'member', 'team member', 'team_member', 'full name', 'fullname'].includes(h));
       const roleIdx = headerLower.findIndex(h => ['role', 'position', 'title', 'job title', 'job_title'].includes(h));
+      const experienceIdx = headerLower.findIndex(h => ['experiencelevel', 'experience level', 'experience', 'level', 'seniority'].includes(h));
       const notesIdx = headerLower.findIndex(h => ['notes', 'note', 'description', 'bio', 'details'].includes(h));
 
       if (nameIdx === -1) {
-        setCsvError('Could not find a "name" column in the CSV. Expected columns: name, role, notes');
+        setCsvError('Could not find a "name" column in the CSV. Expected columns: name, role, experienceLevel');
         return;
       }
 
       const parsed: TeamMemberDraft[] = [];
       const errors: string[] = [];
+
+      const normalizeExperienceLevel = (exp: string): 'Junior' | 'Mid' | 'Senior' => {
+        const lower = exp.toLowerCase().trim();
+        if (['junior', 'jr', 'entry', 'entry level', 'entry-level'].includes(lower)) return 'Junior';
+        if (['senior', 'sr', 'lead', 'principal'].includes(lower)) return 'Senior';
+        // Default to Mid for any other value or empty
+        return 'Mid';
+      };
 
       rows.forEach((row, i) => {
         const name = row[nameIdx]?.trim();
@@ -108,8 +121,9 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
           return;
         }
         const role = roleIdx >= 0 ? normalizeRole(row[roleIdx] || '') : 'Developer';
+        const experienceLevel = experienceIdx >= 0 ? normalizeExperienceLevel(row[experienceIdx] || 'Mid') : 'Mid';
         const notes = notesIdx >= 0 ? (row[notesIdx]?.trim() || '') : '';
-        parsed.push({ name, role, notes });
+        parsed.push({ name, role, experienceLevel, notes });
       });
 
       if (parsed.length === 0) {
@@ -156,7 +170,7 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
   }, [processCSVContent]);
 
   const downloadTeamTemplate = () => {
-    const csv = 'name,role,notes\nJane Doe,Developer,Full-stack engineer\nJohn Smith,Designer,UI/UX specialist\nAlex Johnson,QA,Automation lead';
+    const csv = 'name,role,experienceLevel\nJane Doe,Developer,Senior\nJohn Smith,Designer,Mid\nAlex Johnson,QA,Mid';
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -315,7 +329,7 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
                     </div>
 
                     {/* Fields */}
-                    <div className="flex-1 grid grid-cols-[1fr_120px_1fr] gap-3">
+                    <div className="flex-1 grid grid-cols-[1.5fr_110px_110px_1fr] gap-2">
                       <div>
                         <label className="block text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">Name</label>
                         <input
@@ -343,6 +357,18 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
                           <option value="Developer">Developer</option>
                           <option value="Designer">Designer</option>
                           <option value="QA">QA</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">Level</label>
+                        <select
+                          value={member.experienceLevel}
+                          onChange={(e) => updateMember(index, 'experienceLevel', e.target.value)}
+                          className="w-full px-2.5 py-1.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        >
+                          <option value="Junior">Junior</option>
+                          <option value="Mid">Mid</option>
+                          <option value="Senior">Senior</option>
                         </select>
                       </div>
                       <div>
@@ -453,12 +479,12 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
                   <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
                     <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-2">Expected CSV format</p>
                     <div className="text-xs font-mono text-gray-600 bg-white p-2 rounded border border-gray-200 overflow-x-auto">
-                      <div className="text-gray-900 font-semibold">name,role,notes</div>
-                      <div>Jane Doe,Developer,Full-stack engineer</div>
-                      <div>John Smith,Designer,UI/UX specialist</div>
+                      <div className="text-gray-900 font-semibold">name,role,experienceLevel</div>
+                      <div>Jane Doe,Developer,Senior</div>
+                      <div>John Smith,Designer,Mid</div>
                     </div>
                     <p className="text-[10px] text-gray-400 mt-2">
-                      Only <span className="font-medium">name</span> is required. Role defaults to Developer if missing.
+                      Only <span className="font-medium">name</span> is required. Role defaults to Developer, experience level defaults to Mid.
                     </p>
                   </div>
                 </div>

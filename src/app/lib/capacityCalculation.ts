@@ -3,7 +3,8 @@
  * Calculates sprint capacity considering working days, holidays, PTO, and team velocity
  */
 
-import { StoryPointMapping, storyPointsToDays } from '../data/mockData';
+import { StoryPointMapping } from '../data/mockData';
+import { resolveEffortDaysWithMapping } from './effortResolver';
 
 export interface Sprint {
   id: string;
@@ -19,6 +20,7 @@ export interface Ticket {
   endDate: Date;
   assignedTo: string;
   storyPoints: number;
+  effortDays?: number; // New primary estimation field
   status: string;
 }
 
@@ -184,14 +186,14 @@ export function calculateSprintCapacity(
   const totalTeamDays = Math.max(0, (availableDays * teamSize) - ptoDays);
   const capacityStoryPoints = totalTeamDays * velocityPerDay;
   
-  // Calculate planned story points for this sprint
+  // Calculate planned story points for this sprint (legacy display)
   const plannedStoryPoints = sprintTickets.reduce((sum, ticket) => {
     return sum + ticket.storyPoints;
   }, 0);
 
-  // Convert planned SP to days using mapping
+  // Calculate planned days using effort resolver (effortDays → storyPoints with mapping)
   const plannedDays = sprintTickets.reduce((sum, ticket) => {
-    return sum + storyPointsToDays(ticket.storyPoints, spMapping);
+    return sum + resolveEffortDaysWithMapping(ticket, spMapping);
   }, 0);
   
   // Calculate utilization based on days (mapping-aware)
