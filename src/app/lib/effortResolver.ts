@@ -165,5 +165,5 @@ export function getAdjustedDuration(
   // Prevent divide-by-zero
   if (velocity <= 0) return rawEffort;
 
-  return rawEffort / velocity;
+  return Math.max(1, Math.round(rawEffort / velocity));
 }

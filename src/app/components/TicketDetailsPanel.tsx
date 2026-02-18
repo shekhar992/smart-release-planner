@@ -3,7 +3,6 @@ import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check } from 'lucide-reac
 import { Ticket, Release, TeamMember } from '../data/mockData';
 import { resolveEffortDays } from '../lib/effortResolver';
 import { calculateEndDate, calculateEndDateFromEffort, calculateEffortFromDates } from '../lib/dateUtils';
-import { calculateWorkingDays } from '../lib/teamCapacityCalculation';
 
 interface TicketDetailsPanelProps {
   ticket: Ticket;
@@ -73,7 +72,7 @@ export function TicketDetailsPanel({
       const newVelocity = newAssignedDev?.velocityMultiplier ?? 1;
       
       const effort = ticket.effortDays || resolveEffortDays(ticket);
-      const adjustedDuration = Math.ceil(effort / newVelocity);
+      const adjustedDuration = Math.max(1, Math.round(effort / newVelocity));
       const newEndDate = calculateEndDate(ticket.startDate, adjustedDuration - 1);
       
       onUpdate(featureId, ticket.id, {
@@ -107,7 +106,11 @@ export function TicketDetailsPanel({
   const otherFeatures = release.features.filter(f => f.id !== featureId);
 
   const getDuration = () => {
-    return calculateWorkingDays(ticket.startDate, ticket.endDate);
+    // Calculate adjusted duration based on effort and velocity
+    const effort = ticket.effortDays || resolveEffortDays(ticket);
+    const assignedDev = teamMembers.find(m => m.name === ticket.assignedTo);
+    const velocity = assignedDev?.velocityMultiplier ?? 1;
+    return Math.max(1, Math.round(effort / velocity));
   };
 
   // Get unique team member names for dropdown
@@ -246,7 +249,7 @@ export function TicketDetailsPanel({
                 const velocity = assignedDev?.velocityMultiplier ?? 1;
                 
                 // Calculate velocity-adjusted duration in working days
-                const adjustedDuration = Math.ceil(value / velocity);
+                const adjustedDuration = Math.max(1, Math.round(value / velocity));
                 
                 // Calculate end date using working days (skips weekends)
                 const newEndDate = calculateEndDate(ticket.startDate, adjustedDuration - 1);
@@ -464,7 +467,7 @@ export function TicketDetailsPanel({
           <div className="pt-4 border-t border-gray-200/50 space-y-3">
             <div className="flex items-center justify-between text-sm leading-relaxed">
               <span className="text-gray-500">Duration</span>
-              <span className="font-normal text-gray-900">{getDuration()} days</span>
+              <span className="font-normal text-gray-900">{getDuration()} working days</span>
             </div>
             
             <div className="flex items-center justify-between text-sm leading-relaxed">

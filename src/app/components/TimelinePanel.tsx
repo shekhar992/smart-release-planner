@@ -1423,13 +1423,10 @@ function TicketTimelineBar({
   const ptoEntries = assignedMember?.pto || [];
 
   const ticketLeft = getPositionFromDate(ticket.startDate);
-  const ticketWidth = Math.max(1, getDaysDifference(ticket.startDate, ticket.endDate) + 1) * dayWidth;
-
-  // Calculate adjusted duration (Phase 1: debug only, not affecting width yet)
+  
+  // Calculate adjusted duration based on effort and velocity
   const adjustedDuration = getAdjustedDuration(ticket, assignedMember);
-  console.debug(
-    `[AdjustedDuration] ${ticket.title}: raw=${resolveEffortDays(ticket)} adjusted=${adjustedDuration.toFixed(2)}`
-  );
+  const ticketWidth = adjustedDuration * dayWidth;
 
   // Calculate PTO impact for display
   const calculatePTOImpact = () => {
