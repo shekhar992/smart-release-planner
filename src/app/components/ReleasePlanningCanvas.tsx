@@ -112,7 +112,7 @@ export function ReleasePlanningCanvas() {
   };
 
   const handleMoveTicketToSprintById = (ticketId: string, sprintId: string) => {
-    const sprint = release?.sprints.find(s => s.id === sprintId);
+    const sprint = (release?.sprints ?? []).find(s => s.id === sprintId);
     if (!sprint) return;
     
     const featureWithTicket = release?.features.find(f => 

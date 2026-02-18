@@ -28,5 +28,5 @@ export function calculateDurationDays(
   if (!effortDays || effortDays <= 0) return 1;
 
   const rawDuration = effortDays / velocityMultiplier;
-  return Math.ceil(rawDuration); // Always round UP
+  return Math.max(1, Math.round(rawDuration));
 }
