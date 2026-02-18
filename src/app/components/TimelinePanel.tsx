@@ -681,7 +681,7 @@ function HolidayBands({
   const [hoveredHoliday, setHoveredHoliday] = useState<string | null>(null);
 
   return (
-    <div className="absolute inset-0" style={{ zIndex: 3 }}>
+    <div className="absolute inset-0" style={{ zIndex: designTokens.zIndex.holidays }}>
       {holidays.map((holiday) => {
         if (holiday.endDate < startDate || holiday.startDate > endDate) return null;
         
@@ -698,9 +698,9 @@ function HolidayBands({
             style={{
               left,
               width,
-              backgroundColor: isHovered ? '#CBD5E1' : '#E2E8F0',
-              borderLeft: '1px solid #94A3B8',
-              borderRight: '1px solid #94A3B8',
+              backgroundColor: isHovered ? designTokens.colors.overlay.holiday.secondary : designTokens.colors.overlay.holiday.primary,
+              borderLeft: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
+              borderRight: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
               pointerEvents: 'auto',
               cursor: 'help',
             }}
@@ -719,7 +719,7 @@ function HolidayBands({
                 <div 
                   className="px-2 py-1 text-[10px] font-medium rounded shadow-lg whitespace-nowrap"
                   style={{
-                    backgroundColor: 'rgba(100, 116, 139, 0.95)',
+                    backgroundColor: designTokens.colors.overlay.holiday.badge,
                     color: 'white',
                   }}
                 >
@@ -1581,7 +1581,7 @@ function TicketTimelineBar({
               ? `2px solid ${getTicketColors(ticket.status).border}`
               : `1px solid rgba(0, 0, 0, 0.08)`,
           borderRadius: designTokens.borderRadius.md,
-          zIndex: isSelected ? 2 : 1,
+          zIndex: isSelected ? designTokens.zIndex.ticketSelected : designTokens.zIndex.tickets,
           opacity: isDragging ? 0.7 : 1,
           // Enhanced shadow with glow for selection (overrides base shadow-sm)
           boxShadow: hasConflict 
