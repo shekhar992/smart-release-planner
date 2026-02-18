@@ -698,9 +698,9 @@ function HolidayBands({
             style={{
               left,
               width,
-              backgroundColor: isHovered ? 'rgba(100, 116, 139, 0.18)' : 'rgba(100, 116, 139, 0.12)',
-              borderLeft: '1px solid rgba(100, 116, 139, 0.3)',
-              borderRight: '1px solid rgba(100, 116, 139, 0.3)',
+              backgroundColor: isHovered ? '#CBD5E1' : '#E2E8F0',
+              borderLeft: '1px solid #94A3B8',
+              borderRight: '1px solid #94A3B8',
               pointerEvents: 'auto',
               cursor: 'help',
             }}
