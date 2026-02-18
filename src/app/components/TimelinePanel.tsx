@@ -662,7 +662,7 @@ function SprintBands({
   );
 }
 
-// LAYER 3: HOLIDAYS (Enhanced with diagonal pattern)
+// LAYER 3: HOLIDAYS (Vertical bars - Gantt standard)
 function HolidayBands({
   holidays,
   startDate,
@@ -678,46 +678,55 @@ function HolidayBands({
   getDaysDifference: (date1: Date, date2: Date) => number;
   dayWidth: number;
 }) {
+  const [hoveredHoliday, setHoveredHoliday] = useState<string | null>(null);
+
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 3 }}>
+    <div className="absolute inset-0" style={{ zIndex: 3 }}>
       {holidays.map((holiday) => {
         if (holiday.endDate < startDate || holiday.startDate > endDate) return null;
         
         const overlayStart = holiday.startDate < startDate ? startDate : holiday.startDate;
         const overlayEnd = holiday.endDate > endDate ? endDate : holiday.endDate;
         const left = getPositionFromDate(overlayStart);
-        const width = getDaysDifference(overlayStart, overlayEnd) * dayWidth;
+        const width = (getDaysDifference(overlayStart, overlayEnd) + 1) * dayWidth;
+        const isHovered = hoveredHoliday === holiday.id;
         
         return (
           <div
             key={holiday.id}
-            className="absolute top-0 bottom-0"
+            className="absolute top-0 bottom-0 transition-all duration-200"
             style={{
               left,
               width,
-              background: `
-                repeating-linear-gradient(
-                  45deg,
-                  rgba(100, 116, 139, 0.04),
-                  rgba(100, 116, 139, 0.04) 10px,
-                  rgba(100, 116, 139, 0.08) 10px,
-                  rgba(100, 116, 139, 0.08) 20px
-                )
-              `,
+              backgroundColor: isHovered ? 'rgba(100, 116, 139, 0.18)' : 'rgba(100, 116, 139, 0.12)',
+              borderLeft: '1px solid rgba(100, 116, 139, 0.3)',
+              borderRight: '1px solid rgba(100, 116, 139, 0.3)',
+              pointerEvents: 'auto',
+              cursor: 'help',
             }}
             title={holiday.name}
+            onMouseEnter={() => setHoveredHoliday(holiday.id)}
+            onMouseLeave={() => setHoveredHoliday(null)}
           >
-            <div className="absolute top-2 left-0 right-0 text-center">
+            {/* Hover tooltip */}
+            {isHovered && (
               <div 
-                className="inline-block px-2 py-0.5 text-[9px] font-medium rounded shadow-sm"
+                className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50"
                 style={{
-                  backgroundColor: 'rgba(100, 116, 139, 0.9)',
-                  color: 'white',
+                  pointerEvents: 'none',
                 }}
               >
-                🏖️ {holiday.name}
+                <div 
+                  className="px-2 py-1 text-[10px] font-medium rounded shadow-lg whitespace-nowrap"
+                  style={{
+                    backgroundColor: 'rgba(100, 116, 139, 0.95)',
+                    color: 'white',
+                  }}
+                >
+                  🏖️ {holiday.name}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         );
       })}
