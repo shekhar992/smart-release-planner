@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { Plus, AlertTriangle, GripVertical, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { Release, Ticket, Holiday, TeamMember } from '../data/mockData';
 import { SprintCreationPopover } from './SprintCreationPopover';
@@ -39,6 +39,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   const [showConflictSummary, setShowConflictSummary] = useState(false);
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
   const [showSprintSummary, setShowSprintSummary] = useState(false);
+  const [selectedDeveloperId, setSelectedDeveloperId] = useState<'all' | 'unassigned' | string>('all');
   
   // Refs for scroll synchronization
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -112,12 +113,45 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
     return daysFromStart * DAY_WIDTH;
   };
 
-  // Calculate total content height
-  const totalTickets = release.features.reduce((sum, f) => {
+  // Filter features/tickets based on selected developer
+  const visibleFeatures = useMemo(() => {
+    if (selectedDeveloperId === 'all') {
+      return release.features;
+    }
+
+    if (selectedDeveloperId === 'unassigned') {
+      return release.features
+        .map(feature => ({
+          ...feature,
+          tickets: feature.tickets.filter(ticket => 
+            !ticket.assignedTo || ticket.assignedTo.trim() === '' || ticket.assignedTo === 'Unassigned'
+          )
+        }))
+        .filter(feature => feature.tickets.length > 0);
+    }
+
+    // Filter by specific developer
+    const selectedMember = teamMembers.find(m => m.id === selectedDeveloperId);
+    if (!selectedMember) {
+      return release.features;
+    }
+
+    return release.features
+      .map(feature => ({
+        ...feature,
+        tickets: feature.tickets.filter(ticket => 
+          ticket.assignedTo === selectedMember.name
+        )
+      }))
+      .filter(feature => feature.tickets.length > 0);
+  }, [release.features, selectedDeveloperId, teamMembers]);
+
+  // Calculate total content height using visible features
+  const totalTickets = visibleFeatures.reduce((sum, f) => {
     const isCollapsed = collapsedFeatures.has(f.id);
     return sum + (isCollapsed ? 0 : f.tickets.length);
   }, 0);
-  const totalFeatures = release.features.length;
+  const totalFeatures = visibleFeatures.length;
   const contentHeight = (totalFeatures * FEATURE_HEADER_HEIGHT) + (totalTickets * ROW_HEIGHT);
 
   return (
@@ -192,6 +226,9 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             onToggleConflictSummary={setShowConflictSummary}
             onAddSprint={() => setShowSprintCreation(true)}
             onViewConflictDetails={onViewConflictDetails}
+            teamMembers={teamMembers}
+            selectedDeveloperId={selectedDeveloperId}
+            onChangeDeveloper={setSelectedDeveloperId}
           />
         </div>
 
@@ -252,7 +289,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
           style={{ width: SIDEBAR_WIDTH, minWidth: SIDEBAR_WIDTH }}
           onScroll={handleSidebarScroll}
         >
-          {release.features.map((feature, featureIndex) => {
+          {visibleFeatures.map((feature, featureIndex) => {
             const isCollapsed = collapsedFeatures.has(feature.id);
             const ticketCount = feature.tickets.length;
             
@@ -378,7 +415,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             )}
 
             {/* LAYER 4: TICKET BARS - Rendered in natural flow matching sidebar */}
-            {release.features.map((feature) => {
+            {visibleFeatures.map((feature) => {
               const isCollapsed = collapsedFeatures.has(feature.id);
               
               return (
@@ -1173,7 +1210,10 @@ function TimelineSidebarHeader({
   showConflictSummary,
   onToggleConflictSummary,
   onAddSprint,
-  onViewConflictDetails
+  onViewConflictDetails,
+  teamMembers,
+  selectedDeveloperId,
+  onChangeDeveloper
 }: {
   showHolidays: boolean;
   showPTO: boolean;
@@ -1184,7 +1224,11 @@ function TimelineSidebarHeader({
   onToggleConflictSummary: (value: boolean) => void;
   onAddSprint: () => void;
   onViewConflictDetails?: () => void;
+  teamMembers: TeamMember[];
+  selectedDeveloperId: 'all' | 'unassigned' | string;
+  onChangeDeveloper: (developerId: 'all' | 'unassigned' | string) => void;
 }) {
+  const developers = teamMembers.filter(m => m.role === 'Developer');
   return (
     <div className="h-full flex flex-col">
       {/* Control Bar */}
@@ -1215,6 +1259,19 @@ function TimelineSidebarHeader({
                 PTO
               </span>
             </label>
+
+            {/* Developer Filter */}
+            <select
+              value={selectedDeveloperId}
+              onChange={(e) => onChangeDeveloper(e.target.value as 'all' | 'unassigned' | string)}
+              className="text-xs font-medium px-2 py-1 border border-gray-300 rounded bg-white hover:border-gray-400 transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400"
+            >
+              <option value="all">All Developers</option>
+              <option value="unassigned">Unassigned</option>
+              {developers.map(dev => (
+                <option key={dev.id} value={dev.id}>{dev.name}</option>
+              ))}
+            </select>
 
             {/* Conflict Summary Badge */}
             {conflictSummary.totalConflicts > 0 && (
