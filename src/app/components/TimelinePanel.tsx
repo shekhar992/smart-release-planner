@@ -681,7 +681,7 @@ function HolidayBands({
   const [hoveredHoliday, setHoveredHoliday] = useState<string | null>(null);
 
   return (
-    <div className="absolute inset-0" style={{ zIndex: designTokens.zIndex.holidays }}>
+    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: designTokens.zIndex.holidays }}>
       {holidays.map((holiday) => {
         if (holiday.endDate < startDate || holiday.startDate > endDate) return null;
         
@@ -692,41 +692,53 @@ function HolidayBands({
         const isHovered = hoveredHoliday === holiday.id;
         
         return (
-          <div
-            key={holiday.id}
-            className="absolute top-0 bottom-0 transition-all duration-200"
-            style={{
-              left,
-              width,
-              backgroundColor: isHovered ? designTokens.colors.overlay.holiday.secondary : designTokens.colors.overlay.holiday.primary,
-              borderLeft: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
-              borderRight: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
-              pointerEvents: 'auto',
-              cursor: 'help',
-            }}
-            title={holiday.name}
-            onMouseEnter={() => setHoveredHoliday(holiday.id)}
-            onMouseLeave={() => setHoveredHoliday(null)}
-          >
-            {/* Hover tooltip */}
-            {isHovered && (
-              <div 
-                className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50"
-                style={{
-                  pointerEvents: 'none',
-                }}
-              >
+          <div key={holiday.id} className="relative">
+            {/* Full-height non-interactive background shading */}
+            <div
+              className="absolute top-0 bottom-0 transition-all duration-200"
+              style={{
+                left,
+                width,
+                backgroundColor: isHovered ? designTokens.colors.overlay.holiday.secondary : designTokens.colors.overlay.holiday.primary,
+                borderLeft: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
+                borderRight: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
+              }}
+            />
+            
+            {/* Small top strip for hover interaction */}
+            <div
+              className="absolute top-0"
+              style={{
+                left,
+                width,
+                height: '24px',
+                pointerEvents: 'auto',
+                cursor: 'help',
+              }}
+              title={holiday.name}
+              onMouseEnter={() => setHoveredHoliday(holiday.id)}
+              onMouseLeave={() => setHoveredHoliday(null)}
+            >
+              {/* Hover tooltip */}
+              {isHovered && (
                 <div 
-                  className="px-2 py-1 text-[10px] font-medium rounded shadow-lg whitespace-nowrap"
+                  className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50"
                   style={{
-                    backgroundColor: designTokens.colors.overlay.holiday.badge,
-                    color: 'white',
+                    pointerEvents: 'none',
                   }}
                 >
-                  🏖️ {holiday.name}
+                  <div 
+                    className="px-2 py-1 text-[10px] font-medium rounded shadow-lg whitespace-nowrap"
+                    style={{
+                      backgroundColor: designTokens.colors.overlay.holiday.badge,
+                      color: 'white',
+                    }}
+                  >
+                    🏖️ {holiday.name}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         );
       })}
