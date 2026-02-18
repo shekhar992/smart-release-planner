@@ -70,6 +70,8 @@ export function PlanningDashboard({
         notes: m.notes,
         pto: m.pto || [],
         productId,
+        experienceLevel: m.experienceLevel ?? 'Mid',
+        velocityMultiplier: m.velocityMultiplier ?? 1.0,
       }));
       saveTeamMembers([...existingTeam, ...newMembers]);
     }

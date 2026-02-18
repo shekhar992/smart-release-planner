@@ -33,9 +33,23 @@ generate_resume.py
 RES.md
 .venv/
 
-# Testing and documentation files
+# Documentation and generated files - excluded from git
+docs/
+guidelines/
+sample-data/
+sample-import-data/
+tools/
 audit-mock-data.ts
 *_old_backup.*
 MOCK_DATA_SUMMARY.md
-docs/SENIOR_UIUX_DESIGN_CRITIQUE.md
-docs/TIMELINE_CANVAS_ARCHITECTURE.md
+*.pptx
+*.xlsx
+*.docx
+*.pdf
+
+# Context and chat documentation files
+*ChatGPT*.md
+*ChatgPT*.md
+*context.md
+*Context.md
+*Tilldate*.md

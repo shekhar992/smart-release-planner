@@ -1,9 +1,0 @@
-id,name,startDate,endDate
-s1,Sprint 1 - Foundation,2026-02-10,2026-02-21
-s2,Sprint 2 - Core Features,2026-02-24,2026-03-07
-s3,Sprint 3 - UI Polish,2026-03-10,2026-03-21
-s4,Sprint 4 - Integration,2026-03-24,2026-04-04
-s5,Sprint 5 - Testing & Bug Fixes,2026-04-07,2026-04-18
-s6,Sprint 6 - Performance,2026-04-21,2026-05-02
-s7,Sprint 7 - Documentation,2026-05-05,2026-05-16
-s8,Sprint 8 - Release Prep,2026-05-19,2026-05-30

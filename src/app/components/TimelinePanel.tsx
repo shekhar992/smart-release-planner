@@ -1,8 +1,8 @@
 import { useState, useRef, useMemo } from 'react';
-import { Plus, AlertTriangle, GripVertical, ChevronDown, ChevronUp, Copy } from 'lucide-react';
+import { Plus, AlertTriangle, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { Release, Ticket, Holiday, TeamMember } from '../data/mockData';
 import { SprintCreationPopover } from './SprintCreationPopover';
-import { TicketConflict, ConflictSummary, hasConflict, getTicketConflicts } from '../lib/conflictDetection';
+import { TicketConflict, ConflictSummary, hasConflict } from '../lib/conflictDetection';
 import { SprintCapacity, getCapacityStatusColor } from '../lib/capacityCalculation';
 import designTokens, { getTicketColors, getConflictColors } from '../lib/designTokens';
 import { TruncatedText } from './Tooltip';
@@ -718,7 +718,7 @@ function HolidayBands({
   const [hoveredHoliday, setHoveredHoliday] = useState<string | null>(null);
 
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: designTokens.zIndex.holidays }}>
+    <div className="absolute inset-0" style={{ zIndex: designTokens.zIndex.holidays }}>
       {holidays.map((holiday) => {
         if (holiday.endDate < startDate || holiday.startDate > endDate) return null;
         
@@ -739,6 +739,7 @@ function HolidayBands({
                 backgroundColor: isHovered ? designTokens.colors.overlay.holiday.secondary : designTokens.colors.overlay.holiday.primary,
                 borderLeft: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
                 borderRight: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
+                pointerEvents: 'none',
               }}
             />
             
@@ -751,6 +752,7 @@ function HolidayBands({
                 height: '24px',
                 pointerEvents: 'auto',
                 cursor: 'help',
+                backgroundColor: isHovered ? designTokens.colors.overlay.holiday.secondary : 'transparent',
               }}
               title={holiday.name}
               onMouseEnter={() => setHoveredHoliday(holiday.id)}
@@ -1457,7 +1459,6 @@ function TicketSidebarRow({
 function TicketTimelineBar({
   ticket,
   featureId: _featureId,
-  featureName,
   rowHeight,
   dayWidth,
   getPositionFromDate,
@@ -1465,12 +1466,9 @@ function TicketTimelineBar({
   isSelected,
   onSelect,
   onMove,
-  onResize,
-  onClone,
   showPTO,
   startDate: _startDate,
   hasConflict,
-  conflicts,
   teamMembers,
   isLastInFeature: _isLastInFeature
 }: {
@@ -1505,20 +1503,6 @@ function TicketTimelineBar({
   // Calculate adjusted duration based on effort and velocity
   const adjustedDuration = getAdjustedDuration(ticket, assignedMember);
   const ticketWidth = adjustedDuration * dayWidth;
-
-  // Calculate PTO impact for display
-  const calculatePTOImpact = () => {
-    let ptoDaysInTicket = 0;
-    ptoEntries.forEach(pto => {
-      if (pto.endDate < ticket.startDate || pto.startDate > ticket.endDate) return;
-      const overlapStart = pto.startDate < ticket.startDate ? ticket.startDate : pto.startDate;
-      const overlapEnd = pto.endDate > ticket.endDate ? ticket.endDate : pto.endDate;
-      ptoDaysInTicket += Math.max(1, getDaysDifference(overlapStart, overlapEnd) + 1);
-    });
-    return ptoDaysInTicket;
-  };
-  
-  const ptoDays = showPTO ? calculatePTOImpact() : 0;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
