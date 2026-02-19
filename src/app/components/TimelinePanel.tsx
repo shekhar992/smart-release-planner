@@ -706,29 +706,11 @@ function SprintBands({
   getDaysDifference: (date1: Date, date2: Date) => number;
   dayWidth: number;
 }) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
   return (
     <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 2 }}>
       {sprints.map((sprint, index) => {
         const left = getPositionFromDate(sprint.startDate);
         const width = getDaysDifference(sprint.startDate, sprint.endDate) * dayWidth;
-        
-        // Check if sprint is current (today falls within sprint dates)
-        const sprintStart = new Date(sprint.startDate);
-        const sprintEnd = new Date(sprint.endDate);
-        sprintStart.setHours(0, 0, 0, 0);
-        sprintEnd.setHours(0, 0, 0, 0);
-        const isCurrent = today >= sprintStart && today <= sprintEnd;
-        
-        // Calculate progress percentage for current sprint
-        let progressPercent = 0;
-        if (isCurrent) {
-          const totalDays = getDaysDifference(sprintStart, sprintEnd);
-          const elapsedDays = getDaysDifference(sprintStart, today);
-          progressPercent = (elapsedDays / totalDays) * 100;
-        }
         
         return (
           <div
@@ -743,36 +725,7 @@ function SprintBands({
               borderLeft: `1px solid rgba(59, 130, 246, 0.08)`,
               borderRight: `1px solid rgba(59, 130, 246, 0.08)`,
             }}
-          >
-            {/* Current sprint progress overlay */}
-            {isCurrent && progressPercent > 0 && (
-              <div
-                className="absolute top-0 bottom-0 left-0"
-                style={{
-                  width: `${progressPercent}%`,
-                  background: `linear-gradient(to right, 
-                    rgba(59, 130, 246, 0.08), 
-                    rgba(59, 130, 246, 0.04)
-                  )`,
-                  borderRight: `2px solid ${designTokens.colors.sprint.primary}`,
-                  boxShadow: `2px 0 8px rgba(59, 130, 246, 0.2)`,
-                  zIndex: 1,
-                }}
-              >
-                {/* Progress indicator badge */}
-                <div
-                  className="absolute top-2 right-0 transform translate-x-1/2 text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap"
-                  style={{
-                    backgroundColor: designTokens.colors.sprint.primary,
-                    color: '#FFFFFF',
-                    boxShadow: designTokens.shadows.sm,
-                  }}
-                >
-                  {Math.round(progressPercent)}%
-                </div>
-              </div>
-            )}
-          </div>
+          />
         );
       })}
     </div>
