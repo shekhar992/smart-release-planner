@@ -98,6 +98,62 @@ function countWorkingDays(startDate: Date, endDate: Date): number {
   return count;
 }
 
+function toLocalDateKey(date: Date): string {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function buildHolidayWorkingDaySet(holidays: Holiday[], start: Date, end: Date): Set<string> {
+  const set = new Set<string>();
+  const rangeStart = new Date(start);
+  const rangeEnd = new Date(end);
+  rangeStart.setHours(0, 0, 0, 0);
+  rangeEnd.setHours(0, 0, 0, 0);
+
+  for (const holiday of holidays) {
+    const hs = new Date(holiday.startDate);
+    const he = new Date(holiday.endDate);
+    hs.setHours(0, 0, 0, 0);
+    he.setHours(0, 0, 0, 0);
+
+    const overlapStart = new Date(Math.max(hs.getTime(), rangeStart.getTime()));
+    const overlapEnd = new Date(Math.min(he.getTime(), rangeEnd.getTime()));
+    if (overlapStart > overlapEnd) continue;
+
+    const cursor = new Date(overlapStart);
+    while (cursor <= overlapEnd) {
+      if (!isWeekend(cursor)) {
+        set.add(toLocalDateKey(cursor));
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
+
+  return set;
+}
+
+function countWorkingDaysExcludingSet(startDate: Date, endDate: Date, excluded: Set<string>): number {
+  let count = 0;
+  const current = new Date(startDate);
+  current.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+
+  while (current <= end) {
+    if (!isWeekend(current)) {
+      const key = toLocalDateKey(current);
+      if (!excluded.has(key)) count++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return count;
+}
+
 /**
  * Check if two date ranges overlap
  */
@@ -144,15 +200,8 @@ export function calculateSprintCapacity(
   const workingDays = countWorkingDays(sprint.startDate, sprint.endDate);
   
   // Calculate holiday days that fall within sprint (excluding weekends)
-  let holidayDays = 0;
-  holidays.forEach(holiday => {
-    holidayDays += countOverlapWorkingDays(
-      sprint.startDate,
-      sprint.endDate,
-      holiday.startDate,
-      holiday.endDate
-    );
-  });
+  const holidayWorkingDays = buildHolidayWorkingDaySet(holidays, sprint.startDate, sprint.endDate);
+  const holidayDays = holidayWorkingDays.size;
   
   // Find all developers working in this sprint
   const sprintTickets = tickets.filter(ticket => isTicketInSprint(ticket, sprint));
@@ -168,12 +217,10 @@ export function calculateSprintCapacity(
     const member = teamMembers.find(m => m.name === devName);
     if (member && member.pto) {
       member.pto.forEach(pto => {
-        ptoDays += countOverlapWorkingDays(
-          sprint.startDate,
-          sprint.endDate,
-          pto.startDate,
-          pto.endDate
-        );
+        if (!datesOverlap(pto.startDate, pto.endDate, sprint.startDate, sprint.endDate)) return;
+        const overlapStart = pto.startDate > sprint.startDate ? pto.startDate : sprint.startDate;
+        const overlapEnd = pto.endDate < sprint.endDate ? pto.endDate : sprint.endDate;
+        ptoDays += countWorkingDaysExcludingSet(overlapStart, overlapEnd, holidayWorkingDays);
       });
     }
   });

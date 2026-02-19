@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X } from 'lucide-react';
+import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, AlertTriangle } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { WorkloadModal } from './WorkloadModal';
@@ -14,6 +14,7 @@ import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpd
 import { calculateEffortFromDates } from '../lib/dateUtils';
 import { calculateDurationDays } from '../lib/durationCalculator';
 import { addDays } from 'date-fns';
+import { exportReleaseTimelinePptx } from '../lib/exporters/exportReleaseTimelinePptx';
 
 export function ReleasePlanningCanvas() {
   const { releaseId } = useParams();
@@ -21,12 +22,24 @@ export function ReleasePlanningCanvas() {
   
   // Initialize localStorage with mock data if empty (only once)
   const [initialized, setInitialized] = useState(false);
+  const [teamMembersRefreshKey, setTeamMembersRefreshKey] = useState(0);
+  
   useEffect(() => {
     if (!initialized) {
       initializeStorage(mockProducts, mockHolidays, mockTeamMembers);
       setInitialized(true);
     }
   }, [initialized]);
+
+  // Listen for team members updates (from PTO Calendar, etc.)
+  useEffect(() => {
+    const handleTeamMembersUpdate = () => {
+      setTeamMembersRefreshKey(prev => prev + 1);
+    };
+
+    window.addEventListener('teamMembersUpdated', handleTeamMembersUpdate);
+    return () => window.removeEventListener('teamMembersUpdated', handleTeamMembersUpdate);
+  }, []);
   
   // Load products, holidays, and team members from localStorage or use mock data
   const products = useMemo(() => loadProducts() || mockProducts, [initialized]);
@@ -45,7 +58,7 @@ export function ReleasePlanningCanvas() {
     const stored = loadTeamMembersByProduct(productId);
     if (stored && stored.length > 0) return stored;
     return getTeamMembersByProduct(productId, mockTeamMembers);
-  }, [initialized, releaseData]);
+  }, [initialized, releaseData, teamMembersRefreshKey]);
   
   // Find the specific release
   const currentRelease = useMemo(() => {
@@ -66,8 +79,12 @@ export function ReleasePlanningCanvas() {
   const [draftReleaseName, setDraftReleaseName] = useState('');
   const [draftStartDate, setDraftStartDate] = useState('');
   const [draftEndDate, setDraftEndDate] = useState('');
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [showSprintCreation, setShowSprintCreation] = useState(false);
 
   // SCENARIO SIMULATION STATE (Phase 1)
+  // Feature flag: disabled per user request
+  const SCENARIO_ENABLED = false;
   const [scenarioMode, setScenarioMode] = useState(false);
   const [scenarioOverrides, setScenarioOverrides] = useState({
     removedDevelopers: [] as string[],
@@ -200,18 +217,33 @@ export function ReleasePlanningCanvas() {
     return detectConflicts(allTickets);
   }, [allTickets]);
 
-  const conflictSummary = useMemo(() => {
-    return getConflictSummary(conflicts, allTickets);
-  }, [conflicts, allTickets]);
-
   // Enhanced conflicts with suggestions
   const enhancedConflicts = useMemo(() => {
+    // Get the latest end date from sprints to determine timeline end
+    const timelineEndDate = release?.sprints.length 
+      ? new Date(Math.max(...release.sprints.map(s => s.endDate.getTime())))
+      : undefined;
+    
     return detectEnhancedConflicts(
       allTickets,
       release?.sprints,
-      teamMembers
+      teamMembers,
+      timelineEndDate
     );
   }, [allTickets, release?.sprints, teamMembers]);
+
+  const conflictSummary = useMemo(() => {
+    const baseSummary = getConflictSummary(conflicts, allTickets);
+    
+    // Add overflow conflicts count from enhanced conflicts
+    const overflowCount = enhancedConflicts.filter(c => c.type === 'timelineOverflow').length;
+    
+    return {
+      ...baseSummary,
+      timelineOverflowConflicts: overflowCount,
+      totalConflicts: baseSummary.totalConflicts + overflowCount,
+    };
+  }, [conflicts, allTickets, enhancedConflicts]);
 
   // SCENARIO SIMULATION: Derive team members for capacity calculations
   const derivedTeamMembers = useMemo(() => {
@@ -514,6 +546,16 @@ export function ReleasePlanningCanvas() {
     });
   };
 
+  const handleExportPPTX = async () => {
+    if (!release) return;
+    try {
+      await exportReleaseTimelinePptx(release);
+    } catch (error) {
+      console.error('PPTX export failed:', error);
+      alert('Export failed. Please check the console for details.');
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-[#F7F8FA]">
       {/* Top Navigation Bar */}
@@ -547,90 +589,182 @@ export function ReleasePlanningCanvas() {
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Storage indicator */}
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-md text-xs text-green-700 mr-2">
-            <Database className="w-3.5 h-3.5" />
-            <span>
-              Data saved
-              {lastSaved && (
-                <span className="ml-1 text-green-600">
-                  • {lastSaved.toLocaleTimeString()}
-                </span>
-              )}
-            </span>
+        <div className="flex items-center gap-3">
+          {/* Storage indicator - subtle */}
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted border border-border rounded text-[11px] text-muted-foreground">
+            <Database className="w-3 h-3" />
+            {lastSaved && (
+              <span>
+                {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
           </div>
           
-          <button
-            onClick={handleResetStorage}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-md transition-colors"
-            title="Reset to original mock data"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            Reset
-          </button>
-
+          {/* Primary CTA */}
           <button
             onClick={() => setShowTicketCreation({})}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-sm hover:shadow-md"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-primary-foreground bg-primary hover:bg-primary-hover rounded-md transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
             <span>New Ticket</span>
           </button>
 
-          <button
-            onClick={() => setShowBulkImport({})}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all border border-gray-200 hover:border-gray-300"
-          >
-            <Upload className="w-4 h-4" />
-            <span>Import Tickets</span>
-          </button>
-          
-          <button
-            onClick={() => navigate(`/product/${releaseData.id}/team`)}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all border border-transparent hover:border-gray-200"
-          >
-            <Users className="w-4 h-4" />
-            <span>Team Roster</span>
-          </button>
-          <button
-            onClick={() => navigate(`/release/${releaseId}/team/holidays`)}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-all border border-transparent hover:border-gray-200"
-          >
-            <Calendar className="w-4 h-4" />
-            <span>Holidays</span>
-          </button>
+          {/* Alerts - Shown when conflicts exist */}
+          {conflictSummary.totalConflicts > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowConflictResolution(true)}
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-all text-sm font-medium hover:shadow-sm"
+                style={{
+                  backgroundColor: 'rgba(251, 192, 45, 0.15)',
+                  border: '1px solid rgba(251, 192, 45, 0.3)',
+                  color: '#b45309',
+                }}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Alerts</span>
+                <div className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{
+                  backgroundColor: '#b45309',
+                  color: 'white',
+                }}>
+                  {conflictSummary.totalConflicts}
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* Actions Menu (overflow) */}
+          <div className="relative">
+            <button
+              onClick={() => setShowActionsMenu(!showActionsMenu)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-foreground hover:bg-muted rounded-md transition-colors border border-border"
+            >
+              <span>Actions</span>
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+            
+            {showActionsMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowActionsMenu(false)}
+                />
+                <div className="absolute right-0 mt-1 w-56 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
+                  <button
+                    onClick={() => {
+                      setShowSprintCreation(true);
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Sprint</span>
+                  </button>
+                  <div className="my-1 border-t border-border" />
+                  <button
+                    onClick={() => {
+                      setShowBulkImport({});
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <Upload className="w-4 h-4" />
+                    <span>Import Tickets</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleExportPPTX();
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <FileDown className="w-4 h-4" />
+                    <span>Export PPTX</span>
+                  </button>
+                  <div className="my-1 border-t border-border" />
+                  <button
+                    onClick={() => {
+                      navigate(`/product/${releaseData.id}/team`);
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>Team Roster</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      navigate(`/release/${releaseId}/team/holidays`);
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Holidays</span>
+                  </button>
+                  {SCENARIO_ENABLED && (
+                    <>
+                      <div className="my-1 border-t border-border" />
+                      <button
+                        onClick={() => {
+                          setScenarioMode(!scenarioMode);
+                          if (scenarioMode) {
+                            // Reset overrides when turning off
+                            setScenarioOverrides({
+                              removedDevelopers: [],
+                              velocityOverrides: {},
+                              scopeDeltaDays: 0
+                            });
+                          }
+                          setShowActionsMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left"
+                        style={{
+                          backgroundColor: scenarioMode ? 'rgba(251, 192, 45, 0.1)' : 'transparent',
+                          color: scenarioMode ? '#b45309' : 'inherit'
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!scenarioMode) {
+                            e.currentTarget.style.backgroundColor = 'var(--muted)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!scenarioMode) {
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
+                      >
+                        <Beaker className="w-4 h-4" />
+                        <span>Scenario Mode</span>
+                        {scenarioMode && <span className="ml-1 text-xs">(Active)</span>}
+                      </button>
+                    </>
+                  )}
+                  <div className="my-1 border-t border-border" />
+                  <button
+                    onClick={() => {
+                      handleResetStorage();
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset to Demo Data</span>
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* SCENARIO SIMULATION CONTROLS */}
-      <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
+      {/* SCENARIO SIMULATION CONTROLS - Only shown when scenario mode is active */}
+      {SCENARIO_ENABLED && scenarioMode && (
+      <div className="border-b border-gray-200 bg-amber-50/30 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                setScenarioMode(!scenarioMode);
-                if (scenarioMode) {
-                  // Reset overrides when turning off
-                  setScenarioOverrides({
-                    removedDevelopers: [],
-                    velocityOverrides: {},
-                    scopeDeltaDays: 0
-                  });
-                }
-              }}
-              className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-                scenarioMode
-                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              <Beaker className="w-4 h-4" />
-              <span>Scenario Mode</span>
-              {scenarioMode && <span className="ml-1 text-xs">(Active)</span>}
-            </button>
-
-            {scenarioMode && (
+            {/* Scenario controls - always shown when mode is active */}
+            {(
               <div className="flex items-center gap-3 pl-3 border-l border-gray-300">
                 {/* Remove Developers */}
                 <div className="flex flex-col gap-1">
@@ -755,19 +889,16 @@ export function ReleasePlanningCanvas() {
             )}
           </div>
 
-          {scenarioMode && (
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-md">
-              <Beaker className="w-3.5 h-3.5 text-yellow-700" />
-              <span className="text-xs font-semibold text-yellow-800">Scenario Simulation Active</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 border border-amber-300 rounded-md">
+            <Beaker className="w-3.5 h-3.5 text-amber-700" />
+            <span className="text-xs font-semibold text-amber-800">Scenario Mode Active</span>
+          </div>
         </div>
       </div>
+      )}
 
       {/* Main Canvas */}
-      <div className={`flex-1 overflow-hidden ${
-        scenarioMode ? 'ring-2 ring-yellow-300 ring-inset' : ''
-      }`}>
+      <div className="flex-1 overflow-hidden">
         <TimelinePanel
           release={release}
           holidays={holidays}
@@ -780,9 +911,9 @@ export function ReleasePlanningCanvas() {
           onUpdateSprint={handleUpdateSprint}
           onDeleteSprint={handleDeleteSprint}
           conflicts={conflicts}
-          conflictSummary={conflictSummary}
           sprintCapacities={sprintCapacities}
-          onViewConflictDetails={() => setShowConflictResolution(true)}
+          showSprintCreation={showSprintCreation}
+          onShowSprintCreationChange={setShowSprintCreation}
         />
       </div>
 

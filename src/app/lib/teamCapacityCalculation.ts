@@ -80,6 +80,79 @@ function calculatePTOOverlap(
   return calculateWorkingDays(overlapStart, overlapEnd);
 }
 
+function toLocalDateKey(date: Date): string {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function buildHolidayWorkingDaySet(
+  holidays: Holiday[],
+  rangeStart: Date,
+  rangeEnd: Date
+): Set<string> {
+  const set = new Set<string>();
+  const start = new Date(rangeStart);
+  const end = new Date(rangeEnd);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  for (const holiday of holidays) {
+    const hs = new Date(holiday.startDate);
+    const he = new Date(holiday.endDate);
+    hs.setHours(0, 0, 0, 0);
+    he.setHours(0, 0, 0, 0);
+
+    const overlapStart = new Date(Math.max(hs.getTime(), start.getTime()));
+    const overlapEnd = new Date(Math.min(he.getTime(), end.getTime()));
+    if (overlapStart > overlapEnd) continue;
+
+    const cursor = new Date(overlapStart);
+    while (cursor <= overlapEnd) {
+      const dow = cursor.getDay();
+      if (dow !== 0 && dow !== 6) {
+        set.add(toLocalDateKey(cursor));
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+  }
+
+  return set;
+}
+
+function calculatePTOOverlapExcludingHolidays(
+  ptoStart: Date,
+  ptoEnd: Date,
+  sprintStart: Date,
+  sprintEnd: Date,
+  holidayWorkingDays: Set<string>
+): number {
+  const overlapStart = new Date(Math.max(ptoStart.getTime(), sprintStart.getTime()));
+  const overlapEnd = new Date(Math.min(ptoEnd.getTime(), sprintEnd.getTime()));
+
+  if (overlapStart > overlapEnd) return 0;
+
+  let count = 0;
+  const cursor = new Date(overlapStart);
+  cursor.setHours(0, 0, 0, 0);
+  const end = new Date(overlapEnd);
+  end.setHours(0, 0, 0, 0);
+
+  while (cursor <= end) {
+    const dow = cursor.getDay();
+    if (dow !== 0 && dow !== 6) {
+      const key = toLocalDateKey(cursor);
+      if (!holidayWorkingDays.has(key)) count++;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return count;
+}
+
 /**
  * Calculate how many holidays fall within a sprint (excluding weekends)
  */
@@ -158,6 +231,8 @@ export function calculateTeamMemberCapacity(
     const sprintStart = new Date(sprint.startDate);
     const sprintEnd = new Date(sprint.endDate);
 
+    const holidayWorkingDays = buildHolidayWorkingDaySet(holidays, sprintStart, sprintEnd);
+
     // Calculate working days in sprint
     const workingDays = calculateWorkingDays(sprintStart, sprintEnd);
 
@@ -167,11 +242,12 @@ export function calculateTeamMemberCapacity(
     
     if (member.pto) {
       for (const pto of member.pto) {
-        const overlapDays = calculatePTOOverlap(
+        const overlapDays = calculatePTOOverlapExcludingHolidays(
           pto.startDate,
           pto.endDate,
           sprintStart,
-          sprintEnd
+          sprintEnd,
+          holidayWorkingDays
         );
         
         if (overlapDays > 0) {

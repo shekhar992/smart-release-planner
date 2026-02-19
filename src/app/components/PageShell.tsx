@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router';
 import { Layers, Home } from 'lucide-react';
+import { UpcomingFeaturesPanel } from './UpcomingFeaturesPanel';
 
 interface Breadcrumb {
   label: string;
@@ -70,11 +71,13 @@ export function PageShell({ children, breadcrumbs, actions, flush = false }: Pag
           </div>
 
           {/* Right: Actions */}
-          {actions && (
-            <div className="flex items-center gap-2 shrink-0">
-              {actions}
-            </div>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Upcoming Features - always visible */}
+            <UpcomingFeaturesPanel />
+            
+            {/* Custom actions */}
+            {actions}
+          </div>
         </div>
       </header>
 

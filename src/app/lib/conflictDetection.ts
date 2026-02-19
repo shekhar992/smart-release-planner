@@ -33,21 +33,26 @@ export interface ConflictSummary {
   overlapConflicts?: number;
   developerOverloadConflicts?: number;
   sprintOverCapacityConflicts?: number;
+  timelineOverflowConflicts?: number;
 }
 
 // Enhanced Conflict Type with Suggestions
 export interface Conflict {
   ticketId: string;
   developer: string;
-  type: "overlap" | "developerOverload" | "sprintOverCapacity";
+  type: "overlap" | "developerOverload" | "sprintOverCapacity" | "timelineOverflow";
   severity: "high" | "medium" | "low";
   message: string;
   impactedDays?: number;
   conflictingTickets?: string[];
+  overflowDays?: number;
   suggestions?: {
     possibleReassignments?: string[];
     possibleSprintMoves?: string[];
     possibleShiftDays?: number[];
+    extendTimeline?: boolean;
+    reduceScope?: boolean;
+    splitTicket?: boolean;
   };
 }
 
@@ -157,7 +162,8 @@ export function getConflictSummary(conflicts: Map<string, TicketConflict>, ticke
     conflictsByDeveloper: conflictsByDev,
     overlapConflicts: conflicts.size, // All current conflicts are overlaps
     developerOverloadConflicts: 0,
-    sprintOverCapacityConflicts: 0
+    sprintOverCapacityConflicts: 0,
+    timelineOverflowConflicts: 0
   };
 }
 
@@ -217,7 +223,8 @@ export function getTicketConflicts(ticketId: string, conflicts: Map<string, Tick
 export function detectEnhancedConflicts(
   tickets: Ticket[],
   sprints?: Array<{ id: string; startDate: Date; endDate: Date }>,
-  teamMembers?: Array<{ name: string }>
+  teamMembers?: Array<{ name: string; experienceLevel?: string; velocityMultiplier?: number }>,
+  timelineEndDate?: Date
 ): Conflict[] {
   const conflicts: Conflict[] = [];
   
@@ -230,7 +237,7 @@ export function detectEnhancedConflicts(
     ticketsByDeveloper.set(ticket.assignedTo, devTickets);
   });
   
-  // Check for overlaps within each developer's workload
+  // 1. Check for overlaps within each developer's workload
   ticketsByDeveloper.forEach((devTickets, developer) => {
     for (let i = 0; i < devTickets.length; i++) {
       const ticket1 = devTickets[i];
@@ -282,6 +289,52 @@ export function detectEnhancedConflicts(
     }
   });
   
+  // 2. Check for timeline overflow (tickets extending beyond end date)
+  if (timelineEndDate) {
+    tickets.forEach(ticket => {
+      // Calculate adjusted duration based on velocity
+      const assignedMember = teamMembers?.find(tm => tm.name === ticket.assignedTo);
+      const velocityMultiplier = assignedMember?.velocityMultiplier ?? 1;
+      const effortDays = (ticket as any).effortDays ?? ticket.storyPoints ?? 1;
+      const adjustedDuration = Math.ceil(effortDays / velocityMultiplier);
+      
+      // Calculate when ticket would actually end
+      const actualEndDate = new Date(ticket.startDate);
+      actualEndDate.setDate(actualEndDate.getDate() + adjustedDuration);
+      
+      // Check if it overflows beyond timeline
+      if (actualEndDate > timelineEndDate) {
+        const overflowDays = Math.ceil(
+          (actualEndDate.getTime() - timelineEndDate.getTime()) / (1000 * 60 * 60 * 24)
+        );
+        
+        // Compute overflow-specific suggestions
+        const suggestions = computeOverflowSuggestions(
+          ticket,
+          overflowDays,
+          assignedMember,
+          teamMembers,
+          sprints
+        );
+        
+        // Severity based on how much it overflows
+        const severity: "high" | "medium" | "low" = 
+          overflowDays > 5 ? "high" :
+          overflowDays > 2 ? "medium" : "low";
+        
+        conflicts.push({
+          ticketId: ticket.id,
+          developer: ticket.assignedTo || 'Unassigned',
+          type: "timelineOverflow",
+          severity,
+          message: `${ticket.title} extends ${overflowDays} day${overflowDays > 1 ? 's' : ''} beyond timeline end`,
+          overflowDays,
+          suggestions
+        });
+      }
+    });
+  }
+  
   return conflicts;
 }
 
@@ -294,7 +347,7 @@ function computeSuggestions(
   allTickets: Ticket[],
   ticketsByDeveloper: Map<string, Ticket[]>,
   sprints?: Array<{ id: string; startDate: Date; endDate: Date }>,
-  teamMembers?: Array<{ name: string }>
+  teamMembers?: Array<{ name: string; experienceLevel?: string; velocityMultiplier?: number }>
 ): {
   possibleReassignments?: string[];
   possibleSprintMoves?: string[];
@@ -365,6 +418,70 @@ function computeSuggestions(
   
   if (shiftOptions.length > 0) {
     suggestions.possibleShiftDays = shiftOptions;
+  }
+  
+  return suggestions;
+}
+
+/**
+ * Compute suggestions for resolving timeline overflow
+ */
+function computeOverflowSuggestions(
+  ticket: Ticket,
+  overflowDays: number,
+  assignedMember: any,
+  teamMembers?: Array<{ name: string; experienceLevel?: string; velocityMultiplier?: number }>,
+  sprints?: Array<{ id: string; startDate: Date; endDate: Date }>
+): {
+  possibleReassignments?: string[];
+  possibleSprintMoves?: string[];
+  extendTimeline?: boolean;
+  reduceScope?: boolean;
+  splitTicket?: boolean;
+} {
+  const suggestions: any = {};
+  
+  // 1. Suggest extending the timeline
+  suggestions.extendTimeline = true;
+  
+  // 2. Suggest reducing scope if ticket has high effort
+  const effortDays = (ticket as any).effortDays ?? ticket.storyPoints ?? 1;
+  if (effortDays > 3) {
+    suggestions.reduceScope = true;
+  }
+  
+  // 3. Suggest splitting if ticket is large
+  if (effortDays > 5) {
+    suggestions.splitTicket = true;
+  }
+  
+  // 4. Find faster developers (higher velocity multiplier)
+  if (teamMembers && teamMembers.length > 0 && assignedMember) {
+    const currentVelocity = assignedMember.velocityMultiplier ?? 1;
+    const fasterDevs = teamMembers
+      .filter(tm => {
+        const velocity = tm.velocityMultiplier ?? 1;
+        return velocity > currentVelocity && tm.name !== ticket.assignedTo;
+      })
+      .sort((a, b) => (b.velocityMultiplier ?? 1) - (a.velocityMultiplier ?? 1))
+      .map(tm => tm.name)
+      .slice(0, 3);
+    
+    if (fasterDevs.length > 0) {
+      suggestions.possibleReassignments = fasterDevs;
+    }
+  }
+  
+  // 5. Suggest moving to earlier sprint to start sooner
+  if (sprints && sprints.length > 0) {
+    const currentSprintIndex = sprints.findIndex(s => 
+      ticket.startDate >= s.startDate && ticket.startDate <= s.endDate
+    );
+    
+    if (currentSprintIndex > 0) {
+      // Suggest previous sprint to start earlier
+      suggestions.possibleSprintMoves = [sprints[currentSprintIndex - 1].id];
+    }
   }
   
   return suggestions;

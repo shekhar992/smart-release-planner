@@ -1,6 +1,6 @@
-import type { Release } from '../data/mockData';
-import { buildRoadmapTemplateDataFromRelease } from '../lib/pptxTemplate/buildTemplateData';
-import { generateRoadmapPptx } from '../lib/pptxTemplate/generatePptxFromTemplate';
+import type { Release } from '../../data/mockData';
+import { buildRoadmapTemplateDataFromRelease } from '../pptxTemplate/buildTemplateData';
+import { generateRoadmapPptx } from '../pptxTemplate/generatePptxFromTemplate';
 
 export type ExportReleaseTimelinePptxOptions = {
   fileName?: string;

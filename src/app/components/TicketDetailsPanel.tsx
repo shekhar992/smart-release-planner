@@ -1,8 +1,81 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check } from 'lucide-react';
+import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check, AlertTriangle } from 'lucide-react';
 import { Ticket, Release, TeamMember } from '../data/mockData';
 import { resolveEffortDays } from '../lib/effortResolver';
 import { calculateEndDate, calculateEndDateFromEffort, calculateEffortFromDates } from '../lib/dateUtils';
+
+// Helper: Count working days (Mon-Fri) between two dates
+function countWorkingDays(start: Date, end: Date): number {
+  let count = 0;
+  const current = new Date(start);
+  current.setHours(0, 0, 0, 0);
+  const endDate = new Date(end);
+  endDate.setHours(0, 0, 0, 0);
+  
+  while (current <= endDate) {
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday or Saturday
+      count++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
+// Helper: Check if a ticket has PTO overlap
+function getPTOOverlapInfo(ticket: Ticket, assignedMember: TeamMember | undefined) {
+  if (!assignedMember || !assignedMember.pto || assignedMember.pto.length === 0) {
+    return { hasPtoRisk: false, overlapDays: 0, overlappingPTO: [] };
+  }
+
+  const ticketStart = new Date(ticket.startDate);
+  ticketStart.setHours(0, 0, 0, 0);
+  const ticketEnd = new Date(ticket.endDate);
+  ticketEnd.setHours(0, 0, 0, 0);
+
+  const overlappingPTO: Array<{ name: string; startDate: Date; endDate: Date; workingDays: number }> = [];
+  const overlapDates = new Set<string>();
+
+  assignedMember.pto.forEach(pto => {
+    const ptoStart = new Date(pto.startDate);
+    ptoStart.setHours(0, 0, 0, 0);
+    const ptoEnd = new Date(pto.endDate);
+    ptoEnd.setHours(0, 0, 0, 0);
+
+    // Check if PTO overlaps with ticket
+    if (ptoEnd >= ticketStart && ptoStart <= ticketEnd) {
+      const overlapStart = ptoStart > ticketStart ? ptoStart : ticketStart;
+      const overlapEnd = ptoEnd < ticketEnd ? ptoEnd : ticketEnd;
+      
+      const workingDays = countWorkingDays(overlapStart, overlapEnd);
+      
+      if (workingDays > 0) {
+        overlappingPTO.push({
+          name: pto.name,
+          startDate: ptoStart,
+          endDate: ptoEnd,
+          workingDays
+        });
+
+        // Track unique overlap dates
+        const current = new Date(overlapStart);
+        while (current <= overlapEnd) {
+          const dayOfWeek = current.getDay();
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            overlapDates.add(current.toISOString().split('T')[0]);
+          }
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    }
+  });
+
+  return {
+    hasPtoRisk: overlappingPTO.length > 0,
+    overlapDays: overlapDates.size,
+    overlappingPTO
+  };
+}
 
 interface TicketDetailsPanelProps {
   ticket: Ticket;
@@ -83,6 +156,10 @@ export function TicketDetailsPanel({
       onUpdate(featureId, ticket.id, { [field]: value });
     }
   };
+
+  // Compute PTO overlap for the assigned developer
+  const assignedDeveloper = teamMembers.find(m => m.name === ticket.assignedTo);
+  const ptoOverlapInfo = getPTOOverlapInfo(ticket, assignedDeveloper);
 
   const handleDelete = () => {
     onDelete(featureId, ticket.id);
@@ -418,6 +495,53 @@ export function TicketDetailsPanel({
               ))}
             </div>
           </div>
+
+          {/* Constraints & Risks - PTO Overlap Warning */}
+          {ptoOverlapInfo.hasPtoRisk && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-amber-900 mb-2">Constraints & Risks</h3>
+                  
+                  <div className="space-y-2 text-sm text-amber-800">
+                    <p className="leading-relaxed">
+                      <strong>Assigned developer PTO overlaps this ticket by {ptoOverlapInfo.overlapDays} working day{ptoOverlapInfo.overlapDays > 1 ? 's' : ''}.</strong>
+                    </p>
+                    
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium text-amber-700">Overlapping PTO entries:</p>
+                      {ptoOverlapInfo.overlappingPTO.map((pto, idx) => (
+                        <div key={idx} className="text-xs bg-white/60 rounded px-2 py-1.5 border border-amber-200">
+                          <div className="font-medium">{pto.name}</div>
+                          <div className="text-amber-600 mt-0.5">
+                            {pto.startDate.toLocaleDateString()} - {pto.endDate.toLocaleDateString()} 
+                            <span className="ml-1">({pto.workingDays} working day{pto.workingDays > 1 ? 's' : ''})</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-amber-200">
+                      <p className="text-xs font-medium text-amber-700 mb-1.5">Schedule Risk:</p>
+                      <p className="text-xs leading-relaxed text-amber-700">
+                        May delay completion by ~{ptoOverlapInfo.overlapDays} working day{ptoOverlapInfo.overlapDays > 1 ? 's' : ''} if work is sequential for this assignee.
+                      </p>
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-amber-200">
+                      <p className="text-xs font-medium text-amber-700 mb-1.5">Suggested next steps:</p>
+                      <ul className="text-xs space-y-1 ml-4 list-disc text-amber-700">
+                        <li>Reassign to another developer</li>
+                        <li>Adjust ticket dates around PTO</li>
+                        <li>Split into smaller tickets</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Dates */}
           <div className="grid grid-cols-2 gap-4">

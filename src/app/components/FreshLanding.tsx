@@ -48,6 +48,22 @@ export function FreshLanding({ openCreateProduct: _openCreateProduct }: FreshLan
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Create a product, add your team, and generate a capacity-aware release plan.
           </p>
+
+          {/* Quick Switch to Demo */}
+          <div className="mt-8 pt-6 border-t border-border/50 max-w-md mx-auto">
+            <p className="text-sm text-muted-foreground mb-3">
+              Want to explore with sample data first?
+            </p>
+            <button
+              onClick={() => {
+                localStorage.setItem('appMode', 'demo');
+                window.location.reload();
+              }}
+              className="text-sm font-medium text-primary hover:underline hover:text-primary-hover transition-colors"
+            >
+              Switch to Demo Mode →
+            </button>
+          </div>
         </div>
 
         {/* Steps */}
@@ -103,22 +119,6 @@ export function FreshLanding({ openCreateProduct: _openCreateProduct }: FreshLan
           <p className="text-sm text-muted-foreground mt-4">
             This will take you to the dashboard where you can start building.
           </p>
-        </div>
-
-        {/* Quick Switch */}
-        <div className="mt-16 pt-8 border-t border-border text-center">
-          <p className="text-sm text-muted-foreground mb-3">
-            Want to explore with sample data first?
-          </p>
-          <button
-            onClick={() => {
-              localStorage.setItem('appMode', 'demo');
-              window.location.reload();
-            }}
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            Switch to Demo Mode
-          </button>
         </div>
       </div>
     </div>

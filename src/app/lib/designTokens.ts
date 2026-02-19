@@ -29,21 +29,21 @@ export const colors = {
   // Ticket status colors (3-shade system: bg, border, text)
   ticket: {
     planned: {
-      bg: '#DBEAFE',              // Blue 200 (stronger)
+      bg: '#93C5FD',              // Blue 300 (lighter solid filled)
       border: '#3B82F6',          // Blue 500
-      text: '#1E40AF',            // Blue 800
+      text: '#1E3A8A',            // Blue 900
       accent: '#3B82F6'           // Left border accent
     },
     'in-progress': {
-      bg: '#FDE68A',              // Amber 200 (stronger)
+      bg: '#FBBF24',              // Amber 400 (solid filled)
       border: '#F59E0B',          // Amber 500
-      text: '#92400E',            // Amber 800
+      text: '#78350F',            // Amber 900
       accent: '#F59E0B'
     },
     completed: {
-      bg: '#A7F3D0',              // Green 300 (stronger)
+      bg: '#34D399',              // Green 400 (solid filled)
       border: '#10B981',          // Green 500
-      text: '#065F46',            // Green 800
+      text: '#064E3B',            // Green 900
       accent: '#10B981'
     }
   },

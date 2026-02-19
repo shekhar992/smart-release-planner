@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { Plus, Calendar, Package, FolderPlus, Users, ChevronRight, BarChart3, Layers, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Calendar, Package, FolderPlus, Users, ChevronRight, Layers, MoreVertical, Pencil, Trash2, Sparkles } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { mockProducts, Product, Release, mockHolidays, mockTeamMembers, TeamMember } from '../data/mockData';
 import { CreateProductModal } from './CreateProductModal';
@@ -7,6 +7,7 @@ import { CreateReleaseModal } from './CreateReleaseModal';
 import { AutoReleaseModal } from './AutoReleaseModal';
 import { PageShell } from './PageShell';
 import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers } from '../lib/localStorage';
+import { ModeSwitch } from './ModeSwitch';
 
 interface PlanningDashboardProps {
   openCreateProduct?: () => void;
@@ -257,6 +258,9 @@ export function PlanningDashboard({
         />
       )}
 
+      {/* Mode Switch - Only visible on product landing page */}
+      <ModeSwitch />
+
     </PageShell>
   );
 }
@@ -415,11 +419,20 @@ function ProductCard({
           <div className="px-2 py-6 text-center">
             <p className="text-xs text-muted-foreground mb-3">No releases yet</p>
             <button
-              onClick={onNewRelease}
-              className="text-xs font-medium text-primary hover:underline"
+              onClick={onAutoGenerate}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-md transition-colors shadow-sm mb-2"
             >
-              + Create first release
+              <Sparkles className="w-3 h-3" />
+              Create Smart Release
             </button>
+            <div>
+              <button
+                onClick={onNewRelease}
+                className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
+              >
+                or create manually
+              </button>
+            </div>
           </div>
         ) : (
           <ul className="space-y-0.5">
@@ -440,16 +453,22 @@ function ProductCard({
 
       {/* Card footer */}
       <div className="flex items-center gap-1.5 px-3 pb-3 pt-1 mt-auto">
-        <Link
-          to={product.releases[0] ? `/release/${product.releases[0].id}` : '#'}
-          onClick={(e) => {
-            if (!product.releases[0]) { e.preventDefault(); onNewRelease(); }
-          }}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-secondary hover:bg-accent rounded-lg transition-colors"
+        <button
+          onClick={onAutoGenerate}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm"
+          title="AI-powered release creation"
         >
-          <BarChart3 className="w-3.5 h-3.5" />
-          Open
-        </Link>
+          <Sparkles className="w-3.5 h-3.5" />
+          Create Smart Release
+        </button>
+        <button
+          onClick={onNewRelease}
+          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-secondary hover:bg-accent rounded-lg transition-colors"
+          title="Manual release creation"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Manual
+        </button>
         <Link
           to={`/product/${product.id}/team`}
           className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-secondary hover:bg-accent rounded-lg transition-colors"
@@ -457,21 +476,6 @@ function ProductCard({
           <Users className="w-3.5 h-3.5" />
           Team
         </Link>
-        <button
-          onClick={onAutoGenerate}
-          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-indigo-600 bg-indigo-50 dark:bg-indigo-950/20 hover:bg-indigo-100 dark:hover:bg-indigo-950/30 rounded-lg transition-colors"
-          title="Auto Generate Release"
-        >
-          <BarChart3 className="w-3.5 h-3.5" />
-          AI
-        </button>
-        <button
-          onClick={onNewRelease}
-          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-primary bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Release
-        </button>
       </div>
     </div>
   );

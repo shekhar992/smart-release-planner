@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, User, ArrowLeft } from 'lucide-react';
+import { Plus, User, ArrowLeft, Calendar } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { mockTeamMembers, TeamMember, mockProducts } from '../data/mockData';
 import { loadTeamMembers, loadProducts, saveTeamMembers } from '../lib/localStorage';
@@ -84,13 +84,23 @@ export function TeamRoster() {
             </div>
           </div>
           {resolvedProductId && (
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              Add Team Member
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate(`/product/${resolvedProductId}/team/pto`)}
+                className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 text-sm font-medium border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                title="Manage PTO Calendar"
+              >
+                <Calendar className="w-4 h-4" />
+                PTO Calendar
+              </button>
+              <button
+                onClick={() => setShowAddForm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                Add Team Member
+              </button>
+            </div>
           )}
         </div>
       </div>

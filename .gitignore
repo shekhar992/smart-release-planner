@@ -28,7 +28,7 @@ dist-ssr
 .vercel
 
 # Resume files - never commit personal documents
-generate_resume.py
+*.pdf
 *Resume*.pdf
 RES.md
 .venv/

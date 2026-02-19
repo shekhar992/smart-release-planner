@@ -108,11 +108,15 @@ export function loadHolidays(): Holiday[] | null {
 
 /**
  * Save team members to localStorage
+ * Dispatches 'teamMembersUpdated' event for auto-refresh in planning views
  */
 export function saveTeamMembers(teamMembers: TeamMember[]): void {
   try {
     localStorage.setItem(STORAGE_KEYS.TEAM_MEMBERS, JSON.stringify(teamMembers));
     localStorage.setItem(STORAGE_KEYS.LAST_UPDATED, new Date().toISOString());
+    
+    // Dispatch event for auto-refresh in planning views
+    window.dispatchEvent(new Event('teamMembersUpdated'));
   } catch (error) {
     console.error('Failed to save team members to localStorage:', error);
   }

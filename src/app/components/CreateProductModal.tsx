@@ -26,7 +26,7 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
   const [members, setMembers] = useState<TeamMemberDraft[]>([
     { name: '', role: 'Developer', experienceLevel: 'Mid', notes: '' }
   ]);
-  const [inputMode, setInputMode] = useState<TeamInputMode>('manual');
+  const [inputMode, setInputMode] = useState<TeamInputMode>('csv');
   const [csvError, setCsvError] = useState<string | null>(null);
   const [csvSuccess, setCsvSuccess] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -170,7 +170,16 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
   }, [processCSVContent]);
 
   const downloadTeamTemplate = () => {
-    const csv = 'name,role,experienceLevel\nJane Doe,Developer,Senior\nJohn Smith,Designer,Mid\nAlex Johnson,QA,Mid';
+    const csv = `name,role,notes,experienceLevel
+AI Tech Lead 1,Developer,Full-stack engineer,Senior
+AI Tech Backend 1,Developer,Full-stack engineer,Senior
+AI Tech Backend 2,Developer,Full-stack engineer,Mid
+AI Tech Backend 3,Developer,Full-stack engineer,Mid
+AI Tech Backend 4,Developer,Full-stack engineer,Junior
+AI Tech Frontend 1,Developer,Full-stack engineer,Junior
+AI Tech Frontend 2,Developer,Full-stack engineer,Senior
+AI Tech Frontend 3,Developer,Full-stack engineer,Mid
+AI Tech Frontend 4,Developer,Full-stack engineer,Junior`;
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -283,17 +292,6 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
               {/* Input Mode Tabs */}
               <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-lg mb-4">
                 <button
-                  onClick={() => { setInputMode('manual'); setCsvError(null); }}
-                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
-                    inputMode === 'manual'
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  Manual Add
-                </button>
-                <button
                   onClick={() => { setInputMode('csv'); setCsvSuccess(null); }}
                   className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
                     inputMode === 'csv'
@@ -303,6 +301,17 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
                 >
                   <Upload className="w-3.5 h-3.5" />
                   Import CSV
+                </button>
+                <button
+                  onClick={() => { setInputMode('manual'); setCsvError(null); }}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
+                    inputMode === 'manual'
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  Manual Add
                 </button>
               </div>
 
@@ -423,8 +432,11 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
                   <div className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <FileText className="w-5 h-5 text-blue-600 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="text-xs text-blue-800">
-                        Need a template? Download a CSV with the correct columns.
+                      <p className="text-xs text-blue-800 font-medium mb-1">
+                        Need a template? Download a pre-filled CSV with sample data.
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        Includes 9 sample AI Tech team members with roles, experience levels, and notes. Edit and upload to bulk-import your team.
                       </p>
                     </div>
                     <button

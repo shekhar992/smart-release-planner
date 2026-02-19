@@ -1,13 +1,87 @@
-import { useState, useRef, useMemo } from 'react';
-import { Plus, AlertTriangle, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useRef, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { AlertTriangle, GripVertical, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { Release, Ticket, Holiday, TeamMember } from '../data/mockData';
 import { SprintCreationPopover } from './SprintCreationPopover';
-import { TicketConflict, ConflictSummary, hasConflict } from '../lib/conflictDetection';
+import { TicketConflict, hasConflict } from '../lib/conflictDetection';
 import { SprintCapacity, getCapacityStatusColor } from '../lib/capacityCalculation';
 import designTokens, { getTicketColors, getConflictColors } from '../lib/designTokens';
 import { TruncatedText } from './Tooltip';
 import { resolveEffortDays, getAdjustedDuration } from '../lib/effortResolver';
 import { calculateWorkingDays } from '../lib/teamCapacityCalculation';
+
+// Helper: Count working days (Mon-Fri) between two dates
+function countWorkingDays(start: Date, end: Date): number {
+  let count = 0;
+  const current = new Date(start);
+  current.setHours(0, 0, 0, 0);
+  const endDate = new Date(end);
+  endDate.setHours(0, 0, 0, 0);
+  
+  while (current <= endDate) {
+    const dayOfWeek = current.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Not Sunday or Saturday
+      count++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+}
+
+// Helper: Check if a ticket has PTO overlap and calculate working days overlap
+function getPTOOverlapInfo(ticket: Ticket, assignedMember: TeamMember | undefined) {
+  if (!assignedMember || !assignedMember.pto || assignedMember.pto.length === 0) {
+    return { hasPtoRisk: false, overlapDays: 0, overlappingPTO: [] };
+  }
+
+  const ticketStart = new Date(ticket.startDate);
+  ticketStart.setHours(0, 0, 0, 0);
+  const ticketEnd = new Date(ticket.endDate);
+  ticketEnd.setHours(0, 0, 0, 0);
+
+  const overlappingPTO: Array<{ name: string; startDate: Date; endDate: Date; workingDays: number }> = [];
+  const overlapDates = new Set<string>();
+
+  assignedMember.pto.forEach(pto => {
+    const ptoStart = new Date(pto.startDate);
+    ptoStart.setHours(0, 0, 0, 0);
+    const ptoEnd = new Date(pto.endDate);
+    ptoEnd.setHours(0, 0, 0, 0);
+
+    // Check if PTO overlaps with ticket
+    if (ptoEnd >= ticketStart && ptoStart <= ticketEnd) {
+      const overlapStart = ptoStart > ticketStart ? ptoStart : ticketStart;
+      const overlapEnd = ptoEnd < ticketEnd ? ptoEnd : ticketEnd;
+      
+      const workingDays = countWorkingDays(overlapStart, overlapEnd);
+      
+      if (workingDays > 0) {
+        overlappingPTO.push({
+          name: pto.name,
+          startDate: ptoStart,
+          endDate: ptoEnd,
+          workingDays
+        });
+
+        // Track unique overlap dates
+        const current = new Date(overlapStart);
+        while (current <= overlapEnd) {
+          const dayOfWeek = current.getDay();
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            overlapDates.add(current.toISOString().split('T')[0]);
+          }
+          current.setDate(current.getDate() + 1);
+        }
+      }
+    }
+  });
+
+  return {
+    hasPtoRisk: overlappingPTO.length > 0,
+    overlapDays: overlapDates.size,
+    overlappingPTO
+  };
+}
 
 interface TimelinePanelProps {
   release: Release;
@@ -21,9 +95,9 @@ interface TimelinePanelProps {
   onUpdateSprint?: (sprintId: string, name: string, startDate: Date, endDate: Date) => void;
   onDeleteSprint?: (sprintId: string) => void;
   conflicts: Map<string, TicketConflict>;
-  conflictSummary: ConflictSummary;
   sprintCapacities: Map<string, SprintCapacity>;
-  onViewConflictDetails?: () => void;
+  showSprintCreation?: boolean;
+  onShowSprintCreationChange?: (show: boolean) => void;
 }
 
 const DAY_WIDTH = 40;
@@ -31,12 +105,19 @@ const ROW_HEIGHT = 48;
 const FEATURE_HEADER_HEIGHT = 40;
 const SIDEBAR_WIDTH = 320; // Fixed left sidebar width
 
-export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, conflictSummary, sprintCapacities, onViewConflictDetails }: TimelinePanelProps) {
+export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, sprintCapacities, showSprintCreation: externalShowSprintCreation, onShowSprintCreationChange }: TimelinePanelProps) {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
-  const [showSprintCreation, setShowSprintCreation] = useState(false);
+  const [internalShowSprintCreation, setInternalShowSprintCreation] = useState(false);
+  const showSprintCreation = externalShowSprintCreation ?? internalShowSprintCreation;
+  const setShowSprintCreation = (show: boolean) => {
+    if (onShowSprintCreationChange) {
+      onShowSprintCreationChange(show);
+    } else {
+      setInternalShowSprintCreation(show);
+    }
+  };
   const [showHolidays, setShowHolidays] = useState(true);
   const [showPTO, setShowPTO] = useState(true);
-  const [showConflictSummary, setShowConflictSummary] = useState(false);
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
   const [showSprintSummary, setShowSprintSummary] = useState(false);
   const [selectedDeveloperId, setSelectedDeveloperId] = useState<'all' | 'unassigned' | string>('all');
@@ -106,7 +187,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   };
 
   const totalDays = getDaysDifference(startDate, endDate);
-  const timelineWidth = totalDays * DAY_WIDTH;
+  const timelineWidth = (totalDays + 1) * DAY_WIDTH; // +1 to include end date
 
   const getPositionFromDate = (date: Date) => {
     const daysFromStart = getDaysDifference(startDate, date);
@@ -221,11 +302,6 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             showPTO={showPTO}
             onToggleHolidays={setShowHolidays}
             onTogglePTO={setShowPTO}
-            conflictSummary={conflictSummary}
-            showConflictSummary={showConflictSummary}
-            onToggleConflictSummary={setShowConflictSummary}
-            onAddSprint={() => setShowSprintCreation(true)}
-            onViewConflictDetails={onViewConflictDetails}
             teamMembers={teamMembers}
             selectedDeveloperId={selectedDeveloperId}
             onChangeDeveloper={setSelectedDeveloperId}
@@ -452,6 +528,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                         onClone={onCloneTicket ? () => onCloneTicket(feature.id, ticket.id) : undefined}
                         showPTO={showPTO}
                         startDate={startDate}
+                        endDate={endDate}
                         hasConflict={hasConflict(ticket.id, conflicts)}
                         conflicts={conflicts}
                         teamMembers={teamMembers}
@@ -483,7 +560,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   );
 }
 
-// LAYER 1: TIME GRID (Enhanced with today indicator, weekend shading, month boundaries)
+// LAYER 1: TIME GRID (Enhanced with today indicator, weekend shading, month boundaries - Premium styling)
 function TimeGrid({ 
   totalDays, 
   dayWidth, 
@@ -500,7 +577,10 @@ function TimeGrid({
   today.setHours(0, 0, 0, 0);
   
   return (
-    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 1, height: contentHeight }}>
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{ zIndex: 1, height: contentHeight, backgroundColor: 'rgba(0, 0, 0, 0.03)' }}
+    >
       {/* Weekend shading + vertical day lines */}
       {Array.from({ length: totalDays + 1 }).map((_, i) => {
         const currentDate = new Date(startDate);
@@ -512,7 +592,7 @@ function TimeGrid({
         
         return (
           <div key={`day-${i}`}>
-            {/* Weekend shading */}
+            {/* Weekend shading - keep de-emphasized but clear */}
             {isWeekend && (
               <div
                 className="absolute"
@@ -521,25 +601,25 @@ function TimeGrid({
                   width: dayWidth,
                   height: contentHeight,
                   top: 0,
-                  backgroundColor: 'rgba(0, 0, 0, 0.01)',
+                  backgroundColor: 'rgba(0, 0, 0, 0.06)',
                   zIndex: 0,
                 }}
               />
             )}
             
-            {/* Vertical day lines */}
+            {/* Vertical day lines - more prominent */}
             <div
               className="absolute"
               style={{
                 left: i * dayWidth,
-                width: isMonthStart ? '1px' : '1px',
+                width: isMonthStart ? '1.5px' : '1px',
                 height: contentHeight,
                 top: 0,
                 backgroundColor: isMonthStart 
-                  ? 'rgba(0, 0, 0, 0.08)'
+                  ? 'rgba(0, 0, 0, 0.14)'
                   : isWeekBoundary 
-                    ? 'rgba(0, 0, 0, 0.03)' 
-                    : 'rgba(0, 0, 0, 0.02)',
+                    ? 'rgba(0, 0, 0, 0.075)' 
+                    : 'rgba(0, 0, 0, 0.05)',
                 zIndex: 1,
               }}
             />
@@ -715,10 +795,8 @@ function HolidayBands({
   getDaysDifference: (date1: Date, date2: Date) => number;
   dayWidth: number;
 }) {
-  const [hoveredHoliday, setHoveredHoliday] = useState<string | null>(null);
-
   return (
-    <div className="absolute inset-0" style={{ zIndex: designTokens.zIndex.holidays }}>
+    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: designTokens.zIndex.holidays }}>
       {holidays.map((holiday) => {
         if (holiday.endDate < startDate || holiday.startDate > endDate) return null;
         
@@ -726,57 +804,30 @@ function HolidayBands({
         const overlayEnd = holiday.endDate > endDate ? endDate : holiday.endDate;
         const left = getPositionFromDate(overlayStart);
         const width = (getDaysDifference(overlayStart, overlayEnd) + 1) * dayWidth;
-        const isHovered = hoveredHoliday === holiday.id;
         
         return (
-          <div key={holiday.id} className="relative">
-            {/* Full-height non-interactive background shading */}
-            <div
-              className="absolute top-0 bottom-0 transition-all duration-200"
-              style={{
-                left,
-                width,
-                backgroundColor: isHovered ? designTokens.colors.overlay.holiday.secondary : designTokens.colors.overlay.holiday.primary,
-                borderLeft: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
-                borderRight: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
-                pointerEvents: 'none',
-              }}
-            />
-            
-            {/* Small top strip for hover interaction */}
-            <div
-              className="absolute top-0"
-              style={{
-                left,
-                width,
-                height: '24px',
-                pointerEvents: 'auto',
-                cursor: 'help',
-                backgroundColor: isHovered ? designTokens.colors.overlay.holiday.secondary : 'transparent',
-              }}
-              title={holiday.name}
-              onMouseEnter={() => setHoveredHoliday(holiday.id)}
-              onMouseLeave={() => setHoveredHoliday(null)}
-            >
-              {/* Hover tooltip */}
-              {isHovered && (
-                <div 
-                  className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50"
-                  style={{
-                    pointerEvents: 'none',
-                  }}
-                >
-                  <div 
-                    className="px-2 py-1 text-[10px] font-medium rounded shadow-lg whitespace-nowrap"
-                    style={{
-                      backgroundColor: designTokens.colors.overlay.holiday.badge,
-                      color: 'white',
-                    }}
-                  >
-                    🏖️ {holiday.name}
-                  </div>
-                </div>
-              )}
+          <div
+            key={holiday.id}
+            className="absolute top-0 bottom-0"
+            style={{
+              left,
+              width,
+              backgroundColor: designTokens.colors.overlay.holiday.primary,
+              borderLeft: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
+              borderRight: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
+            }}
+          >
+            {/* Always-visible holiday name badge */}
+            <div className="absolute top-2 left-0 right-0 text-center">
+              <div 
+                className="inline-block px-2 py-0.5 text-[9px] font-medium rounded shadow-sm"
+                style={{
+                  backgroundColor: designTokens.colors.overlay.holiday.badge,
+                  color: 'white',
+                }}
+              >
+                🏖️ {holiday.name}
+              </div>
             </div>
           </div>
         );
@@ -785,7 +836,7 @@ function HolidayBands({
   );
 }
 
-// HEADER
+// HEADER - Premium MS Project/Smartsheet feel with daily date numbers
 function TimelineHeader({
   startDate,
   totalDays,
@@ -803,16 +854,88 @@ function TimelineHeader({
   getDaysDifference: (date1: Date, date2: Date) => number;
   sprintCapacities: Map<string, SprintCapacity>;
 }) {
+  // Calculate month spans for the header band
+  const monthSpans: Array<{ label: string; startIndex: number; days: number }> = [];
+  let currentMonth = -1;
+  let currentMonthStart = 0;
+  let currentMonthDays = 0;
+  
+  for (let i = 0; i <= totalDays; i++) {
+    const currentDate = new Date(startDate);
+    currentDate.setDate(currentDate.getDate() + i);
+    const month = currentDate.getMonth();
+    
+    if (month !== currentMonth) {
+      if (currentMonth !== -1) {
+        monthSpans.push({
+          label: new Date(startDate.getFullYear(), currentMonth, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+          startIndex: currentMonthStart,
+          days: currentMonthDays
+        });
+      }
+      currentMonth = month;
+      currentMonthStart = i;
+      currentMonthDays = 1;
+    } else {
+      currentMonthDays++;
+    }
+  }
+  // Add the last month
+  if (currentMonth !== -1) {
+    monthSpans.push({
+      label: new Date(startDate.getFullYear(), currentMonth, 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      startIndex: currentMonthStart,
+      days: currentMonthDays
+    });
+  }
+
+  // Derived info for the header strip
+  const headerEndDate = new Date(startDate);
+  headerEndDate.setDate(headerEndDate.getDate() + totalDays);
+  const releaseWorkingDays = calculateWorkingDays(startDate, headerEndDate);
+
   return (
-    <div className="bg-white">
-      {/* Date labels - Enhanced with month boundaries and today indicator */}
-      <div className="flex h-12 items-end border-b border-gray-200 relative">
+    <div className="bg-card border-b border-border">
+      {/* Header strip: uses otherwise-empty space and improves calendar readability */}
+      <div className="flex h-10 items-center justify-between px-3 border-b border-border/50 bg-card">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-xs font-semibold text-foreground tracking-tight">Calendar</span>
+          <span className="text-[11px] text-muted-foreground truncate">
+            {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – {headerEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-shrink-0">
+          <span className="font-medium text-foreground/80">{totalDays + 1} days</span>
+          <span className="font-medium text-foreground/80">{releaseWorkingDays} working</span>
+        </div>
+      </div>
+
+      {/* Month band */}
+      <div className="flex h-7 items-center border-b border-border/50 relative bg-muted/35">
+        {monthSpans.map((span, idx) => (
+          <div
+            key={idx}
+            className="flex-shrink-0 px-2 flex items-center"
+            style={{ 
+              width: span.days * dayWidth,
+              borderRight: idx < monthSpans.length - 1 ? '1px solid rgba(0,0,0,0.1)' : 'none'
+            }}
+          >
+            <span className="text-[10px] font-semibold text-foreground/70 uppercase tracking-wider">
+              {span.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Date labels - Show every day number */}
+      <div className="flex h-12 items-center border-b border-border relative">
         {Array.from({ length: totalDays + 1 }).map((_, i) => {
           const currentDate = new Date(startDate);
           currentDate.setDate(currentDate.getDate() + i);
-          const isWeekStart = currentDate.getDay() === 1;
-          const isMonthStart = currentDate.getDate() === 1;
+          const dayOfMonth = currentDate.getDate();
           const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+          const isMonthStart = dayOfMonth === 1;
           
           // Check if today
           const today = new Date();
@@ -824,61 +947,53 @@ function TimelineHeader({
           return (
             <div
               key={i}
-              className="flex-shrink-0 px-1 pb-1.5 relative"
+              className="flex-shrink-0 px-0.5 py-1.5 relative flex flex-col items-center justify-center"
               style={{ 
                 width: dayWidth,
                 backgroundColor: isToday 
                   ? 'rgba(239, 68, 68, 0.08)' 
-                  : isWeekend 
-                    ? 'rgba(0, 0, 0, 0.02)' 
-                    : 'transparent',
+                  : 'transparent',
+                borderLeft: isMonthStart ? '1.5px solid rgba(0,0,0,0.12)' : 'none'
               }}
             >
-              {/* Month boundary marker */}
-              {isMonthStart && (
-                <>
-                  <div className="text-[11px] font-bold mb-0.5" style={{ color: designTokens.colors.sprint.primary }}>
-                    {currentDate.toLocaleDateString('en-US', { month: 'short' })}
-                  </div>
-                  <div 
-                    className="absolute left-0 top-0 bottom-0" 
-                    style={{ 
-                      width: '2px', 
-                      backgroundColor: designTokens.colors.timeline.weekBoundary 
-                    }}
-                  />
-                </>
-              )}
-              
-              {/* Week start date */}
-              {isWeekStart && !isMonthStart && (
-                <div className="text-[10px] font-medium" style={{ color: 'rgba(0, 0, 0, 0.6)' }}>
-                  {currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </div>
-              )}
-              
-              {/* Day letter with today highlight */}
+              {/* Day of month number - always shown */}
               <div 
-                className="text-[9px] font-medium" 
+                className="text-[11px] font-semibold leading-none mb-0.5" 
                 style={{ 
                   color: isToday 
                     ? designTokens.colors.today.line 
                     : isWeekend 
-                      ? 'rgba(0, 0, 0, 0.3)' 
-                      : 'rgba(0, 0, 0, 0.4)',
-                  fontWeight: isToday ? 'bold' : 'normal',
+                      ? 'rgba(0, 0, 0, 0.4)' 
+                      : 'rgba(0, 0, 0, 0.82)',
+                  fontWeight: isToday ? 'bold' : isMonthStart ? 700 : 600,
+                }}
+              >
+                {dayOfMonth}
+              </div>
+              
+              {/* Day letter */}
+              <div 
+                className="text-[9px] font-medium leading-none" 
+                style={{ 
+                  color: isToday 
+                    ? designTokens.colors.today.line 
+                    : isWeekend 
+                      ? 'rgba(0, 0, 0, 0.28)' 
+                      : 'rgba(0, 0, 0, 0.55)',
+                  fontWeight: isToday ? 'bold' : 500,
                 }}
               >
                 {currentDate.toLocaleDateString('en-US', { weekday: 'narrow' })}
               </div>
               
-              {/* Today indicator in header */}
+              {/* Today indicator dot */}
               {isToday && (
                 <div
-                  className="absolute bottom-0 left-1/2 transform -translate-x-1/2"
+                  className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2"
                   style={{
-                    width: '2px',
-                    height: '4px',
+                    width: '3px',
+                    height: '3px',
+                    borderRadius: '50%',
                     backgroundColor: designTokens.colors.today.line,
                   }}
                 />
@@ -1208,11 +1323,6 @@ function TimelineSidebarHeader({
   showPTO,
   onToggleHolidays,
   onTogglePTO,
-  conflictSummary,
-  showConflictSummary,
-  onToggleConflictSummary,
-  onAddSprint,
-  onViewConflictDetails,
   teamMembers,
   selectedDeveloperId,
   onChangeDeveloper
@@ -1221,156 +1331,89 @@ function TimelineSidebarHeader({
   showPTO: boolean;
   onToggleHolidays: (value: boolean) => void;
   onTogglePTO: (value: boolean) => void;
-  conflictSummary: ConflictSummary;
-  showConflictSummary: boolean;
-  onToggleConflictSummary: (value: boolean) => void;
-  onAddSprint: () => void;
-  onViewConflictDetails?: () => void;
   teamMembers: TeamMember[];
   selectedDeveloperId: 'all' | 'unassigned' | string;
   onChangeDeveloper: (developerId: 'all' | 'unassigned' | string) => void;
 }) {
   const developers = teamMembers.filter(m => m.role === 'Developer');
+  const [showViewMenu, setShowViewMenu] = useState(false);
+  
   return (
     <div className="h-full flex flex-col">
-      {/* Control Bar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2">
-        <div className="flex items-center justify-between w-full gap-4">
-          {/* LEFT SIDE - Toggles & Conflict Badge */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 transition-colors text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={showHolidays}
-                onChange={(e) => onToggleHolidays(e.target.checked)}
-                className="w-3 h-3"
-              />
-              <span className="text-xs font-medium">
-                Holidays
-              </span>
-            </label>
-            
-            <label className="flex items-center gap-1.5 cursor-pointer hover:text-gray-900 transition-colors text-sm text-gray-600">
-              <input
-                type="checkbox"
-                checked={showPTO}
-                onChange={(e) => onTogglePTO(e.target.checked)}
-                className="w-3 h-3"
-              />
-              <span className="text-xs font-medium">
-                PTO
-              </span>
-            </label>
+      {/* Control Bar - Grouped by intent */}
+      <div className="bg-card/50 border-b border-border px-3 py-2">
+        <div className="flex items-center justify-between w-full gap-2">
+          <div className="flex items-center gap-2">
+            {/* View Menu */}
+            <div className="relative">
+              <button
+                onClick={() => setShowViewMenu(!showViewMenu)}
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+              >
+                <span>View</span>
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {showViewMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowViewMenu(false)} />
+                  <div className="absolute left-0 mt-1 w-36 bg-card border border-border rounded-md shadow-lg z-50 py-1">
+                    <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={showHolidays}
+                        onChange={(e) => onToggleHolidays(e.target.checked)}
+                        className="w-3 h-3"
+                      />
+                      <span className="text-xs">Holidays</span>
+                    </label>
+                    <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={showPTO}
+                        onChange={(e) => onTogglePTO(e.target.checked)}
+                        className="w-3 h-3"
+                      />
+                      <span className="text-xs">PTO</span>
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
 
-            {/* Developer Filter */}
-            <select
-              value={selectedDeveloperId}
-              onChange={(e) => onChangeDeveloper(e.target.value as 'all' | 'unassigned' | string)}
-              className="text-xs font-medium px-2 py-1 border border-gray-300 rounded bg-white hover:border-gray-400 transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400"
-            >
-              <option value="all">All Developers</option>
-              <option value="unassigned">Unassigned</option>
-              {developers.map(dev => (
-                <option key={dev.id} value={dev.id}>{dev.name}</option>
-              ))}
-            </select>
+            <div className="w-px h-4 bg-border" />
 
-            {/* Conflict Summary Badge */}
-            {conflictSummary.totalConflicts > 0 && (
-              <div className="relative max-w-fit">
-                <button
-                  onClick={() => onToggleConflictSummary(!showConflictSummary)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded transition-all hover:shadow-sm text-xs whitespace-nowrap"
-                  style={{
-                    backgroundColor: 'rgba(251, 192, 45, 0.15)',
-                    border: '1px solid rgba(251, 192, 45, 0.3)',
-                    color: '#b45309',
-                  }}
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  <span className="font-medium">
-                    {conflictSummary.totalConflicts} Conflict{conflictSummary.totalConflicts > 1 ? 's' : ''}
-                  </span>
-                </button>
-                
-                {showConflictSummary && (
-                  <>
-                    <div 
-                      className="fixed inset-0 z-40"
-                      onClick={() => onToggleConflictSummary(false)}
-                    />
-                    <div 
-                      className="absolute left-0 bg-white border border-gray-200 rounded-lg shadow-xl p-3 min-w-[280px] z-50"
-                      style={{ top: 'calc(100% + 8px)' }}
-                    >
-                      <div style={{ fontSize: designTokens.typography.fontSize.xs, fontWeight: designTokens.typography.fontWeight.medium, color: designTokens.colors.neutral[800], marginBottom: '8px' }}>
-                        Scheduling Conflicts
-                      </div>
-                      <ul className="space-y-1 mb-2">
-                        {conflictSummary.affectedDevelopers.map(dev => (
-                          <li key={dev} className="flex items-center justify-between" style={{ fontSize: designTokens.typography.fontSize.xs }}>
-                            <span style={{ color: designTokens.colors.neutral[700], fontWeight: designTokens.typography.fontWeight.medium }}>{dev}</span>
-                            <span style={{ color: '#d97706', fontWeight: designTokens.typography.fontWeight.medium }}>
-                              {conflictSummary.conflictsByDeveloper[dev]} conflict{conflictSummary.conflictsByDeveloper[dev] > 1 ? 's' : ''}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                      {onViewConflictDetails && (
-                        <button
-                          onClick={() => {
-                            onViewConflictDetails();
-                            onToggleConflictSummary(false);
-                          }}
-                          className="w-full px-2 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 rounded transition-colors"
-                        >
-                          View Conflict Details →
-                        </button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+            {/* Filter */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-medium text-muted-foreground">Filter</span>
+              <select
+                value={selectedDeveloperId}
+                onChange={(e) => onChangeDeveloper(e.target.value as 'all' | 'unassigned' | string)}
+                className="text-xs px-2 py-0.5 border border-border rounded bg-card hover:bg-muted transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="all">All</option>
+                <option value="unassigned">Unassigned</option>
+                {developers.map(dev => (
+                  <option key={dev.id} value={dev.id}>{dev.name}</option>
+                ))}
+              </select>
+            </div>
+
           </div>
 
-          {/* RIGHT SIDE - Add Sprint Button */}
-          <div className="flex items-center shrink-0">
-            <button
-              onClick={onAddSprint}
-              className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs rounded transition-all duration-150 ease-out hover:scale-[1.02] active:scale-[0.98] shrink-0 whitespace-nowrap"
-              style={{
-                backgroundColor: '#64748b',
-                color: 'white',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#475569';
-                e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.1)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#64748b';
-                e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
-              }}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Sprint
-            </button>
-          </div>
         </div>
       </div>
 
       {/* Ticket Name Header */}
       <div 
-        className="px-4 py-3 border-b border-gray-200 font-semibold"
+        className="px-4 h-7 flex items-center justify-between border-b border-border/50 bg-muted/35"
         style={{
           fontSize: designTokens.typography.fontSize.xs,
           fontWeight: designTokens.typography.fontWeight.semibold,
-          color: designTokens.colors.neutral[700],  // 1.3.2: Better contrast
-          letterSpacing: designTokens.typography.letterSpacing.wide  // 1.3.2: Uppercase tracking
+          color: designTokens.colors.neutral[700],
+          letterSpacing: designTokens.typography.letterSpacing.wide
         }}
       >
-        TICKET DETAILS
+        <span>TICKETS</span>
       </div>
     </div>
   );
@@ -1434,19 +1477,12 @@ function TicketSidebarRow({
           {/* 1.3.3: Smart truncation with tooltip */}
           <TruncatedText
             text={ticket.title}
-            className="font-medium"
+            className="text-sm font-semibold text-foreground leading-tight"
             delay={500}
           />
         </div>
-        <div 
-          className="flex items-center gap-3"
-          style={{
-            fontSize: designTokens.typography.fontSize.xs,
-            fontWeight: 400,
-            color: '#6b7280'
-          }}
-        >
-          <span className="truncate">{ticket.assignedTo}</span>
+        <div className="flex items-center gap-3 text-xs font-medium text-muted-foreground">
+          <span className="truncate">{ticket.assignedTo || 'Unassigned'}</span>
           <span className="flex-shrink-0">•</span>
           <span className="flex-shrink-0">{resolveEffortDays(ticket)}d</span>
         </div>
@@ -1468,6 +1504,7 @@ function TicketTimelineBar({
   onMove,
   showPTO,
   startDate: _startDate,
+  endDate,
   hasConflict,
   teamMembers,
   isLastInFeature: _isLastInFeature
@@ -1486,6 +1523,7 @@ function TicketTimelineBar({
   onClone?: () => void;
   showPTO: boolean;
   startDate: Date;
+  endDate: Date;
   hasConflict: boolean;
   conflicts: Map<string, TicketConflict>;
   teamMembers: TeamMember[];
@@ -1493,16 +1531,68 @@ function TicketTimelineBar({
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const ticketRef = useRef<HTMLDivElement>(null);
 
   const assignedMember = teamMembers.find(m => m.name === ticket.assignedTo);
   const ptoEntries = assignedMember?.pto || [];
+  const ptoOverlapInfo = getPTOOverlapInfo(ticket, assignedMember);
 
   const ticketLeft = getPositionFromDate(ticket.startDate);
   
   // Calculate adjusted duration based on effort and velocity
   const adjustedDuration = getAdjustedDuration(ticket, assignedMember);
-  const ticketWidth = adjustedDuration * dayWidth;
+  const rawTicketWidth = adjustedDuration * dayWidth;
+  
+  // Calculate the maximum available width from ticket start to timeline end
+  const timelineEndPosition = getPositionFromDate(endDate);
+  const maxAvailableWidth = Math.max(0, timelineEndPosition - ticketLeft);
+  
+  // Clamp ticket width to stay within timeline bounds
+  const ticketWidth = Math.min(rawTicketWidth, maxAvailableWidth);
+  const isOverflowing = rawTicketWidth > maxAvailableWidth && maxAvailableWidth > 0;
+
+  // Hide tooltip on scroll or resize
+  useEffect(() => {
+    if (isHovered && tooltipPos) {
+      const hideTooltip = () => {
+        setIsHovered(false);
+        setTooltipPos(null);
+      };
+
+      window.addEventListener('scroll', hideTooltip, true);
+      window.addEventListener('resize', hideTooltip);
+
+      return () => {
+        window.removeEventListener('scroll', hideTooltip, true);
+        window.removeEventListener('resize', hideTooltip);
+      };
+    }
+  }, [isHovered, tooltipPos]);
+
+  // Hide tooltip when dragging
+  useEffect(() => {
+    if (isDragging) {
+      setIsHovered(false);
+      setTooltipPos(null);
+    }
+  }, [isDragging]);
+
+  const handleMouseEnter = () => {
+    if (ticketRef.current) {
+      const rect = ticketRef.current.getBoundingClientRect();
+      setTooltipPos({
+        x: rect.left + rect.width / 2,
+        y: rect.top - 8
+      });
+      setIsHovered(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setTooltipPos(null);
+  };
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -1652,8 +1742,8 @@ function TicketTimelineBar({
           // Cursor feedback
           cursor: isDragging ? 'grabbing' : 'grab',
         }}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         onMouseDown={handleMouseDown}
       >
         {/* 1.2.4: Drag handle affordance (visible on hover) */}
@@ -1676,6 +1766,41 @@ function TicketTimelineBar({
             }} 
           />
         </div>
+
+        {/* PTO Risk Indicator - subtle icon in top-left */}
+        {!hasConflict && ptoOverlapInfo.hasPtoRisk && (
+          <div
+            className="absolute top-0.5 left-1 z-10"
+            title={`PTO overlap: ${ptoOverlapInfo.overlapDays} working day${ptoOverlapInfo.overlapDays > 1 ? 's' : ''}\n${ptoOverlapInfo.overlappingPTO.map(p => `${p.name}: ${p.startDate.toLocaleDateString()} - ${p.endDate.toLocaleDateString()}`).join('\n')}`}
+          >
+            <Calendar className="w-3 h-3 text-amber-600 opacity-70" />
+          </div>
+        )}
+
+        {/* PTO Risk Stripe - subtle amber accent on right edge */}
+        {!hasConflict && ptoOverlapInfo.hasPtoRisk && (
+          <div
+            className="absolute top-0 right-0 bottom-0 w-1 bg-amber-500 opacity-30 rounded-r"
+            style={{ zIndex: 1 }}
+          />
+        )}
+
+        {/* Overflow Warning - Red stripe and icon when ticket extends beyond timeline */}
+        {isOverflowing && (
+          <>
+            <div
+              className="absolute top-0 right-0 bottom-0 w-1 bg-red-500 rounded-r"
+              style={{ zIndex: 2 }}
+              title="Ticket extends beyond timeline end date"
+            />
+            <div
+              className="absolute top-1 right-1 z-10 bg-red-500 text-white rounded-full p-0.5"
+              title="Ticket extends beyond timeline end date"
+            >
+              <AlertTriangle className="w-2.5 h-2.5" />
+            </div>
+          </>
+        )}
         
         <div className="flex flex-col justify-center h-full px-2 overflow-hidden">
           
@@ -1714,45 +1839,50 @@ function TicketTimelineBar({
           </div>
 
         </div>
-
-        {/* Inline Tooltip */}
-        {isHovered && (
-          <div
-            className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-72 bg-white border border-gray-200 rounded-md shadow-xl p-3 text-sm z-[100]"
-          >
-            <div className="font-semibold text-sm mb-1">
-              {ticket.title}
-            </div>
-
-            {assignedMember && (
-              <div className="text-xs text-gray-600 mb-2">
-                {assignedMember.name}
-                {assignedMember.experienceLevel
-                  ? ` (${assignedMember.experienceLevel} · ${assignedMember.velocityMultiplier ?? 1}x)`
-                  : ''}
-              </div>
-            )}
-
-            <div className="text-xs mb-1">
-              Effort: {ticket.effortDays ?? ticket.storyPoints ?? 1}d
-            </div>
-
-            <div className="text-xs mb-1">
-              Duration: {calculateWorkingDays(ticket.startDate, ticket.endDate)} working days
-            </div>
-
-            <div className="text-xs text-gray-500">
-              {ticket.startDate.toLocaleDateString()} – {ticket.endDate.toLocaleDateString()}
-            </div>
-
-            {hasConflict && (
-              <div className="text-xs text-amber-600 mt-2">
-                ⚠ Overallocated in sprint
-              </div>
-            )}
-          </div>
-        )}
       </div>
+
+      {/* Portal-based Tooltip - renders at document.body to avoid positioning context issues */}
+      {isHovered && tooltipPos && !isDragging && createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            transform: 'translate(-50%, -100%)',
+            zIndex: 2000,
+            pointerEvents: 'none'
+          }}
+          className="w-72 bg-white border border-gray-200 rounded-md shadow-xl p-3 text-sm"
+        >
+          <div className="font-semibold text-sm mb-1">
+            {ticket.title}
+          </div>
+
+          {assignedMember && (
+            <div className="text-xs text-gray-600 mb-2">
+              {assignedMember.name}
+              {assignedMember.experienceLevel
+                ? ` (${assignedMember.experienceLevel} · ${assignedMember.velocityMultiplier ?? 1}x)`
+                : ''}
+            </div>
+          )}
+
+          <div className="text-xs mb-1">
+            Effort: {ticket.effortDays ?? ticket.storyPoints ?? 1}d
+          </div>
+
+          <div className="text-xs text-gray-500">
+            {ticket.startDate.toLocaleDateString()} – {ticket.endDate.toLocaleDateString()}
+          </div>
+
+          {hasConflict && (
+            <div className="text-xs text-amber-600 mt-2">
+              ⚠ Overallocated in sprint
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

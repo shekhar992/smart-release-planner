@@ -163,10 +163,36 @@ export function BulkTicketImportModal({
   };
 
   const handleDownloadTemplate = () => {
-    const template = `id,title,description,feature,startDate,endDate,status,storyPoints,assignedTo
-t1,User Login API,Implement login endpoint,Authentication,2026-03-01,2026-03-05,planned,5,Sarah Chen
-t2,Password Reset Flow,Build reset email flow,Authentication,2026-03-06,2026-03-10,planned,3,Marcus Rivera
-t3,Dashboard Charts,Create chart components,Dashboard,2026-03-08,2026-03-14,in-progress,8,Alex Thompson`;
+    const template = `title,epic,effortDays,priority,assignedTo
+Configure AWS hosting services,Infra Setup,15,High,AI Tech Lead
+Configure AWS GenAI services,Infra Setup,10,High,AI Tech Lead
+Configure AWS storage services,Infra Setup,5,High,AI Tech Lead
+Configure Environments and Deployments,Infra Setup,10,High,AI Tech Lead
+Agents codebase setup,Code Setup,10,High,AI Tech Lead
+Backend setup (BFF layer),Code Setup,10,High,AI Tech Lead
+Develop framework to build and orchestrate multiple agents,Agentic AI Foundation,5,High,AI Tech Backend 1
+Develop data source connectors,Agentic AI Foundation,10,High,AI Tech Backend 1
+Develop tools (or MCP server) for external operations,Agentic AI Foundation,15,High,AI Tech Backend 1
+Setup memory layer,Agentic AI Foundation,10,High,AI Tech Backend 1
+Setup knowledge bases,Agentic AI Foundation,10,High,AI Tech Backend 1
+SSO Login,Authentication,5,High,AI Tech Backend 1
+SSO token verification,Authentication,5,High,AI Tech Backend 1
+Role Based access control and User groups,Account Management,15,High,AI Tech Backend 1
+Brand Library Creation,Brand Library,10,High,AI Tech Backend 2
+Document management,Brand Library,10,High,AI Tech Backend 2
+Knowledge Base - Ingestion Workflow,Brand Library,25,High,AI Tech Backend 2
+Ability to create and manage content collection in brand library,Content Collection,5,High,AI Tech Backend 2
+Agents to identify relevant documents from brand library,Content Collection,5,High,AI Tech Backend 2
+Agents to generate text content based on context and template,Content Creation,10,High,AI Tech Backend 2
+Agentic workflow to draft content with given inputs,Content Creation,10,High,AI Tech Backend 2
+Workflows to modify content draft,Content Creation,10,High,AI Tech Backend 2
+Fine-tune creation agents for specific channel templates,Content Creation,15,High,AI Tech Backend 3
+Dynamic Templates with X dynamic components,Templates,5,High,AI Tech Backend 3
+Agentic workflows to localize the content draft (translation + rules),Content Localization,15,High,AI Tech Backend 3
+Workflows to modify localized content,Content Localization,5,High,AI Tech Backend 3
+Fine-tune localization agents for specific geographies,Content Localization,10,High,AI Tech Backend 3
+UI Based Form to collect key pieces of information that will be captured and stored in our DD. This will be used for the master prompt,Master Story,15,High,AI Tech Backend 3
+Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Backend 3`;
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -258,21 +284,19 @@ t3,Dashboard Charts,Create chart components,Dashboard,2026-03-08,2026-03-14,in-p
               <div className="flex items-start gap-3 px-3.5 py-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <Table2 className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-blue-800 leading-relaxed">
-                  <p className="font-semibold mb-1">Upload a file with feature &amp; ticket data</p>
+                  <p className="font-semibold mb-1">Download a pre-filled template with 29 sample tickets</p>
                   <p>
-                    Include a <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">feature</code> column
-                    so tickets are auto-grouped into features. New features will be created automatically.
+                    Covers infrastructure setup, authentication, AI foundation, content creation, and localization workflows. Edit with your data and upload.
+                    Include a <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">feature</code> or <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">epic</code> column
+                    to auto-group tickets into features.
                   </p>
                 </div>
               </div>
 
               {/* Required / optional columns */}
               <div className="text-xs text-gray-500 leading-relaxed">
-                <span className="font-medium text-gray-700">Required:</span>{' '}
-                <code className="px-1 py-0.5 bg-gray-100 rounded text-[11px]">id, title, feature, startDate, endDate, status, storyPoints, assignedTo</code>
-                <br />
-                <span className="font-medium text-gray-700">Optional:</span>{' '}
-                <code className="px-1 py-0.5 bg-gray-100 rounded text-[11px]">description</code>
+                <span className="font-medium text-gray-700">Supported columns:</span>{' '}
+                <code className="px-1 py-0.5 bg-gray-100 rounded text-[11px]">title, epic, effortDays, priority, assignedTo, feature, storyPoints, startDate, endDate, status, description</code>
               </div>
 
               {/* Upload area */}

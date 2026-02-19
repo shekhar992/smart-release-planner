@@ -4,15 +4,12 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { router } from './routes';
 import { ModeSelector } from './components/ModeSelector';
 import { FreshLanding } from './components/FreshLanding';
-import { ModeSwitch } from './components/ModeSwitch';
 
 export default function App() {
   const appMode = localStorage.getItem('appMode');
 
   return (
     <>
-      {/* Mode Switch button (shown when mode is selected) */}
-      {appMode && <ModeSwitch />}
 
       <DndProvider backend={HTML5Backend}>
         <div className="h-screen bg-gray-50">

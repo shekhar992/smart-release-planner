@@ -57,6 +57,7 @@ export function ConflictResolutionPanel({
       case "overlap": return "🔴";
       case "developerOverload": return "🟠";
       case "sprintOverCapacity": return "🟡";
+      case "timelineOverflow": return "⚠️";
       default: return "⚠️";
     }
   };
@@ -112,7 +113,10 @@ export function ConflictResolutionPanel({
             const hasAnySuggestions = conflict.suggestions && (
               (conflict.suggestions.possibleReassignments?.length ?? 0) > 0 ||
               (conflict.suggestions.possibleSprintMoves?.length ?? 0) > 0 ||
-              (conflict.suggestions.possibleShiftDays?.length ?? 0) > 0
+              (conflict.suggestions.possibleShiftDays?.length ?? 0) > 0 ||
+              conflict.suggestions.extendTimeline ||
+              conflict.suggestions.reduceScope ||
+              conflict.suggestions.splitTicket
             );
 
             return (
@@ -141,6 +145,11 @@ export function ConflictResolutionPanel({
                         {conflict.impactedDays && (
                           <p className="text-xs text-amber-700 mt-1">
                             ⏱ {conflict.impactedDays} day{conflict.impactedDays > 1 ? 's' : ''} impacted
+                          </p>
+                        )}
+                        {conflict.overflowDays && (
+                          <p className="text-xs text-red-700 mt-1">
+                            📅 Extends {conflict.overflowDays} day{conflict.overflowDays > 1 ? 's' : ''} beyond timeline
                           </p>
                         )}
                       </div>
@@ -264,6 +273,43 @@ export function ConflictResolutionPanel({
                               ))}
                             </div>
                           </div>
+                        )}
+
+                        {/* Overflow-specific Suggestions */}
+                        {conflict.type === 'timelineOverflow' && (
+                          <>
+                            {conflict.suggestions?.extendTimeline && (
+                              <div className="space-y-1">
+                                <p className="text-xs text-gray-600">Timeline adjustments:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  <div className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded flex items-center gap-1">
+                                    <CalendarClock className="w-3 h-3" />
+                                    Extend timeline end date by {conflict.overflowDays} day{(conflict.overflowDays || 0) > 1 ? 's' : ''}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {conflict.suggestions?.reduceScope && (
+                              <div className="space-y-1">
+                                <p className="text-xs text-gray-600">Scope adjustments:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  <div className="px-2 py-1 text-xs bg-orange-50 text-orange-700 border border-orange-200 rounded flex items-center gap-1">
+                                    ✂️ Reduce ticket scope/effort to fit within timeline
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {conflict.suggestions?.splitTicket && (
+                              <div className="space-y-1">
+                                <p className="text-xs text-gray-600">Ticket breakdown:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  <div className="px-2 py-1 text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded flex items-center gap-1">
+                                    🔀 Split into smaller tickets across multiple sprints
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     ) : (

@@ -4,6 +4,7 @@ import { ReleasePlanningCanvas } from './components/ReleasePlanningCanvas';
 import { TeamRoster } from './components/TeamRoster';
 import { TeamMemberDetail } from './components/TeamMemberDetail';
 import { HolidayManagement } from './components/HolidayManagement';
+import { PTOCalendar } from './components/PTOCalendar';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -26,6 +27,11 @@ export const router = createBrowserRouter([
   {
     path: '/release/:releaseId/team/holidays',
     Component: HolidayManagement,
+    ErrorBoundary: ErrorBoundary
+  },
+  {
+    path: '/product/:productId/team/pto',
+    Component: PTOCalendar,
     ErrorBoundary: ErrorBoundary
   },
   {
