@@ -6,7 +6,7 @@ export interface Ticket {
   endDate: Date;
   status: 'in-progress' | 'planned' | 'completed';
   storyPoints: number;
-  effortDays?: number; // New primary estimation field
+  effortDays?: number;
   assignedTo: string;
 }
 
@@ -34,7 +34,6 @@ export interface SPMappingEntry {
 
 export interface StoryPointMapping {
   preset: SPMappingPreset;
-  /** Ordered list of SP → days pairs (ascending by sp) */
   entries: SPMappingEntry[];
 }
 
@@ -63,30 +62,21 @@ export const SP_PRESETS: Record<Exclude<SPMappingPreset, 'custom'>, StoryPointMa
   },
 };
 
-/**
- * Convert a story-point value to days using the mapping.
- * For SP values not in the table, interpolates linearly between nearest entries.
- * Falls back to 1:1 when no mapping provided.
- */
 export function storyPointsToDays(sp: number, mapping?: StoryPointMapping): number {
-  if (!mapping || mapping.entries.length === 0) return sp; // 1:1 fallback
+  if (!mapping || mapping.entries.length === 0) return sp;
   const entries = mapping.entries;
-  // Exact match
   const exact = entries.find(e => e.sp === sp);
   if (exact) return exact.days;
-  // Below minimum → proportional
   if (sp <= entries[0].sp) return (sp / entries[0].sp) * entries[0].days;
-  // Above maximum → proportional from last entry
   const last = entries[entries.length - 1];
   if (sp >= last.sp) return (sp / last.sp) * last.days;
-  // Between two entries → linear interpolation
   for (let i = 0; i < entries.length - 1; i++) {
     if (sp > entries[i].sp && sp < entries[i + 1].sp) {
       const ratio = (sp - entries[i].sp) / (entries[i + 1].sp - entries[i].sp);
       return entries[i].days + ratio * (entries[i + 1].days - entries[i].days);
     }
   }
-  return sp; // ultimate fallback
+  return sp;
 }
 
 export interface Release {
@@ -98,7 +88,7 @@ export interface Release {
   sprints?: Sprint[];
   storyPointMapping?: StoryPointMapping;
   milestones: Milestone[];
-  phases?: Phase[]; // OPTIONAL for backward compatibility
+  phases?: Phase[];
 }
 
 export interface Product {
@@ -122,7 +112,7 @@ export interface TeamMember {
   notes?: string;
   pto: PTOEntry[];
   productId: string;
-  velocityMultiplier?: number; // Optional: defaults to 1. Adjusts capacity calculations (e.g., 0.5 = half speed, 2.0 = double speed)
+  velocityMultiplier?: number;
 }
 
 export interface Holiday {
@@ -131,2893 +121,6 @@ export interface Holiday {
   startDate: Date;
   endDate: Date;
 }
-
-// ===========================================
-// PRODUCT 1: FinTech Payment Gateway
-// ===========================================
-const product1: Product = {
-  id: 'p1',
-  name: 'FinTech Payment Gateway',
-  releases: [
-    {
-      id: 'r1',
-      name: 'R1 2026 - Core Payment Infrastructure',
-      startDate: new Date('2026-02-17'),
-      endDate: new Date('2026-04-24'),
-      storyPointMapping: SP_PRESETS.fibonacci,
-      features: [
-        {
-          id: 'f1',
-          name: 'Payment API & Authentication',
-          tickets: [
-            {
-              id: 't1',
-              title: 'Design payment API architecture',
-              description: 'Priority: High | Design RESTful payment API with proper versioning and error handling patterns.',
-              startDate: new Date('2026-02-17'),
-              endDate: new Date('2026-02-21'),
-              status: 'completed',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Arjun Mehta'
-            },
-            {
-              id: 't2',
-              title: 'Implement OAuth 2.0 authentication',
-              description: 'Priority: High | Implement secure OAuth 2.0 flow for API access with JWT tokens.',
-              startDate: new Date('2026-02-17'),
-              endDate: new Date('2026-02-24'),
-              status: 'in-progress',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Priya Sharma'
-            },
-            {
-              id: 't3',
-              title: 'API rate limiting and throttling',
-              description: 'Priority: Medium | Implement rate limiting per merchant with Redis-based throttling.',
-              startDate: new Date('2026-02-24'),
-              endDate: new Date('2026-02-27'),
-              status: 'planned',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Vikram Singh'
-            },
-            {
-              id: 't4',
-              title: 'API key management system',
-              description: 'Priority: High | Build API key generation, rotation, and revocation system.',
-              startDate: new Date('2026-02-27'),
-              endDate: new Date('2026-03-05'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Priya Sharma'
-            },
-            {
-              id: 't5',
-              title: 'Webhook signature verification',
-              description: 'Priority: Medium | Implement HMAC-based webhook signature verification for security.',
-              startDate: new Date('2026-03-05'),
-              endDate: new Date('2026-03-09'),
-              status: 'planned',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Vikram Singh'
-            }
-          ]
-        },
-        {
-          id: 'f2',
-          name: 'Transaction Processing Engine',
-          tickets: [
-            {
-              id: 't6',
-              title: 'Design transaction state machine',
-              description: 'Priority: High | Design robust state machine for payment lifecycle (pending, processing, completed, failed).',
-              startDate: new Date('2026-02-24'),
-              endDate: new Date('2026-03-02'),
-              status: 'in-progress',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Arjun Mehta'
-            },
-            {
-              id: 't7',
-              title: 'Implement payment initiation flow',
-              description: 'Priority: High | Build payment initiation with validation and preliminary fraud checks.',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Neha Patel'
-            },
-            {
-              id: 't8',
-              title: 'Payment processing worker service',
-              description: 'Priority: High | Build async worker service for processing payments using message queue.',
-              startDate: new Date('2026-03-09'),
-              endDate: new Date('2026-03-16'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Vikram Singh'
-            },
-            {
-              id: 't9',
-              title: 'Transaction reconciliation service',
-              description: 'Priority: Medium | Build automated reconciliation between internal ledger and payment gateway.',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-23'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Arjun Mehta'
-            },
-            {
-              id: 't10',
-              title: 'Refund and reversal logic',
-              description: 'Priority: Medium | Implement refund processing with partial and full refund support.',
-              startDate: new Date('2026-03-23'),
-              endDate: new Date('2026-03-27'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Neha Patel'
-            }
-          ]
-        },
-        {
-          id: 'f3',
-          name: 'Security & Compliance',
-          tickets: [
-            {
-              id: 't11',
-              title: 'PCI DSS compliance audit preparation',
-              description: 'Priority: High | Prepare infrastructure and code for PCI DSS Level 1 compliance audit.',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Rajesh Kumar'
-            },
-            {
-              id: 't12',
-              title: 'Card data encryption at rest',
-              description: 'Priority: High | Implement AES-256 encryption for sensitive card data storage.',
-              startDate: new Date('2026-03-09'),
-              endDate: new Date('2026-03-13'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Priya Sharma'
-            },
-            {
-              id: 't13',
-              title: 'TLS 1.3 implementation',
-              description: 'Priority: High | Upgrade all API endpoints to TLS 1.3 with proper cipher suites.',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-19'),
-              status: 'planned',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Vikram Singh'
-            },
-            {
-              id: 't14',
-              title: 'Audit logging system',
-              description: 'Priority: Medium | Implement comprehensive audit logging for all financial transactions.',
-              startDate: new Date('2026-03-23'),
-              endDate: new Date('2026-03-30'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Rajesh Kumar'
-            },
-            {
-              id: 't15',
-              title: 'Data retention policy implementation',
-              description: 'Priority: Medium | Implement automated data retention and purging based on regulatory requirements.',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-03'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Rajesh Kumar'
-            }
-          ]
-        },
-        {
-          id: 'f4',
-          name: 'Merchant Dashboard',
-          tickets: [
-            {
-              id: 't16',
-              title: 'Dashboard UI framework setup',
-              description: 'Priority: Medium | Setup React dashboard with authentication and routing.',
-              startDate: new Date('2026-03-09'),
-              endDate: new Date('2026-03-13'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Ananya Reddy'
-            },
-            {
-              id: 't17',
-              title: 'Transaction listing and search',
-              description: 'Priority: High | Build transaction listing with filters, search, and pagination.',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-23'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Ananya Reddy'
-            },
-            {
-              id: 't18',
-              title: 'Real-time transaction status updates',
-              description: 'Priority: Medium | Implement WebSocket-based real-time status updates for transactions.',
-              startDate: new Date('2026-03-23'),
-              endDate: new Date('2026-03-27'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Kabir Joshi'
-            },
-            {
-              id: 't19',
-              title: 'Merchant settings management',
-              description: 'Priority: Medium | Build UI for merchant profile, API keys, and webhook configuration.',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-06'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Ananya Reddy'
-            },
-            {
-              id: 't20',
-              title: 'Basic analytics dashboard',
-              description: 'Priority: Low | Build basic analytics with transaction volume and success rate charts.',
-              startDate: new Date('2026-04-07'),
-              endDate: new Date('2026-04-13'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Kabir Joshi'
-            }
-          ]
-        },
-        {
-          id: 'f5',
-          name: 'Testing & Documentation',
-          tickets: [
-            {
-              id: 't21',
-              title: 'Integration test suite setup',
-              description: 'Priority: High | Setup integration testing framework with test data management.',
-              startDate: new Date('2026-03-23'),
-              endDate: new Date('2026-03-27'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Lakshmi Iyer'
-            },
-            {
-              id: 't22',
-              title: 'API endpoint testing',
-              description: 'Priority: High | Write comprehensive tests for all payment API endpoints.',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-06'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Lakshmi Iyer'
-            },
-            {
-              id: 't23',
-              title: 'API documentation with OpenAPI',
-              description: 'Priority: Medium | Create comprehensive API documentation using OpenAPI 3.0 spec.',
-              startDate: new Date('2026-04-07'),
-              endDate: new Date('2026-04-13'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Arjun Mehta'
-            },
-            {
-              id: 't24',
-              title: 'Sandbox environment testing',
-              description: 'Priority: Medium | Setup and test sandbox environment for merchant integration testing.',
-              startDate: new Date('2026-04-14'),
-              endDate: new Date('2026-04-20'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Lakshmi Iyer'
-            }
-          ]
-        }
-      ],
-      sprints: [
-        {
-          id: 's1',
-          name: 'Sprint 1 - Foundation',
-          startDate: new Date('2026-02-17'),
-          endDate: new Date('2026-02-28')
-        },
-        {
-          id: 's2',
-          name: 'Sprint 2 - Core APIs',
-          startDate: new Date('2026-03-02'),
-          endDate: new Date('2026-03-13')
-        },
-        {
-          id: 's3',
-          name: 'Sprint 3 - Transaction Engine',
-          startDate: new Date('2026-03-16'),
-          endDate: new Date('2026-03-27')
-        },
-        {
-          id: 's4',
-          name: 'Sprint 4 - Dashboard & Security',
-          startDate: new Date('2026-03-30'),
-          endDate: new Date('2026-04-10')
-        },
-        {
-          id: 's5',
-          name: 'Sprint 5 - Testing & Polish',
-          startDate: new Date('2026-04-13'),
-          endDate: new Date('2026-04-24')
-        }
-      ],
-      milestones: [],
-      phases: [
-        {
-          id: 'p1-phase1',
-          releaseId: 'r1',
-          name: 'Dev Window',
-          type: 'DevWindow',
-          startDate: new Date('2026-02-17'),
-          endDate: new Date('2026-03-28'),
-          allowsWork: true,
-          order: 1,
-          description: 'Active development period for all features'
-        },
-        {
-          id: 'p1-phase2',
-          releaseId: 'r1',
-          name: 'Code Freeze',
-          type: 'Deployment',
-          startDate: new Date('2026-03-29'),
-          endDate: new Date('2026-03-30'),
-          allowsWork: false,
-          order: 2,
-          description: 'No new code changes, final build preparation'
-        },
-        {
-          id: 'p1-phase3',
-          releaseId: 'r1',
-          name: 'SIT Testing',
-          type: 'Testing',
-          startDate: new Date('2026-03-31'),
-          endDate: new Date('2026-04-10'),
-          allowsWork: false,
-          order: 3,
-          description: 'System Integration Testing with external payment providers'
-        },
-        {
-          id: 'p1-phase4',
-          releaseId: 'r1',
-          name: 'UAT',
-          type: 'Approval',
-          startDate: new Date('2026-04-11'),
-          endDate: new Date('2026-04-18'),
-          allowsWork: false,
-          order: 4,
-          description: 'User Acceptance Testing with merchant partners'
-        },
-        {
-          id: 'p1-phase5',
-          releaseId: 'r1',
-          name: 'Pre-Prod Validation',
-          type: 'Testing',
-          startDate: new Date('2026-04-19'),
-          endDate: new Date('2026-04-21'),
-          allowsWork: false,
-          order: 5,
-          description: 'Final validation in pre-production environment'
-        },
-        {
-          id: 'p1-phase6',
-          releaseId: 'r1',
-          name: 'Production Deployment',
-          type: 'Deployment',
-          startDate: new Date('2026-04-22'),
-          endDate: new Date('2026-04-22'),
-          allowsWork: false,
-          order: 6,
-          description: 'Deploy to production during maintenance window'
-        },
-        {
-          id: 'p1-phase7',
-          releaseId: 'r1',
-          name: 'Hypercare',
-          type: 'Launch',
-          startDate: new Date('2026-04-23'),
-          endDate: new Date('2026-04-24'),
-          allowsWork: false,
-          order: 7,
-          description: 'Post-launch monitoring and immediate issue resolution'
-        }
-      ]
-    },
-    {
-      id: 'r2',
-      name: 'R2 2026 - Advanced Features & Scale',
-      startDate: new Date('2026-04-27'),
-      endDate: new Date('2026-06-26'),
-      storyPointMapping: SP_PRESETS.fibonacci,
-      features: [
-        {
-          id: 'f6',
-          name: 'Multi-Currency Support',
-          tickets: [
-            {
-              id: 't25',
-              title: 'Currency conversion engine',
-              description: 'Priority: High | Implement real-time currency conversion with multiple FX providers.',
-              startDate: new Date('2026-04-27'),
-              endDate: new Date('2026-05-04'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Neha Patel'
-            },
-            {
-              id: 't26',
-              title: 'Multi-currency transaction support',
-              description: 'Priority: High | Extend payment processing to handle multiple currencies.',
-              startDate: new Date('2026-05-04'),
-              endDate: new Date('2026-05-11'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Arjun Mehta'
-            },
-            {
-              id: 't27',
-              title: 'Currency settlement workflow',
-              description: 'Priority: Medium | Implement settlement workflow for multi-currency transactions.',
-              startDate: new Date('2026-05-11'),
-              endDate: new Date('2026-05-18'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Neha Patel'
-            },
-            {
-              id: 't28',
-              title: 'FX rate caching and optimization',
-              description: 'Priority: Low | Implement intelligent FX rate caching to reduce API calls.',
-              startDate: new Date('2026-05-18'),
-              endDate: new Date('2026-05-22'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Vikram Singh'
-            }
-          ]
-        },
-        {
-          id: 'f7',
-          name: 'Fraud Detection System',
-          tickets: [
-            {
-              id: 't29',
-              title: 'Fraud detection rule engine',
-              description: 'Priority: High | Build configurable rule engine for fraud detection with scoring system.',
-              startDate: new Date('2026-04-27'),
-              endDate: new Date('2026-05-04'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Rajesh Kumar'
-            },
-            {
-              id: 't30',
-              title: 'Velocity checks implementation',
-              description: 'Priority: High | Implement velocity checks for cards, IPs, and merchant patterns.',
-              startDate: new Date('2026-05-04'),
-              endDate: new Date('2026-05-08'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Priya Sharma'
-            },
-            {
-              id: 't31',
-              title: 'Machine learning fraud model integration',
-              description: 'Priority: Medium | Integrate ML-based fraud detection model with fallback rules.',
-              startDate: new Date('2026-05-11'),
-              endDate: new Date('2026-05-18'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Rajesh Kumar'
-            },
-            {
-              id: 't32',
-              title: 'Fraud review dashboard',
-              description: 'Priority: Medium | Build dashboard for fraud team to review flagged transactions.',
-              startDate: new Date('2026-05-18'),
-              endDate: new Date('2026-05-25'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Ananya Reddy'
-            },
-            {
-              id: 't33',
-              title: 'Automated fraud alerts',
-              description: 'Priority: Low | Implement real-time alerts for high-risk transactions.',
-              startDate: new Date('2026-05-26'),
-              endDate: new Date('2026-05-29'),
-              status: 'planned',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Vikram Singh'
-            }
-          ]
-        },
-        {
-          id: 'f8',
-          name: 'Advanced Analytics & Reporting',
-          tickets: [
-            {
-              id: 't34',
-              title: 'Data warehouse ETL pipeline',
-              description: 'Priority: High | Build ETL pipeline to extract transaction data into analytics warehouse.',
-              startDate: new Date('2026-05-04'),
-              endDate: new Date('2026-05-11'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Arjun Mehta'
-            },
-            {
-              id: 't35',
-              title: 'Advanced analytics dashboard',
-              description: 'Priority: Medium | Build comprehensive analytics with revenue, trends, and cohort analysis.',
-              startDate: new Date('2026-05-11'),
-              endDate: new Date('2026-05-18'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Kabir Joshi'
-            },
-            {
-              id: 't36',
-              title: 'Custom report builder',
-              description: 'Priority: Low | Allow merchants to create custom reports with flexible filters.',
-              startDate: new Date('2026-05-18'),
-              endDate: new Date('2026-05-25'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Kabir Joshi'
-            },
-            {
-              id: 't37',
-              title: 'Scheduled report generation',
-              description: 'Priority: Low | Implement scheduled reports with email delivery.',
-              startDate: new Date('2026-05-26'),
-              endDate: new Date('2026-06-01'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Neha Patel'
-            },
-            {
-              id: 't38',
-              title: 'Export functionality (CSV, Excel, PDF)',
-              description: 'Priority: Medium | Add export functionality for all reports in multiple formats.',
-              startDate: new Date('2026-06-01'),
-              endDate: new Date('2026-06-05'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Ananya Reddy'
-            }
-          ]
-        },
-        {
-          id: 'f9',
-          name: 'Webhooks & Integration',
-          tickets: [
-            {
-              id: 't39',
-              title: 'Webhook delivery system',
-              description: 'Priority: High | Build reliable webhook delivery with retry logic and dead letter queue.',
-              startDate: new Date('2026-05-11'),
-              endDate: new Date('2026-05-18'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Vikram Singh'
-            },
-            {
-              id: 't40',
-              title: 'Webhook testing tools',
-              description: 'Priority: Medium | Build webhook testing UI with payload preview and retry controls.',
-              startDate: new Date('2026-05-18'),
-              endDate: new Date('2026-05-22'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Ananya Reddy'
-            },
-            {
-              id: 't41',
-              title: 'SDK development (Node.js)',
-              description: 'Priority: Medium | Develop official Node.js SDK for payment API integration.',
-              startDate: new Date('2026-05-26'),
-              endDate: new Date('2026-06-01'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Arjun Mehta'
-            },
-            {
-              id: 't42',
-              title: 'SDK development (Python)',
-              description: 'Priority: Low | Develop official Python SDK for payment API integration.',
-              startDate: new Date('2026-06-01'),
-              endDate: new Date('2026-06-08'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Priya Sharma'
-            },
-            {
-              id: 't43',
-              title: 'Integration examples and tutorials',
-              description: 'Priority: Medium | Create comprehensive integration guides with code examples.',
-              startDate: new Date('2026-06-08'),
-              endDate: new Date('2026-06-12'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Kabir Joshi'
-            }
-          ]
-        },
-        {
-          id: 'f10',
-          name: 'Performance & Scalability',
-          tickets: [
-            {
-              id: 't44',
-              title: 'Load testing and optimization',
-              description: 'Priority: High | Conduct load testing and optimize for 10k TPS throughput.',
-              startDate: new Date('2026-05-26'),
-              endDate: new Date('2026-06-01'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Lakshmi Iyer'
-            },
-            {
-              id: 't45',
-              title: 'Database query optimization',
-              description: 'Priority: High | Optimize slow queries and add proper indexes for scale.',
-              startDate: new Date('2026-06-01'),
-              endDate: new Date('2026-06-05'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Rajesh Kumar'
-            },
-            {
-              id: 't46',
-              title: 'Caching layer implementation',
-              description: 'Priority: Medium | Implement Redis caching for frequently accessed data.',
-              startDate: new Date('2026-06-05'),
-              endDate: new Date('2026-06-12'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Vikram Singh'
-            },
-            {
-              id: 't47',
-              title: 'Auto-scaling configuration',
-              description: 'Priority: Medium | Configure auto-scaling for payment processing services.',
-              startDate: new Date('2026-06-12'),
-              endDate: new Date('2026-06-15'),
-              status: 'planned',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Rajesh Kumar'
-            },
-            {
-              id: 't48',
-              title: 'Monitoring and alerting setup',
-              description: 'Priority: High | Setup comprehensive monitoring with SLA-based alerts.',
-              startDate: new Date('2026-06-15'),
-              endDate: new Date('2026-06-19'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Lakshmi Iyer'
-            },
-            {
-              id: 't49',
-              title: 'Disaster recovery testing',
-              description: 'Priority: High | Test and document disaster recovery procedures.',
-              startDate: new Date('2026-06-19'),
-              endDate: new Date('2026-06-26'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Lakshmi Iyer'
-            }
-          ]
-        }
-      ],
-      sprints: [
-        {
-          id: 's6',
-          name: 'Sprint 6 - Multi-currency & Fraud',
-          startDate: new Date('2026-04-27'),
-          endDate: new Date('2026-05-08')
-        },
-        {
-          id: 's7',
-          name: 'Sprint 7 - Analytics & Integration',
-          startDate: new Date('2026-05-11'),
-          endDate: new Date('2026-05-22')
-        },
-        {
-          id: 's8',
-          name: 'Sprint 8 - SDKs & Webhooks',
-          startDate: new Date('2026-05-26'),
-          endDate: new Date('2026-06-05')
-        },
-        {
-          id: 's9',
-          name: 'Sprint 9 - Performance & Scale',
-          startDate: new Date('2026-06-08'),
-          endDate: new Date('2026-06-19')
-        },
-        {
-          id: 's10',
-          name: 'Sprint 10 - Launch Prep',
-          startDate: new Date('2026-06-22'),
-          endDate: new Date('2026-06-26')
-        }
-      ],
-      milestones: [],
-      phases: [
-        {
-          id: 'p2-phase1',
-          releaseId: 'r2',
-          name: 'Development Sprint',
-          type: 'DevWindow',
-          startDate: new Date('2026-04-27'),
-          endDate: new Date('2026-06-01'),
-          allowsWork: true,
-          order: 1,
-          description: 'Active development for advanced payment features'
-        },
-        {
-          id: 'p2-phase2',
-          releaseId: 'r2',
-          name: 'Code Complete',
-          type: 'Deployment',
-          startDate: new Date('2026-06-02'),
-          endDate: new Date('2026-06-03'),
-          allowsWork: false,
-          order: 2,
-          description: 'Feature complete, no new development'
-        },
-        {
-          id: 'p2-phase3',
-          releaseId: 'r2',
-          name: 'Integration Testing',
-          type: 'Testing',
-          startDate: new Date('2026-06-04'),
-          endDate: new Date('2026-06-12'),
-          allowsWork: false,
-          order: 3,
-          description: 'End-to-end testing with all payment channels'
-        },
-        {
-          id: 'p2-phase4',
-          releaseId: 'r2',
-          name: 'Security & Compliance Review',
-          type: 'Approval',
-          startDate: new Date('2026-06-13'),
-          endDate: new Date('2026-06-17'),
-          allowsWork: false,
-          order: 4,
-          description: 'PCI-DSS compliance audit and security penetration testing'
-        },
-        {
-          id: 'p2-phase5',
-          releaseId: 'r2',
-          name: 'Staged Rollout',
-          type: 'Deployment',
-          startDate: new Date('2026-06-18'),
-          endDate: new Date('2026-06-20'),
-          allowsWork: false,
-          order: 5,
-          description: 'Gradual rollout to merchant segments'
-        },
-        {
-          id: 'p2-phase6',
-          releaseId: 'r2',
-          name: 'Go-Live',
-          type: 'Launch',
-          startDate: new Date('2026-06-21'),
-          endDate: new Date('2026-06-26'),
-          allowsWork: false,
-          order: 6,
-          description: 'Full production release with enhanced monitoring'
-        }
-      ]
-    }
-  ]
-};
-
-// ===========================================
-// PRODUCT 2: Life Sciences Clinical Trial Management
-// ===========================================
-const product2: Product = {
-  id: 'p2',
-  name: 'Clinical Trial Management Platform',
-  releases: [
-    {
-      id: 'r3',
-      name: 'R1 2026 - Patient & Site Management',
-      startDate: new Date('2026-03-02'),
-      endDate: new Date('2026-05-15'),
-      storyPointMapping: SP_PRESETS.fibonacci,
-      features: [
-        {
-          id: 'f11',
-          name: 'Product Vision & Governance',
-          tickets: [
-            {
-              id: 't50',
-              title: 'Define product vision & outcomes',
-              description: 'Priority: High | Establish clear product vision, success metrics, and business outcomes for clinical trial platform.',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'completed',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Emma Rodriguez'
-            },
-            {
-              id: 't51',
-              title: 'Prioritize clinical use cases',
-              description: 'Priority: High | Identify and prioritize top clinical trial management use cases with stakeholders.',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'completed',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Aisha Osman'
-            },
-            {
-              id: 't52',
-              title: 'Establish governance framework',
-              description: 'Priority: High | Define decision rights, approval workflows, and governance structure.',
-              startDate: new Date('2026-03-09'),
-              endDate: new Date('2026-03-13'),
-              status: 'in-progress',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Emma Rodriguez'
-            },
-            {
-              id: 't53',
-              title: 'Define personas & patient journeys',
-              description: 'Priority: Medium | Map end-to-end patient, site coordinator, and investigator journeys.',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-23'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Zara Khanna'
-            }
-          ]
-        },
-        {
-          id: 'f12',
-          name: 'Platform & Security Infrastructure',
-          tickets: [
-            {
-              id: 't54',
-              title: 'Provision HIPAA-compliant cloud infrastructure',
-              description: 'Priority: High | Setup AWS infrastructure with HIPAA BAA and proper network isolation.',
-              startDate: new Date('2026-03-09'),
-              endDate: new Date('2026-03-16'),
-              status: 'in-progress',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Raj Kapoor'
-            },
-            {
-              id: 't55',
-              title: 'Configure secrets and key management',
-              description: 'Priority: Medium | Setup AWS KMS for encryption keys and secrets management.',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-23'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Raj Kapoor'
-            },
-            {
-              id: 't56',
-              title: 'Implement SAML-based authentication',
-              description: 'Priority: High | Build SAML 2.0 authentication for hospital SSO integration.',
-              startDate: new Date('2026-03-23'),
-              endDate: new Date('2026-03-27'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Chen Wei'
-            },
-            {
-              id: 't57',
-              title: 'Enable comprehensive audit logging',
-              description: 'Priority: High | Implement audit logging for all PHI access per HIPAA requirements.',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-06'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Marcus Johnson'
-            },
-            {
-              id: 't58',
-              title: 'Apply content filtering policies',
-              description: 'Priority: Medium | Implement content validation and sanitization for data entry.',
-              startDate: new Date('2026-04-07'),
-              endDate: new Date('2026-04-13'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Chen Wei'
-            },
-            {
-              id: 't59',
-              title: 'PII detection and redaction',
-              description: 'Priority: Medium | Implement automated PII detection and redaction for exports.',
-              startDate: new Date('2026-04-14'),
-              endDate: new Date('2026-04-20'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Marcus Johnson'
-            }
-          ]
-        },
-        {
-          id: 'f13',
-          name: 'Patient Enrollment System',
-          tickets: [
-            {
-              id: 't60',
-              title: 'Patient registration workflow',
-              description: 'Priority: High | Build patient registration with eligibility criteria validation.',
-              startDate: new Date('2026-03-23'),
-              endDate: new Date('2026-03-30'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Sofia Kowalski'
-            },
-            {
-              id: 't61',
-              title: 'Consent management system',
-              description: 'Priority: High | Implement digital consent capture with version control and audit trail.',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-06'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Liam O\'Brien'
-            },
-            {
-              id: 't62',
-              title: 'Patient screening questionnaire',
-              description: 'Priority: Medium | Build configurable screening questionnaire with branching logic.',
-              startDate: new Date('2026-04-07'),
-              endDate: new Date('2026-04-13'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Yuki Tanaka'
-            },
-            {
-              id: 't63',
-              title: 'Patient randomization engine',
-              description: 'Priority: High | Implement stratified randomization for treatment arm assignment.',
-              startDate: new Date('2026-04-14'),
-              endDate: new Date('2026-04-20'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Aisha Osman'
-            },
-            {
-              id: 't64',
-              title: 'Patient dashboard and portal',
-              description: 'Priority: Medium | Build patient-facing portal for appointments and data review.',
-              startDate: new Date('2026-04-21'),
-              endDate: new Date('2026-04-27'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Sofia Kowalski'
-            }
-          ]
-        },
-        {
-          id: 'f14',
-          name: 'Site Management',
-          tickets: [
-            {
-              id: 't65',
-              title: 'Site registration and onboarding',
-              description: 'Priority: High | Build site registration with investigator credentials verification.',
-              startDate: new Date('2026-04-07'),
-              endDate: new Date('2026-04-13'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Priya Singh'
-            },
-            {
-              id: 't66',
-              title: 'Site coordinator dashboard',
-              description: 'Priority: High | Build coordinator dashboard for patient management and visit tracking.',
-              startDate: new Date('2026-04-14'),
-              endDate: new Date('2026-04-20'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Liam O\'Brien'
-            },
-            {
-              id: 't67',
-              title: 'Visit scheduling system',
-              description: 'Priority: Medium | Implement visit scheduling with automated reminders.',
-              startDate: new Date('2026-04-21'),
-              endDate: new Date('2026-04-27'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Yuki Tanaka'
-            },
-            {
-              id: 't68',
-              title: 'Site performance metrics',
-              description: 'Priority: Low | Build metrics dashboard for enrollment rate and protocol adherence.',
-              startDate: new Date('2026-04-28'),
-              endDate: new Date('2026-05-04'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Priya Singh'
-            }
-          ]
-        },
-        {
-          id: 'f15',
-          name: 'Protocol Compliance',
-          tickets: [
-            {
-              id: 't69',
-              title: 'Protocol deviation tracking',
-              description: 'Priority: High | Implement system to log and track protocol deviations.',
-              startDate: new Date('2026-04-21'),
-              endDate: new Date('2026-04-27'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Marcus Johnson'
-            },
-            {
-              id: 't70',
-              title: 'Adverse event reporting',
-              description: 'Priority: High | Build adverse event capture with severity classification and reporting.',
-              startDate: new Date('2026-04-28'),
-              endDate: new Date('2026-05-04'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Aisha Osman'
-            },
-            {
-              id: 't71',
-              title: 'Visit window compliance checks',
-              description: 'Priority: Medium | Implement automated checks for visit window compliance.',
-              startDate: new Date('2026-05-05'),
-              endDate: new Date('2026-05-11'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Chen Wei'
-            },
-            {
-              id: 't72',
-              title: 'SAE reporting workflow',
-              description: 'Priority: High | Build serious adverse event (SAE) expedited reporting workflow.',
-              startDate: new Date('2026-05-11'),
-              endDate: new Date('2026-05-15'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Aisha Osman'
-            }
-          ]
-        }
-      ],
-      sprints: [
-        {
-          id: 's11',
-          name: 'Sprint 1 - Foundation',
-          startDate: new Date('2026-03-02'),
-          endDate: new Date('2026-03-13')
-        },
-        {
-          id: 's12',
-          name: 'Sprint 2 - Platform Setup',
-          startDate: new Date('2026-03-16'),
-          endDate: new Date('2026-03-27')
-        },
-        {
-          id: 's13',
-          name: 'Sprint 3 - Patient & Auth',
-          startDate: new Date('2026-03-30'),
-          endDate: new Date('2026-04-10')
-        },
-        {
-          id: 's14',
-          name: 'Sprint 4 - Enrollment & Sites',
-          startDate: new Date('2026-04-13'),
-          endDate: new Date('2026-04-24')
-        },
-        {
-          id: 's15',
-          name: 'Sprint 5 - Compliance',
-          startDate: new Date('2026-04-27'),
-          endDate: new Date('2026-05-08')
-        },
-        {
-          id: 's16',
-          name: 'Sprint 6 - Polish & Testing',
-          startDate: new Date('2026-05-11'),
-          endDate: new Date('2026-05-15')
-        }
-      ],
-      milestones: []
-    },
-    {
-      id: 'r4',
-      name: 'R2 2026 - Analytics & Regulatory Reporting',
-      startDate: new Date('2026-05-18'),
-      endDate: new Date('2026-07-24'),
-      storyPointMapping: SP_PRESETS.fibonacci,
-      features: [
-        {
-          id: 'f16',
-          name: 'Data Collection & EDC',
-          tickets: [
-            {
-              id: 't73',
-              title: 'Electronic data capture forms',
-              description: 'Priority: High | Build configurable EDC forms with validation rules.',
-              startDate: new Date('2026-05-18'),
-              endDate: new Date('2026-05-25'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Yuki Tanaka'
-            },
-            {
-              id: 't74',
-              title: 'Data validation engine',
-              description: 'Priority: High | Implement real-time data validation with query generation.',
-              startDate: new Date('2026-05-25'),
-              endDate: new Date('2026-06-01'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Chen Wei'
-            },
-            {
-              id: 't75',
-              title: 'Medical coding integration (MedDRA)',
-              description: 'Priority: Medium | Integrate MedDRA coding for adverse events.',
-              startDate: new Date('2026-06-01'),
-              endDate: new Date('2026-06-08'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Aisha Osman'
-            },
-            {
-              id: 't76',
-              title: 'Source document verification',
-              description: 'Priority: Medium | Build workflow for source data verification (SDV).',
-              startDate: new Date('2026-06-08'),
-              endDate: new Date('2026-06-15'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Marcus Johnson'
-            },
-            {
-              id: 't77',
-              title: 'Query management system',
-              description: 'Priority: High | Implement data query workflow with resolution tracking.',
-              startDate: new Date('2026-06-15'),
-              endDate: new Date('2026-06-19'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Priya Singh'
-            }
-          ]
-        },
-        {
-          id: 'f17',
-          name: 'Clinical Data Analytics',
-          tickets: [
-            {
-              id: 't78',
-              title: 'Real-time enrollment analytics',
-              description: 'Priority: High | Build real-time enrollment tracking with projections.',
-              startDate: new Date('2026-05-18'),
-              endDate: new Date('2026-05-25'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Raj Kapoor'
-            },
-            {
-              id: 't79',
-              title: 'Safety analytics dashboard',
-              description: 'Priority: High | Build safety signals detection and trend analysis.',
-              startDate: new Date('2026-05-25'),
-              endDate: new Date('2026-06-01'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Raj Kapoor'
-            },
-            {
-              id: 't80',
-              title: 'Efficacy endpoint analysis',
-              description: 'Priority: Medium | Implement analysis tools for primary/secondary endpoints.',
-              startDate: new Date('2026-06-01'),
-              endDate: new Date('2026-06-08'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Priya Singh'
-            },
-            {
-              id: 't81',
-              title: 'Data export for statistical analysis',
-              description: 'Priority: Medium | Build CDISC-compliant data export (SDTM, ADaM).',
-              startDate: new Date('2026-06-08'),
-              endDate: new Date('2026-06-15'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Raj Kapoor'
-            }
-          ]
-        },
-        {
-          id: 'f18',
-          name: 'Regulatory Reporting',
-          tickets: [
-            {
-              id: 't82',
-              title: 'IRB/EC reporting module',
-              description: 'Priority: High | Build automated reports for institutional review board submissions.',
-              startDate: new Date('2026-06-08'),
-              endDate: new Date('2026-06-15'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Emma Rodriguez'
-            },
-            {
-              id: 't83',
-              title: 'Regulatory authority reporting (FDA/EMA)',
-              description: 'Priority: High | Implement ICSR generation for regulatory reporting.',
-              startDate: new Date('2026-06-15'),
-              endDate: new Date('2026-06-22'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Emma Rodriguez'
-            },
-            {
-              id: 't84',
-              title: 'Clinical study report generation',
-              description: 'Priority: Medium | Build CSR template system with automated data population.',
-              startDate: new Date('2026-06-22'),
-              endDate: new Date('2026-06-29'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Aisha Osman'
-            },
-            {
-              id: 't85',
-              title: 'TMF document management',
-              description: 'Priority: Medium | Build trial master file system with version control.',
-              startDate: new Date('2026-06-29'),
-              endDate: new Date('2026-07-06'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Marcus Johnson'
-            }
-          ]
-        },
-        {
-          id: 'f19',
-          name: 'Safety Monitoring',
-          tickets: [
-            {
-              id: 't86',
-              title: 'Data safety monitoring board portal',
-              description: 'Priority: High | Build secure DSMB portal with unblinded data access.',
-              startDate: new Date('2026-06-15'),
-              endDate: new Date('2026-06-22'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Sofia Kowalski'
-            },
-            {
-              id: 't87',
-              title: 'Safety signal detection',
-              description: 'Priority: High | Implement automated safety signal detection algorithms.',
-              startDate: new Date('2026-06-22'),
-              endDate: new Date('2026-06-29'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Chen Wei'
-            },
-            {
-              id: 't88',
-              title: 'Patient safety dashboard',
-              description: 'Priority: Medium | Build real-time patient safety monitoring dashboard.',
-              startDate: new Date('2026-06-29'),
-              endDate: new Date('2026-07-06'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Liam O\'Brien'
-            },
-            {
-              id: 't89',
-              title: 'Safety report automation',
-              description: 'Priority: Medium | Automate periodic safety update reports (PSUR/DSUR).',
-              startDate: new Date('2026-07-06'),
-              endDate: new Date('2026-07-13'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Aisha Osman'
-            }
-          ]
-        },
-        {
-          id: 'f20',
-          name: 'Trial Quality & Performance',
-          tickets: [
-            {
-              id: 't90',
-              title: 'Risk-based monitoring framework',
-              description: 'Priority: High | Implement risk indicators and site monitoring prioritization.',
-              startDate: new Date('2026-06-29'),
-              endDate: new Date('2026-07-06'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Emma Rodriguez'
-            },
-            {
-              id: 't91',
-              title: 'Site performance scorecard',
-              description: 'Priority: Medium | Build comprehensive site performance metrics dashboard.',
-              startDate: new Date('2026-07-06'),
-              endDate: new Date('2026-07-13'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Priya Singh'
-            },
-            {
-              id: 't92',
-              title: 'Data quality metrics',
-              description: 'Priority: Medium | Implement data quality KPIs and trend tracking.',
-              startDate: new Date('2026-07-13'),
-              endDate: new Date('2026-07-17'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Raj Kapoor'
-            },
-            {
-              id: 't93',
-              title: 'Training tracking and certification',
-              description: 'Priority: Low | Build system to track site staff training and certifications.',
-              startDate: new Date('2026-07-17'),
-              endDate: new Date('2026-07-24'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Yuki Tanaka'
-            }
-          ]
-        }
-      ],
-      sprints: [
-        {
-          id: 's17',
-          name: 'Sprint 7 - EDC Foundation',
-          startDate: new Date('2026-05-18'),
-          endDate: new Date('2026-05-29')
-        },
-        {
-          id: 's18',
-          name: 'Sprint 8 - Analytics',
-          startDate: new Date('2026-06-01'),
-          endDate: new Date('2026-06-12')
-        },
-        {
-          id: 's19',
-          name: 'Sprint 9 - Regulatory',
-          startDate: new Date('2026-06-15'),
-          endDate: new Date('2026-06-26')
-        },
-        {
-          id: 's20',
-          name: 'Sprint 10 - Safety Monitoring',
-          startDate: new Date('2026-06-29'),
-          endDate: new Date('2026-07-10')
-        },
-        {
-          id: 's21',
-          name: 'Sprint 11 - Quality & Launch',
-          startDate: new Date('2026-07-13'),
-          endDate: new Date('2026-07-24')
-        }
-      ],
-      milestones: []
-    }
-  ]
-};
-
-// ===========================================
-// SHOWCASE PRODUCT 1: Balanced Planning
-// ===========================================
-const product3: Product = {
-  id: 'p_showcase_balanced',
-  name: 'Showcase A – Balanced Planning',
-  releases: [
-    {
-      id: 'r_balanced',
-      name: 'Q1 2026 - Balanced Release',
-      startDate: new Date('2026-03-02'),
-      endDate: new Date('2026-04-24'),
-      storyPointMapping: SP_PRESETS.linear,
-      features: [
-        {
-          id: 'f_bal_1',
-          name: 'Authentication & User Management',
-          tickets: [
-            {
-              id: 't_bal_1',
-              title: 'Implement OAuth 2.0 Integration',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-11'),
-              status: 'planned',
-              storyPoints: 10,
-              effortDays: 10,
-              assignedTo: 'Alex Chen'
-            },
-            {
-              id: 't_bal_2',
-              title: 'Build User Profile Service',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Jordan Smith'
-            },
-            {
-              id: 't_bal_3',
-              title: 'Create Permission Framework',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Taylor Brown'
-            },
-            {
-              id: 't_bal_4',
-              title: 'Add Session Management',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-08'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Casey Lee'
-            },
-            {
-              id: 't_bal_5',
-              title: 'Write Auth Test Suite',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-08'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Morgan Davis'
-            }
-          ]
-        },
-        {
-          id: 'f_bal_2',
-          name: 'API Gateway & Rate Limiting',
-          tickets: [
-            {
-              id: 't_bal_6',
-              title: 'Design API Gateway Architecture',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-26'),
-              status: 'planned',
-              storyPoints: 11,
-              effortDays: 11,
-              assignedTo: 'Alex Chen'
-            },
-            {
-              id: 't_bal_7',
-              title: 'Implement Rate Limiting Logic',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-24'),
-              status: 'planned',
-              storyPoints: 9,
-              effortDays: 9,
-              assignedTo: 'Jordan Smith'
-            },
-            {
-              id: 't_bal_8',
-              title: 'Build Request Throttling',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-24'),
-              status: 'planned',
-              storyPoints: 9,
-              effortDays: 9,
-              assignedTo: 'Taylor Brown'
-            },
-            {
-              id: 't_bal_9',
-              title: 'Add API Monitoring',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-22'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Casey Lee'
-            },
-            {
-              id: 't_bal_10',
-              title: 'Test Gateway Performance',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-21'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Morgan Davis'
-            }
-          ]
-        },
-        {
-          id: 'f_bal_3',
-          name: 'Data Processing Pipeline',
-          tickets: [
-            {
-              id: 't_bal_11',
-              title: 'Build ETL Framework',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-09'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Alex Chen'
-            },
-            {
-              id: 't_bal_12',
-              title: 'Implement Data Validation',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-06'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Jordan Smith'
-            },
-            {
-              id: 't_bal_13',
-              title: 'Create Data Transformers',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-06'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Taylor Brown'
-            },
-            {
-              id: 't_bal_14',
-              title: 'Add Error Recovery',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-04'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Casey Lee'
-            },
-            {
-              id: 't_bal_15',
-              title: 'Test Pipeline Reliability',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-05'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Morgan Davis'
-            }
-          ]
-        },
-        {
-          id: 'f_bal_4',
-          name: 'Reporting & Analytics',
-          tickets: [
-            {
-              id: 't_bal_16',
-              title: 'Design Analytics Engine',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-23'),
-              status: 'planned',
-              storyPoints: 11,
-              effortDays: 11,
-              assignedTo: 'Alex Chen'
-            },
-            {
-              id: 't_bal_17',
-              title: 'Build Report Generator',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-21'),
-              status: 'planned',
-              storyPoints: 9,
-              effortDays: 9,
-              assignedTo: 'Jordan Smith'
-            },
-            {
-              id: 't_bal_18',
-              title: 'Create Dashboard Widgets',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-20'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Taylor Brown'
-            },
-            {
-              id: 't_bal_19',
-              title: 'Add Export Functionality',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-19'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Casey Lee'
-            },
-            {
-              id: 't_bal_20',
-              title: 'Test Report Accuracy',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-18'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Morgan Davis'
-            }
-          ]
-        }
-      ],
-      sprints: [
-        {
-          id: 's_bal_1',
-          name: 'Sprint 1 - Foundation',
-          startDate: new Date('2026-03-02'),
-          endDate: new Date('2026-03-13')
-        },
-        {
-          id: 's_bal_2',
-          name: 'Sprint 2 - Gateway',
-          startDate: new Date('2026-03-16'),
-          endDate: new Date('2026-03-27')
-        },
-        {
-          id: 's_bal_3',
-          name: 'Sprint 3 - Pipeline',
-          startDate: new Date('2026-03-30'),
-          endDate: new Date('2026-04-10')
-        },
-        {
-          id: 's_bal_4',
-          name: 'Sprint 4 - Analytics',
-          startDate: new Date('2026-04-13'),
-          endDate: new Date('2026-04-24')
-        }
-      ],
-      milestones: []
-    }
-  ]
-};
-
-// ===========================================
-// SHOWCASE PRODUCT 2: Overload & Velocity Impact
-// ===========================================
-const product4: Product = {
-  id: 'p_showcase_overload',
-  name: 'Showcase B – Overload & Velocity Impact',
-  releases: [
-    {
-      id: 'r_overload',
-      name: 'Q1 2026 - Overload Demonstration',
-      startDate: new Date('2026-03-02'),
-      endDate: new Date('2026-04-24'),
-      storyPointMapping: SP_PRESETS.linear,
-      features: [
-        {
-          id: 'f_over_1',
-          name: 'Core Infrastructure',
-          tickets: [
-            {
-              id: 't_over_1',
-              title: 'Setup Database Architecture',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-11'),
-              status: 'planned',
-              storyPoints: 10,
-              effortDays: 10,
-              assignedTo: 'Sam Wilson'
-            },
-            {
-              id: 't_over_2',
-              title: 'Configure Cloud Infrastructure',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Riley Martinez'
-            },
-            {
-              id: 't_over_3',
-              title: 'Implement Caching Layer',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Avery Johnson'
-            },
-            {
-              id: 't_over_4',
-              title: 'Setup Monitoring Stack',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-08'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Dakota White'
-            },
-            {
-              id: 't_over_5',
-              title: 'Create Infrastructure Tests',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-08'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Quinn Taylor'
-            }
-          ]
-        },
-        {
-          id: 'f_over_2',
-          name: 'Heavy Feature Load (Overload Sprint)',
-          tickets: [
-            {
-              id: 't_over_6',
-              title: 'Build Complex API Gateway (Senior Task)',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-23'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Sam Wilson',
-              description: '8 days for Senior (1.3x multiplier) - demonstrates velocity impact'
-            },
-            {
-              id: 't_over_7',
-              title: 'Build Complex Data Processor (Junior Task)',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-23'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Dakota White',
-              description: '8 days for Junior (0.7x multiplier) - will show overload impact'
-            },
-            {
-              id: 't_over_8',
-              title: 'Implement Real-time Streaming',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-20'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Sam Wilson'
-            },
-            {
-              id: 't_over_9',
-              title: 'Build Notification System',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-26'),
-              status: 'planned',
-              storyPoints: 11,
-              effortDays: 11,
-              assignedTo: 'Riley Martinez'
-            },
-            {
-              id: 't_over_10',
-              title: 'Create Webhook Handler',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-26'),
-              status: 'planned',
-              storyPoints: 11,
-              effortDays: 11,
-              assignedTo: 'Avery Johnson'
-            },
-            {
-              id: 't_over_11',
-              title: 'Add Event Sourcing',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-19'),
-              status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Dakota White'
-            },
-            {
-              id: 't_over_12',
-              title: 'Test Event Flow',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-23'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Quinn Taylor'
-            }
-          ]
-        },
-        {
-          id: 'f_over_3',
-          name: 'Integration Services',
-          tickets: [
-            {
-              id: 't_over_13',
-              title: 'Build Third-Party Connectors',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-09'),
-              status: 'planned',
-              storyPoints: 10,
-              effortDays: 10,
-              assignedTo: 'Sam Wilson'
-            },
-            {
-              id: 't_over_14',
-              title: 'Implement OAuth Flows',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-06'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Riley Martinez'
-            },
-            {
-              id: 't_over_15',
-              title: 'Create API Client SDK',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-06'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Avery Johnson'
-            },
-            {
-              id: 't_over_16',
-              title: 'Add Error Handling',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-05'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Dakota White'
-            },
-            {
-              id: 't_over_17',
-              title: 'Test Integration Points',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-05'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Quinn Taylor'
-            }
-          ]
-        },
-        {
-          id: 'f_over_4',
-          name: 'Security & Compliance',
-          tickets: [
-            {
-              id: 't_over_18',
-              title: 'Implement Security Audit',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-22'),
-              status: 'planned',
-              storyPoints: 10,
-              effortDays: 10,
-              assignedTo: 'Sam Wilson'
-            },
-            {
-              id: 't_over_19',
-              title: 'Build Encryption Layer',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-20'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Riley Martinez'
-            },
-            {
-              id: 't_over_20',
-              title: 'Add Compliance Reports',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-21'),
-              status: 'planned',
-              storyPoints: 9,
-              effortDays: 9,
-              assignedTo: 'Avery Johnson'
-            },
-            {
-              id: 't_over_21',
-              title: 'Create Audit Logs',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-19'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Dakota White'
-            },
-            {
-              id: 't_over_22',
-              title: 'Test Security Controls',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-18'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Quinn Taylor'
-            }
-          ]
-        }
-      ],
-      sprints: [
-        {
-          id: 's_over_1',
-          name: 'Sprint 1 - Infrastructure',
-          startDate: new Date('2026-03-02'),
-          endDate: new Date('2026-03-13')
-        },
-        {
-          id: 's_over_2',
-          name: 'Sprint 2 - OVERLOAD',
-          startDate: new Date('2026-03-16'),
-          endDate: new Date('2026-03-27')
-        },
-        {
-          id: 's_over_3',
-          name: 'Sprint 3 - Integration',
-          startDate: new Date('2026-03-30'),
-          endDate: new Date('2026-04-10')
-        },
-        {
-          id: 's_over_4',
-          name: 'Sprint 4 - Security',
-          startDate: new Date('2026-04-13'),
-          endDate: new Date('2026-04-24')
-        }
-      ],
-      milestones: []
-    }
-  ]
-};
-
-// ===========================================
-// SHOWCASE PRODUCT 3: Scope Shock & PTO Stress
-// ===========================================
-const product5: Product = {
-  id: 'p_showcase_scope',
-  name: 'Showcase C – Scope Shock & PTO Stress',
-  releases: [
-    {
-      id: 'r_scope',
-      name: 'Q1 2026 - Scope & PTO Impact',
-      startDate: new Date('2026-03-02'),
-      endDate: new Date('2026-04-24'),
-      storyPointMapping: SP_PRESETS.linear,
-      features: [
-        {
-          id: 'f_scope_1',
-          name: 'Platform Foundation',
-          tickets: [
-            {
-              id: 't_scope_1',
-              title: 'Design System Architecture',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-11'),
-              status: 'planned',
-              storyPoints: 10,
-              effortDays: 10,
-              assignedTo: 'Jamie Carter'
-            },
-            {
-              id: 't_scope_2',
-              title: 'Build Core Services',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Morgan Reed'
-            },
-            {
-              id: 't_scope_3',
-              title: 'Setup Service Mesh',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-09'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Parker Kim'
-            },
-            {
-              id: 't_scope_4',
-              title: 'Implement Health Checks',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-08'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Cameron Gray'
-            },
-            {
-              id: 't_scope_5',
-              title: 'Create Platform Tests',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-08'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Skylar Brooks'
-            }
-          ]
-        },
-        {
-          id: 'f_scope_2',
-          name: 'Business Logic Layer',
-          tickets: [
-            {
-              id: 't_scope_6',
-              title: 'Build Workflow Engine',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-26'),
-              status: 'planned',
-              storyPoints: 11,
-              effortDays: 11,
-              assignedTo: 'Jamie Carter'
-            },
-            {
-              id: 't_scope_7',
-              title: 'Implement Business Rules',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-24'),
-              status: 'planned',
-              storyPoints: 9,
-              effortDays: 9,
-              assignedTo: 'Morgan Reed'
-            },
-            {
-              id: 't_scope_8',
-              title: 'Create State Machine',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-24'),
-              status: 'planned',
-              storyPoints: 9,
-              effortDays: 9,
-              assignedTo: 'Parker Kim'
-            },
-            {
-              id: 't_scope_9',
-              title: 'Add Validation Framework',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-22'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Cameron Gray'
-            },
-            {
-              id: 't_scope_10',
-              title: 'Test Business Logic',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-21'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Skylar Brooks'
-            }
-          ]
-        },
-        {
-          id: 'f_scope_3',
-          name: 'SCOPE SHOCK - Additional Requirements',
-          tickets: [
-            {
-              id: 't_scope_11',
-              title: '[EMERGENCY] Implement New Regulatory Feature',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-09'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Jamie Carter',
-              description: 'Late-breaking requirement adding scope'
-            },
-            {
-              id: 't_scope_12',
-              title: '[URGENT] Build Compliance Dashboard',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-09'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Morgan Reed',
-              description: 'Additional scope from stakeholder'
-            },
-            {
-              id: 't_scope_13',
-              title: '[NEW] Add Audit Trail System',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-09'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Parker Kim',
-              description: 'Scope creep from requirements change'
-            },
-            {
-              id: 't_scope_14',
-              title: '[CRITICAL] Implement Data Export',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-07'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Cameron Gray',
-              description: 'New regulatory requirement'
-            },
-            {
-              id: 't_scope_15',
-              title: '[URGENT] Test All Compliance Features',
-              startDate: new Date('2026-03-30'),
-              endDate: new Date('2026-04-06'),
-              status: 'planned',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Skylar Brooks',
-              description: 'Extended testing needed'
-            }
-          ]
-        },
-        {
-          id: 'f_scope_4',
-          name: 'Spillover & Stabilization',
-          tickets: [
-            {
-              id: 't_scope_16',
-              title: 'Complete Outstanding Work',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-23'),
-              status: 'planned',
-              storyPoints: 10,
-              effortDays: 10,
-              assignedTo: 'Jamie Carter',
-              description: 'Spillover from Sprint 3'
-            },
-            {
-              id: 't_scope_17',
-              title: 'Refactor Core Components',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-22'),
-              status: 'planned',
-              storyPoints: 9,
-              effortDays: 9,
-              assignedTo: 'Morgan Reed'
-            },
-            {
-              id: 't_scope_18',
-              title: 'Optimize Performance',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-22'),
-              status: 'planned',
-              storyPoints: 9,
-              effortDays: 9,
-              assignedTo: 'Parker Kim'
-            },
-            {
-              id: 't_scope_19',
-              title: 'Fix Integration Issues',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-21'),
-              status: 'planned',
-              storyPoints: 9,
-              effortDays: 9,
-              assignedTo: 'Cameron Gray'
-            },
-            {
-              id: 't_scope_20',
-              title: 'Final Testing & Documentation',
-              startDate: new Date('2026-04-13'),
-              endDate: new Date('2026-04-20'),
-              status: 'planned',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Skylar Brooks'
-            }
-          ]
-        }
-      ],
-      sprints: [
-        {
-          id: 's_scope_1',
-          name: 'Sprint 1 - Foundation',
-          startDate: new Date('2026-03-02'),
-          endDate: new Date('2026-03-13')
-        },
-        {
-          id: 's_scope_2',
-          name: 'Sprint 2 - Business Logic',
-          startDate: new Date('2026-03-16'),
-          endDate: new Date('2026-03-27')
-        },
-        {
-          id: 's_scope_3',
-          name: 'Sprint 3 - SCOPE SHOCK + PTO',
-          startDate: new Date('2026-03-30'),
-          endDate: new Date('2026-04-10')
-        },
-        {
-          id: 's_scope_4',
-          name: 'Sprint 4 - Spillover',
-          startDate: new Date('2026-04-13'),
-          endDate: new Date('2026-04-24')
-        }
-      ],
-      milestones: []
-    }
-  ]
-};
-
-// Combine all products
-export const mockProducts: Product[] = [product1, product2, product3, product4, product5];
-
-// Helper function to find a release by ID across all products
-export function findReleaseById(releaseId: string): { product: Product; release: Release } | null {
-  for (const product of mockProducts) {
-    const release = product.releases.find(r => r.id === releaseId);
-    if (release) {
-      return { product, release };
-    }
-  }
-  return null;
-}
-
-// ===========================================
-// TEAM MEMBERS
-// ===========================================
-export const mockTeamMembers: TeamMember[] = [
-  // --- Product 1: FinTech Payment Gateway (10 members) ---
-  {
-    id: 'tm1',
-    name: 'Arjun Mehta',
-    role: 'Developer',
-    experienceLevel: 'Senior',
-    notes: 'Tech Lead - Payment Systems Architecture',
-    productId: 'p1',
-    velocityMultiplier: 1.3,
-    pto: [
-      {
-        id: 'pto1',
-        name: 'Family Wedding',
-        startDate: new Date('2026-04-01'),
-        endDate: new Date('2026-04-04')
-      }
-    ]
-  },
-  {
-    id: 'tm2',
-    name: 'Priya Sharma',
-    role: 'Developer',
-    experienceLevel: 'Senior',
-    notes: 'Senior Backend Engineer - Security & Auth',
-    productId: 'p1',
-    velocityMultiplier: 1.3,
-    pto: [
-      {
-        id: 'pto2',
-        name: 'Vacation',
-        startDate: new Date('2026-05-18'),
-        endDate: new Date('2026-05-25')
-      }
-    ]
-  },
-  {
-    id: 'tm3',
-    name: 'Vikram Singh',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Backend Engineer - Transaction Processing',
-    productId: 'p1',
-    velocityMultiplier: 1.0,
-    pto: [
-      {
-        id: 'pto3',
-        name: 'Tech Conference',
-        startDate: new Date('2026-06-16'),
-        endDate: new Date('2026-06-19')
-      }
-    ]
-  },
-  {
-    id: 'tm4',
-    name: 'Neha Patel',
-    role: 'Developer',
-    experienceLevel: 'Junior',
-    notes: 'Backend Engineer - Financial Operations',
-    productId: 'p1',
-    velocityMultiplier: 0.7,
-    pto: []
-  },
-  {
-    id: 'tm5',
-    name: 'Rajesh Kumar',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'DevOps & Security Engineer',
-    productId: 'p1',
-    velocityMultiplier: 1.0,
-    pto: [
-      {
-        id: 'pto5',
-        name: 'Personal',
-        startDate: new Date('2026-03-25'),
-        endDate: new Date('2026-03-27')
-      }
-    ]
-  },
-  {
-    id: 'tm6',
-    name: 'Ananya Reddy',
-    role: 'Developer',
-    experienceLevel: 'Senior',
-    notes: 'Frontend Lead - Dashboard & UX',
-    productId: 'p1',
-    velocityMultiplier: 1.3,
-    pto: [
-      {
-        id: 'pto6',
-        name: 'Spring Break',
-        startDate: new Date('2026-05-04'),
-        endDate: new Date('2026-05-08')
-      }
-    ]
-  },
-  {
-    id: 'tm7',
-    name: 'Kabir Joshi',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Frontend Engineer - Analytics & Reporting',
-    productId: 'p1',
-    velocityMultiplier: 1.0,
-    pto: []
-  },
-  {
-    id: 'tm8',
-    name: 'Lakshmi Iyer',
-    role: 'QA',
-    experienceLevel: 'Mid',
-    notes: 'QA Lead - Test Automation',
-    productId: 'p1',
-    velocityMultiplier: 1.0,
-    pto: [
-      {
-        id: 'pto8',
-        name: 'Training Workshop',
-        startDate: new Date('2026-06-08'),
-        endDate: new Date('2026-06-10')
-      }
-    ]
-  },
-  {
-    id: 'tm9',
-    name: 'Amit Desai',
-    role: 'Designer',
-    experienceLevel: 'Mid',
-    notes: 'Product Designer - UX Research',
-    productId: 'p1',
-    velocityMultiplier: 1.0,
-    pto: []
-  },
-  {
-    id: 'tm10',
-    name: 'Sanjay Reddy',
-    role: 'Developer',
-    experienceLevel: 'Junior',
-    notes: 'Full-Stack Engineer',
-    productId: 'p1',
-    velocityMultiplier: 0.7,
-    pto: [
-      {
-        id: 'pto10',
-        name: 'Pilgrimage',
-        startDate: new Date('2026-04-20'),
-        endDate: new Date('2026-04-24')
-      }
-    ]
-  },
-  
-  // --- Product 2: Clinical Trial Management (9 members) ---
-  {
-    id: 'tm11',
-    name: 'Emma Rodriguez',
-    role: 'Developer',
-    experienceLevel: 'Senior',
-    notes: 'Tech Lead - Clinical Systems',
-    productId: 'p2',
-    velocityMultiplier: 1.3,
-    pto: [
-      {
-        id: 'pto11',
-        name: 'Medical Conference',
-        startDate: new Date('2026-06-22'),
-        endDate: new Date('2026-06-26')
-      }
-    ]
-  },
-  {
-    id: 'tm12',
-    name: 'Raj Kapoor',
-    role: 'Developer',
-    experienceLevel: 'Senior',
-    notes: 'Backend Lead - Data & Analytics',
-    productId: 'p2',
-    velocityMultiplier: 1.3,
-    pto: [
-      {
-        id: 'pto12',
-        name: 'Vacation',
-        startDate: new Date('2026-06-08'),
-        endDate: new Date('2026-06-15')
-      }
-    ]
-  },
-  {
-    id: 'tm13',
-    name: 'Chen Wei',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Backend Engineer - Platform & Security',
-    productId: 'p2',
-    velocityMultiplier: 1.0,
-    pto: []
-  },
-  {
-    id: 'tm14',
-    name: 'Aisha Osman',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Backend Engineer - Regulatory & Compliance',
-    productId: 'p2',
-    velocityMultiplier: 1.0,
-    pto: [
-      {
-        id: 'pto14',
-        name: 'Family Event',
-        startDate: new Date('2026-07-06'),
-        endDate: new Date('2026-07-10')
-      }
-    ]
-  },
-  {
-    id: 'tm15',
-    name: 'Marcus Johnson',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Backend Engineer - Patient Safety',
-    productId: 'p2',
-    velocityMultiplier: 1.0,
-    pto: [
-      {
-        id: 'pto15',
-        name: 'Summer Vacation',
-        startDate: new Date('2026-05-25'),
-        endDate: new Date('2026-05-29')
-      }
-    ]
-  },
-  {
-    id: 'tm16',
-    name: 'Sofia Kowalski',
-    role: 'Developer',
-    experienceLevel: 'Senior',
-    notes: 'Frontend Lead - Patient Portal',
-    productId: 'p2',
-    velocityMultiplier: 1.3,
-    pto: [
-      {
-        id: 'pto16',
-        name: 'Conference',
-        startDate: new Date('2026-04-13'),
-        endDate: new Date('2026-04-17')
-      }
-    ]
-  },
-  {
-    id: 'tm17',
-    name: 'Liam O\'Brien',
-    role: 'Developer',
-    experienceLevel: 'Junior',
-    notes: 'Frontend Engineer - Site Coordinator UI',
-    productId: 'p2',
-    velocityMultiplier: 0.7,
-    pto: []
-  },
-  {
-    id: 'tm18',
-    name: 'Yuki Tanaka',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Full-Stack Engineer - EDC Forms',
-    productId: 'p2',
-    velocityMultiplier: 1.0,
-    pto: [
-      {
-        id: 'pto18',
-        name: 'Personal',
-        startDate: new Date('2026-03-30'),
-        endDate: new Date('2026-04-03')
-      }
-    ]
-  },
-  {
-    id: 'tm19',
-    name: 'Priya Singh',
-    role: 'Developer',
-    experienceLevel: 'Junior',
-    notes: 'Full-Stack Engineer - Data Validation',
-    productId: 'p2',
-    velocityMultiplier: 0.7,
-    pto: []
-  },
-  {
-    id: 'tm20',
-    name: 'Zara Khanna',
-    role: 'Designer',
-    experienceLevel: 'Mid',
-    notes: 'UX Designer - Healthcare Experience',
-    productId: 'p2',
-    velocityMultiplier: 1.0,
-    pto: [
-      {
-        id: 'pto20',
-        name: 'Diwali Celebration',
-        startDate: new Date('2026-06-29'),
-        endDate: new Date('2026-07-03')
-      }
-    ]
-  },
-  
-  // --- Showcase Product 1: Balanced Planning (5 members) ---
-  {
-    id: 'tm21',
-    name: 'Alex Chen',
-    role: 'Developer',
-    experienceLevel: 'Senior',
-    notes: 'Senior Developer - System Architecture',
-    productId: 'p_showcase_balanced',
-    velocityMultiplier: 1.3,
-    pto: []
-  },
-  {
-    id: 'tm22',
-    name: 'Jordan Smith',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Mid-Level Developer - Backend Services',
-    productId: 'p_showcase_balanced',
-    velocityMultiplier: 1.0,
-    pto: []
-  },
-  {
-    id: 'tm23',
-    name: 'Taylor Brown',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Mid-Level Developer - API Development',
-    productId: 'p_showcase_balanced',
-    velocityMultiplier: 1.0,
-    pto: []
-  },
-  {
-    id: 'tm24',
-    name: 'Casey Lee',
-    role: 'Developer',
-    experienceLevel: 'Junior',
-    notes: 'Junior Developer - Learning & Growing',
-    productId: 'p_showcase_balanced',
-    velocityMultiplier: 0.7,
-    pto: [
-      {
-        id: 'pto21',
-        name: 'Personal Time',
-        startDate: new Date('2026-04-06'),
-        endDate: new Date('2026-04-07')
-      }
-    ]
-  },
-  {
-    id: 'tm25',
-    name: 'Morgan Davis',
-    role: 'QA',
-    experienceLevel: 'Mid',
-    notes: 'QA Engineer - Test Automation',
-    productId: 'p_showcase_balanced',
-    velocityMultiplier: 0.8,
-    pto: []
-  },
-  
-  // --- Showcase Product 2: Overload & Velocity Impact (5 members) ---
-  {
-    id: 'tm26',
-    name: 'Sam Wilson',
-    role: 'Developer',
-    experienceLevel: 'Senior',
-    notes: 'Senior Developer - Infrastructure Lead',
-    productId: 'p_showcase_overload',
-    velocityMultiplier: 1.3,
-    pto: []
-  },
-  {
-    id: 'tm27',
-    name: 'Riley Martinez',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Mid-Level Developer - Platform Engineering',
-    productId: 'p_showcase_overload',
-    velocityMultiplier: 1.0,
-    pto: []
-  },
-  {
-    id: 'tm28',
-    name: 'Avery Johnson',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Mid-Level Developer - Integration Specialist',
-    productId: 'p_showcase_overload',
-    velocityMultiplier: 1.0,
-    pto: []
-  },
-  {
-    id: 'tm29',
-    name: 'Dakota White',
-    role: 'Developer',
-    experienceLevel: 'Junior',
-    notes: 'Junior Developer - Early Career',
-    productId: 'p_showcase_overload',
-    velocityMultiplier: 0.7,
-    pto: []
-  },
-  {
-    id: 'tm30',
-    name: 'Quinn Taylor',
-    role: 'QA',
-    experienceLevel: 'Mid',
-    notes: 'QA Engineer - Quality Assurance',
-    productId: 'p_showcase_overload',
-    velocityMultiplier: 0.8,
-    pto: []
-  },
-  
-  // --- Showcase Product 3: Scope Shock & PTO Stress (5 members) ---
-  {
-    id: 'tm31',
-    name: 'Jamie Carter',
-    role: 'Developer',
-    experienceLevel: 'Senior',
-    notes: 'Senior Developer - Technical Lead',
-    productId: 'p_showcase_scope',
-    velocityMultiplier: 1.3,
-    pto: [
-      {
-        id: 'pto22',
-        name: 'Medical Appointment',
-        startDate: new Date('2026-04-02'),
-        endDate: new Date('2026-04-03')
-      }
-    ]
-  },
-  {
-    id: 'tm32',
-    name: 'Morgan Reed',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Mid-Level Developer - Full Stack',
-    productId: 'p_showcase_scope',
-    velocityMultiplier: 1.0,
-    pto: [
-      {
-        id: 'pto23',
-        name: 'Family Emergency',
-        startDate: new Date('2026-04-01'),
-        endDate: new Date('2026-04-03')
-      }
-    ]
-  },
-  {
-    id: 'tm33',
-    name: 'Parker Kim',
-    role: 'Developer',
-    experienceLevel: 'Mid',
-    notes: 'Mid-Level Developer - Service Oriented',
-    productId: 'p_showcase_scope',
-    velocityMultiplier: 1.0,
-    pto: []
-  },
-  {
-    id: 'tm34',
-    name: 'Cameron Gray',
-    role: 'Developer',
-    experienceLevel: 'Junior',
-    notes: 'Junior Developer - Growing Skills',
-    productId: 'p_showcase_scope',
-    velocityMultiplier: 0.7,
-    pto: []
-  },
-  {
-    id: 'tm35',
-    name: 'Skylar Brooks',
-    role: 'QA',
-    experienceLevel: 'Mid',
-    notes: 'QA Engineer - Testing & Automation',
-    productId: 'p_showcase_scope',
-    velocityMultiplier: 0.8,
-    pto: []
-  }
-];
-
-/**
- * Get team members for a specific product
- */
-export function getTeamMembersByProduct(productId: string, allMembers: TeamMember[] = mockTeamMembers): TeamMember[] {
-  return allMembers.filter(m => m.productId === productId);
-}
-
-// ===========================================
-// INDIAN NATIONAL HOLIDAYS & FESTIVALS (Feb - Jul 2026)
-// ===========================================
-export const mockHolidays: Holiday[] = [
-  {
-    id: 'h1',
-    name: 'Maha Shivaratri',
-    startDate: new Date('2026-02-26'),
-    endDate: new Date('2026-02-26')
-  },
-  {
-    id: 'h2',
-    name: 'Holi',
-    startDate: new Date('2026-03-14'),
-    endDate: new Date('2026-03-14')
-  },
-  {
-    id: 'h3',
-    name: 'Good Friday',
-    startDate: new Date('2026-04-03'),
-    endDate: new Date('2026-04-03')
-  },
-  {
-    id: 'h4',
-    name: 'Eid ul-Fitr',
-    startDate: new Date('2026-04-03'),
-    endDate: new Date('2026-04-03')
-  },
-  {
-    id: 'h5',
-    name: 'Mahavir Jayanti',
-    startDate: new Date('2026-04-06'),
-    endDate: new Date('2026-04-06')
-  },
-  {
-    id: 'h6',
-    name: 'Ambedkar Jayanti',
-    startDate: new Date('2026-04-14'),
-    endDate: new Date('2026-04-14')
-  },
-  {
-    id: 'h7',
-    name: 'Buddha Purnima',
-    startDate: new Date('2026-05-01'),
-    endDate: new Date('2026-05-01')
-  },
-  {
-    id: 'h8',
-    name: 'Eid ul-Adha (Bakrid)',
-    startDate: new Date('2026-06-10'),
-    endDate: new Date('2026-06-10')
-  },
-  {
-    id: 'h9',
-    name: 'Company Offsite',
-    startDate: new Date('2026-06-19'),
-    endDate: new Date('2026-06-19')
-  }
-];
 
 // ── Milestones ──
 
@@ -3030,9 +133,9 @@ export interface Milestone {
   type: MilestoneType;
   dateType: 'single' | 'range';
   startDate: Date;
-  endDate?: Date; // required if dateType === 'range'
+  endDate?: Date;
   description?: string;
-  isBlocking?: boolean; // if true, warn when tickets overlap
+  isBlocking?: boolean;
   order?: number;
 }
 
@@ -3043,31 +146,27 @@ export type PhaseType = 'DevWindow' | 'Testing' | 'Deployment' | 'Approval' | 'L
 export interface Phase {
   id: string;
   releaseId: string;
-  name: string; // e.g., "Dev Window", "SIT", "UAT", "Go-Live"
+  name: string;
   type: PhaseType;
   startDate: Date;
   endDate: Date;
-  allowsWork: boolean; // true only for DevWindow, false for Testing/Deployment/Approval/Launch
-  order: number; // for rendering order (1 = first phase, 2 = second, etc.)
-  description?: string; // optional notes
+  allowsWork: boolean;
+  order: number;
+  description?: string;
 }
-/**
- * Generate mock SDLC phases for any release
- * This ensures all releases have phases for immediate visualization
- */
+
 export function getMockPhasesForRelease(release: Release): Phase[] {
-  // Calculate standard SDLC phases for any release
   const goLiveDate = new Date(release.endDate);
   
   const uatEnd = new Date(goLiveDate);
   uatEnd.setDate(uatEnd.getDate() - 1);
   const uatStart = new Date(uatEnd);
-  uatStart.setDate(uatStart.getDate() - 13); // 2 weeks UAT
+  uatStart.setDate(uatStart.getDate() - 13);
   
   const sitEnd = new Date(uatStart);
   sitEnd.setDate(sitEnd.getDate() - 1);
   const sitStart = new Date(sitEnd);
-  sitStart.setDate(sitStart.getDate() - 13); // 2 weeks SIT
+  sitStart.setDate(sitStart.getDate() - 13);
   
   const devEnd = new Date(sitStart);
   devEnd.setDate(devEnd.getDate() - 1);
@@ -3115,4 +214,1815 @@ export function getMockPhasesForRelease(release: Release): Phase[] {
       order: 4,
     },
   ];
+}
+
+// ===========================================
+// PRODUCT 1: E-Commerce Platform
+// Real-world retail e-commerce scenario
+// ===========================================
+const product1: Product = {
+  id: 'ecom01',
+  name: 'ShopEasy - E-Commerce Platform',
+  releases: [
+    {
+      id: 'ecom-r1',
+      name: 'Q2 2026 - Spring Launch',
+      startDate: new Date('2026-03-02'),
+      endDate: new Date('2026-06-06'),
+      storyPointMapping: SP_PRESETS.fibonacci,
+      features: [
+        {
+          id: 'ecom-f1',
+          name: '🛒 Shopping Cart & Checkout',
+          tickets: [
+            {
+              id: 'ecom-t1',
+              title: 'Shopping cart state management',
+              description: 'Priority: High | Design Redux-based cart with persistence and real-time updates',
+              startDate: new Date('2026-03-02'),
+              endDate: new Date('2026-03-06'),
+              status: 'completed',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Sarah Chen'
+            },
+            {
+              id: 'ecom-t2',
+              title: 'One-click checkout flow',
+              description: 'Priority: High | Build streamlined single-page checkout with saved payment methods',
+              startDate: new Date('2026-03-09'),
+              endDate: new Date('2026-03-16'),
+              status: 'in-progress',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Michael Rodriguez'
+            },
+            {
+              id: 'ecom-t3',
+              title: 'Stripe payment integration',
+              description: 'Priority: High | Integrate Stripe with PCI compliance and 3D Secure support',
+              startDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-23'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Sarah Chen'
+            },
+            {
+              id: 'ecom-t4',
+              title: 'Guest checkout option',
+              description: 'Priority: Medium | Allow checkout without account creation',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-27'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Michael Rodriguez'
+            },
+            {
+              id: 'ecom-t5',
+              title: 'Abandoned cart recovery emails',
+              description: 'Priority: Low | Email automation for cart abandonment with discount codes',
+              startDate: new Date('2026-03-30'),
+              endDate: new Date('2026-04-03'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Emily Watson'
+            }
+          ]
+        },
+        {
+          id: 'ecom-f2',
+          name: '🔍 Product Search & Discovery',
+          tickets: [
+            {
+              id: 'ecom-t6',
+              title: 'Elasticsearch integration',
+              description: 'Priority: High | Set up Elasticsearch cluster for product search',
+              startDate: new Date('2026-03-02'),
+              endDate: new Date('2026-03-09'),
+              status: 'completed',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'James Kim'
+            },
+            {
+              id: 'ecom-t7',
+              title: 'Smart search with autocomplete',
+              description: 'Priority: High | Implement typeahead search with product suggestions',
+              startDate: new Date('2026-03-09'),
+              endDate: new Date('2026-03-16'),
+              status: 'in-progress',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'James Kim'
+            },
+            {
+              id: 'ecom-t8',
+              title: 'Advanced filtering system',
+              description: 'Priority: Medium | Multi-faceted filters (price, category, brand, ratings)',
+              startDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-23'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Emily Watson'
+            },
+            {
+              id: 'ecom-t9',
+              title: 'Product recommendations engine',
+              description: 'Priority: Medium | ML-based "You might also like" recommendations',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-04-03'),
+              status: 'planned',
+              storyPoints: 13,
+              effortDays: 13,
+              assignedTo: 'James Kim'
+            }
+          ]
+        },
+        {
+          id: 'ecom-f3',
+          name: '👤 User Accounts & Profiles',
+          tickets: [
+            {
+              id: 'ecom-t10',
+              title: 'OAuth social login (Google, Facebook)',
+              description: 'Priority: High | Implement social authentication with profile sync',
+              startDate: new Date('2026-03-09'),
+              endDate: new Date('2026-03-16'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Sarah Chen'
+            },
+            {
+              id: 'ecom-t11',
+              title: 'User profile management',
+              description: 'Priority: High | Build profile editor with avatar upload and address book',
+              startDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-23'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Michael Rodriguez'
+            },
+            {
+              id: 'ecom-t12',
+              title: 'Order history and tracking',
+              description: 'Priority: High | Display order history with real-time shipment tracking',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-30'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Emily Watson'
+            },
+            {
+              id: 'ecom-t13',
+              title: 'Wishlist functionality',
+              description: 'Priority: Low | Allow users to save favorite products',
+              startDate: new Date('2026-03-30'),
+              endDate: new Date('2026-04-06'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Michael Rodriguez'
+            }
+          ]
+        },
+        {
+          id: 'ecom-f4',
+          name: '📊 Admin Dashboard & Inventory',
+          tickets: [
+            {
+              id: 'ecom-t14',
+              title: 'Product catalog management',
+              description: 'Priority: High | CRUD interface for products with bulk operations',
+              startDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-23'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'James Kim'
+            },
+            {
+              id: 'ecom-t15',
+              title: 'Real-time inventory tracking',
+              description: 'Priority: High | Live stock updates with low-inventory alerts',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-30'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Sarah Chen'
+            },
+            {
+              id: 'ecom-t16',
+              title: 'Sales analytics dashboard',
+              description: 'Priority: Medium | Revenue tracking, top products, conversion metrics',
+              startDate: new Date('2026-03-30'),
+              endDate: new Date('2026-04-10'),
+              status: 'planned',
+              storyPoints: 13,
+              effortDays: 13,
+              assignedTo: 'James Kim'
+            },
+            {
+              id: 'ecom-t17',
+              title: 'Order fulfillment workflow',
+              description: 'Priority: High | Order processing pipeline with status updates',
+              startDate: new Date('2026-04-10'),
+              endDate: new Date('2026-04-17'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Michael Rodriguez'
+            }
+          ]
+        },
+        {
+          id: 'ecom-f5',
+          name: '🚀 Performance & DevOps',
+          tickets: [
+            {
+              id: 'ecom-t18',
+              title: 'CDN integration for static assets',
+              description: 'Priority: High | CloudFlare CDN setup for images and CSS/JS',
+              startDate: new Date('2026-04-10'),
+              endDate: new Date('2026-04-14'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'David Lee'
+            },
+            {
+              id: 'ecom-t19',
+              title: 'Redis caching layer',
+              description: 'Priority: High | Implement Redis for product catalog and session caching',
+              startDate: new Date('2026-04-14'),
+              endDate: new Date('2026-04-18'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'David Lee'
+            },
+            {
+             id: 'ecom-t20',
+              title: 'Load testing & optimization',
+              description: 'Priority: High | k6 load tests targeting 10k concurrent users',
+              startDate: new Date('2026-04-21'),
+              endDate: new Date('2026-04-25'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'David Lee'
+            },
+            {
+              id: 'ecom-t21',
+              title: 'Production monitoring setup',
+              description: 'Priority: Medium | DataDog APM with custom dashboards',
+              startDate: new Date('2026-04-28'),
+              endDate: new Date('2026-05-02'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'David Lee'
+            }
+          ]
+        },
+        {
+          id: 'ecom-f6',
+          name: '🧪 QA & Testing',
+          tickets: [
+            {
+              id: 'ecom-t22',
+              title: 'E2E test suite (Playwright)',
+              description: 'Priority: High | Complete user journey tests from browse to checkout',
+              startDate: new Date('2026-04-21'),
+              endDate: new Date('2026-04-28'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Lisa Park'
+            },
+            {
+              id: 'ecom-t23',
+              title: 'Payment gateway testing',
+              description: 'Priority: High | Test all payment scenarios including failures',
+              startDate: new Date('2026-04-28'),
+              endDate: new Date('2026-05-05'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Lisa Park'
+            },
+            {
+              id: 'ecom-t24',
+              title: 'Mobile responsiveness testing',
+              description: 'Priority: Medium | Cross-device testing on iOS/Android',
+              startDate: new Date('2026-05-05'),
+              endDate: new Date('2026-05-09'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Lisa Park'
+            },
+            {
+              id: 'ecom-t25',
+              title: 'Security penetration testing',
+              description: 'Priority: High | Third-party security audit and fixes',
+              startDate: new Date('2026-05-12'),
+              endDate: new Date('2026-05-19'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'David Lee'
+            }
+          ]
+        }
+      ],
+      sprints: [
+        {
+          id: 'ecom-s1',
+          name: 'Sprint 1 - Foundation',
+          startDate: new Date('2026-03-02'),
+          endDate: new Date('2026-03-15')
+        },
+        {
+          id: 'ecom-s2',
+          name: 'Sprint 2 - Core Features',
+          startDate: new Date('2026-03-16'),
+          endDate: new Date('2026-03-29')
+        },
+        {
+          id: 'ecom-s3',
+          name: 'Sprint 3 - User Experience',
+          startDate: new Date('2026-03-30'),
+          endDate: new Date('2026-04-12')
+        },
+        {
+          id: 'ecom-s4',
+          name: 'Sprint 4 - Admin & Analytics',
+          startDate: new Date('2026-04-13'),
+          endDate: new Date('2026-04-26')
+        },
+        {
+          id: 'ecom-s5',
+          name: 'Sprint 5 - Testing & Polish',
+          startDate: new Date('2026-04-27'),
+          endDate: new Date('2026-05-10')
+        },
+        {
+          id: 'ecom-s6',
+          name: 'Sprint 6 - UAT & Launch Prep',
+          startDate: new Date('2026-05-11'),
+          endDate: new Date('2026-05-24')
+        }
+      ],
+      milestones: [
+        {
+          id: 'ecom-m1',
+          releaseId: 'ecom-r1',
+          name: 'Code Freeze',
+          type: 'Freeze',
+          dateType: 'single',
+          startDate: new Date('2026-05-08'),
+          description: 'No new features, bug fixes only',
+          isBlocking: true,
+          order: 1
+        },
+        {
+          id: 'ecom-m2',
+          releaseId: 'ecom-r1',
+          name: 'Security Audit',
+          type: 'Testing',
+          dateType: 'range',
+          startDate: new Date('2026-05-12'),
+          endDate: new Date('2026-05-16'),
+          description: 'External penetration testing',
+          isBlocking: true,
+          order: 2
+        },
+        {
+          id: 'ecom-m3',
+          releaseId: 'ecom-r1',
+          name: 'UAT Approval Gate',
+          type: 'Approval',
+          dateType: 'single',
+          startDate: new Date('2026-05-23'),
+          description: 'Stakeholder sign-off required',
+          isBlocking: true,
+          order: 3
+        },
+        {
+          id: 'ecom-m4',
+          releaseId: 'ecom-r1',
+          name: 'Production Deployment',
+          type: 'Deployment',
+          dateType: 'single',
+          startDate: new Date('2026-06-02'),
+          description: 'Blue-green deployment to production',
+          isBlocking: false,
+          order: 4
+        },
+        {
+          id: 'ecom-m5',
+          releaseId: 'ecom-r1',
+          name: 'Public Launch 🎉',
+          type: 'Launch',
+          dateType: 'single',
+          startDate: new Date('2026-06-06'),
+          description: 'Marketing campaign goes live',
+          isBlocking: false,
+          order: 5
+        }
+      ],
+      phases: [
+        {
+          id: 'ecom-p1',
+          releaseId: 'ecom-r1',
+          name: 'Development',
+          type: 'DevWindow',
+          startDate: new Date('2026-03-02'),
+          endDate: new Date('2026-05-08'),
+          allowsWork: true,
+          order: 1,
+          description: 'Active feature development'
+        },
+        {
+          id: 'ecom-p2',
+          releaseId: 'ecom-r1',
+          name: 'System Testing (SIT)',
+          type: 'Testing',
+          startDate: new Date('2026-05-09'),
+          endDate: new Date('2026-05-19'),
+          allowsWork: false,
+          order: 2,
+          description: 'Integration and system testing'
+        },
+        {
+          id: 'ecom-p3',
+          releaseId: 'ecom-r1',
+          name: 'User Acceptance (UAT)',
+          type: 'Approval',
+          startDate: new Date('2026-05-20'),
+          endDate: new Date('2026-05-30'),
+          allowsWork: false,
+          order: 3,
+          description: 'Business stakeholder validation'
+        },
+        {
+          id: 'ecom-p4',
+          releaseId: 'ecom-r1',
+          name: 'Deployment & Launch',
+          type: 'Launch',
+          startDate: new Date('2026-06-01'),
+          endDate: new Date('2026-06-06'),
+          allowsWork: false,
+          order: 4,
+          description: 'Production deployment and go-live'
+        }
+      ]
+    }
+  ]
+};
+
+// ===========================================
+// PRODUCT 2: Healthcare Patient Portal
+// HIPAA-compliant digital health platform
+// ===========================================
+const product2: Product = {
+  id: 'health01',
+  name: 'HealthConnect - Patient Portal',
+  releases: [
+    {
+      id: 'health-r1',
+      name: 'Q2 2026 - Digital Health Launch',
+      startDate: new Date('2026-04-01'),
+      endDate: new Date('2026-07-12'),
+      storyPointMapping: SP_PRESETS.fibonacci,
+      features: [
+        {
+          id: 'health-f1',
+          name: '📋 Patient Records & EHR Integration',
+          tickets: [
+            {
+              id: 'health-t1',
+              title: 'HL7 FHIR API integration',
+              description: 'Priority: High | Connect to hospital EHR systems via FHIR standard',
+              startDate: new Date('2026-04-01'),
+              endDate: new Date('2026-04-08'),
+              status: 'completed',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Dr. Raj Patel'
+            },
+            {
+              id: 'health-t2',
+              title: 'Patient records dashboard',
+              description: 'Priority: High | Display medical history, lab results, and imaging reports',
+              startDate: new Date('2026-04-08'),
+              endDate: new Date('2026-04-14'),
+              status: 'completed',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Nina Santos'
+            },
+            {
+              id: 'health-t3',
+              title: 'Document upload and storage',
+              description: 'Priority: Medium | HIPAA-compliant encrypted file storage for patient documents',
+              startDate: new Date('2026-04-14'),
+              endDate: new Date('2026-04-21'),
+              status: 'in-progress',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Alex Kim'
+            },
+            {
+              id: 'health-t4',
+              title: 'Health summary PDF export',
+              description: 'Priority: Low | Generate printable health records in PDF format',
+              startDate: new Date('2026-04-21'),
+              endDate: new Date('2026-04-24'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Nina Santos'
+            },
+            {
+              id: 'health-t5',
+              title: 'Vaccination history tracker',
+              description: 'Priority: Medium | Track immunization records with CDC compliance',
+              startDate: new Date('2026-04-24'),
+              endDate: new Date('2026-04-28'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Priya Gupta'
+            }
+          ]
+        },
+        {
+          id: 'health-f2',
+          name: '📅 Appointment Booking & Scheduling',
+          tickets: [
+            {
+              id: 'health-t6',
+              title: 'Real-time provider availability',
+              description: 'Priority: High | Integrate with hospital scheduling systems for live availability',
+              startDate: new Date('2026-04-28'),
+              endDate: new Date('2026-05-05'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Dr. Raj Patel'
+            },
+            {
+              id: 'health-t7',
+              title: 'Multi-provider booking UI',
+              description: 'Priority: High | Search and filter doctors by specialty, location, and insurance',
+              startDate: new Date('2026-05-05'),
+              endDate: new Date('2026-05-09'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Nina Santos'
+            },
+            {
+              id: 'health-t8',
+              title: 'Appointment reminders (SMS/Email)',
+              description: 'Priority: Medium | Automated notifications 24hrs before appointments',
+              startDate: new Date('2026-05-09'),
+              endDate: new Date('2026-05-13'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Tom Wilson'
+            },
+            {
+              id: 'health-t9',
+              title: 'Cancellation and rescheduling',
+              description: 'Priority: High | Allow patients to modify appointments with proper notifications',
+              startDate: new Date('2026-05-13'),
+              endDate: new Date('2026-05-16'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Alex Kim'
+            }
+          ]
+        },
+        {
+          id: 'health-f3',
+          name: '💻 Telemedicine & Virtual Visits',
+          tickets: [
+            {
+              id: 'health-t10',
+              title: 'WebRTC video consultation',
+              description: 'Priority: High | HIPAA-compliant video chat with end-to-end encryption',
+              startDate: new Date('2026-05-16'),
+              endDate: new Date('2026-05-26'),
+              status: 'planned',
+              storyPoints: 13,
+              effortDays: 13,
+              assignedTo: 'Dr. Raj Patel'
+            },
+            {
+              id: 'health-t11',
+              title: 'Virtual waiting room',
+              description: 'Priority: Medium | Queue management for telehealth appointments',
+              startDate: new Date('2026-05-26'),
+              endDate: new Date('2026-05-29'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Nina Santos'
+            },
+            {
+              id: 'health-t12',
+              title: 'Screen share and annotation tools',
+              description: 'Priority: Low | Enable doctors to share medical images during consultations',
+              startDate: new Date('2026-05-29'),
+              endDate: new Date('2026-06-02'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Alex Kim'
+            },
+            {
+              id: 'health-t13',
+              title: 'Post-visit summary notes',
+              description: 'Priority: Medium | Auto-generate visit summaries with prescriptions',
+              startDate: new Date('2026-06-02'),
+              endDate: new Date('2026-06-05'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Priya Gupta'
+            }
+          ]
+        },
+        {
+          id: 'health-f4',
+          name: '💊 Prescription Refills & Pharmacy',
+          tickets: [
+            {
+              id: 'health-t14',
+              title: 'Medication list and refill requests',
+              description: 'Priority: High | View current prescriptions and request refills',
+              startDate: new Date('2026-06-05'),
+              endDate: new Date('2026-06-09'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Tom Wilson'
+            },
+            {
+              id: 'health-t15',
+              title: 'Pharmacy integration (Surescripts)',
+              description: 'Priority: High | E-prescribing with preferred pharmacy network',
+              startDate: new Date('2026-06-09'),
+              endDate: new Date('2026-06-17'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Dr. Raj Patel'
+            },
+            {
+              id: 'health-t16',
+              title: 'Drug interaction warnings',
+              description: 'Priority: High | Alert patients and doctors about contraindications',
+              startDate: new Date('2026-06-17'),
+              endDate: new Date('2026-06-20'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Priya Gupta'
+            },
+            {
+              id: 'health-t17',
+              title: 'Refill status tracking',
+              description: 'Priority: Low | Notify patients when prescriptions are ready for pickup',
+              startDate: new Date('2026-06-20'),
+              endDate: new Date('2026-06-23'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Nina Santos'
+            }
+          ]
+        },
+        {
+          id: 'health-f5',
+          name: '💳 Billing & Insurance Claims',
+          tickets: [
+            {
+              id: 'health-t18',
+              title: 'Insurance verification API',
+              description: 'Priority: High | Check coverage and benefits in real-time',
+              startDate: new Date('2026-06-23'),
+              endDate: new Date('2026-06-27'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Alex Kim'
+            },
+            {
+              id: 'health-t19',
+              title: 'Medical billing statements',
+              description: 'Priority: Medium | Display charges, payments, and outstanding balances',
+              startDate: new Date('2026-06-27'),
+              endDate: new Date('2026-07-01'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Tom Wilson'
+            },
+            {
+              id: 'health-t20',
+              title: 'Online payment processing',
+              description: 'Priority: High | Secure credit card payments for copays and balances',
+              startDate: new Date('2026-07-01'),
+              endDate: new Date('2026-07-06'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Dr. Raj Patel'
+            },
+            {
+              id: 'health-t21',
+              title: 'Payment plan setup',
+              description: 'Priority: Low | Allow patients to create installment payment plans',
+              startDate: new Date('2026-07-06'),
+              endDate: new Date('2026-07-09'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Nina Santos'
+            }
+          ]
+        }
+      ],
+      sprints: [
+        {
+          id: 'health-s1',
+          name: 'Sprint 1',
+          startDate: new Date('2026-04-01'),
+          endDate: new Date('2026-04-14')
+        },
+        {
+          id: 'health-s2',
+          name: 'Sprint 2',
+          startDate: new Date('2026-04-15'),
+          endDate: new Date('2026-04-28')
+        },
+        {
+          id: 'health-s3',
+          name: 'Sprint 3',
+          startDate: new Date('2026-04-29'),
+          endDate: new Date('2026-05-12')
+        },
+        {
+          id: 'health-s4',
+          name: 'Sprint 4',
+          startDate: new Date('2026-05-13'),
+          endDate: new Date('2026-05-26')
+        },
+        {
+          id: 'health-s5',
+          name: 'Sprint 5',
+          startDate: new Date('2026-05-27'),
+          endDate: new Date('2026-06-09')
+        },
+        {
+          id: 'health-s6',
+          name: 'Sprint 6',
+          startDate: new Date('2026-06-10'),
+          endDate: new Date('2026-06-23')
+        }
+      ],
+      milestones: [
+        {
+          id: 'health-m1',
+          releaseId: 'health-r1',
+          name: 'HIPAA Security Audit',
+          type: 'Approval',
+          dateType: 'range',
+          startDate: new Date('2026-06-15'),
+          endDate: new Date('2026-06-19'),
+          description: 'Third-party HIPAA compliance audit',
+          isBlocking: true,
+          order: 1
+        },
+        {
+          id: 'health-m2',
+          releaseId: 'health-r1',
+          name: 'Code Freeze',
+          type: 'Freeze',
+          dateType: 'single',
+          startDate: new Date('2026-06-24'),
+          description: 'No new features after this date',
+          isBlocking: true,
+          order: 2
+        },
+        {
+          id: 'health-m3',
+          releaseId: 'health-r1',
+          name: 'UAT Sign-off',
+          type: 'Approval',
+          dateType: 'single',
+          startDate: new Date('2026-07-02'),
+          description: 'Clinical stakeholder approval required',
+          isBlocking: true,
+          order: 3
+        },
+        {
+          id: 'health-m4',
+          releaseId: 'health-r1',
+          name: 'Production Deployment',
+          type: 'Deployment',
+          dateType: 'single',
+          startDate: new Date('2026-07-08'),
+          description: 'Deploy to production environment',
+          isBlocking: false,
+          order: 4
+        },
+        {
+          id: 'health-m5',
+          releaseId: 'health-r1',
+          name: 'Patient Portal Launch 🏥',
+          type: 'Launch',
+          dateType: 'single',
+          startDate: new Date('2026-07-12'),
+          description: 'Portal accessible to all patients',
+          isBlocking: false,
+          order: 5
+        }
+      ],
+      phases: [
+        {
+          id: 'health-p1',
+          releaseId: 'health-r1',
+          name: 'Development Window',
+          type: 'DevWindow',
+          startDate: new Date('2026-04-01'),
+          endDate: new Date('2026-06-23'),
+          allowsWork: true,
+          order: 1,
+          description: 'Active development and feature implementation'
+        },
+        {
+          id: 'health-p2',
+          releaseId: 'health-r1',
+          name: 'System Integration Testing',
+          type: 'Testing',
+          startDate: new Date('2026-06-24'),
+          endDate: new Date('2026-06-30'),
+          allowsWork: false,
+          order: 2,
+          description: 'Integration testing with EHR systems'
+        },
+        {
+          id: 'health-p3',
+          releaseId: 'health-r1',
+          name: 'UAT & Clinical Validation',
+          type: 'Testing',
+          startDate: new Date('2026-07-01'),
+          endDate: new Date('2026-07-07'),
+          allowsWork: false,
+          order: 3,
+          description: 'User acceptance testing with medical staff'
+        },
+        {
+          id: 'health-p4',
+          releaseId: 'health-r1',
+          name: 'Go-Live',
+          type: 'Launch',
+          startDate: new Date('2026-07-08'),
+          endDate: new Date('2026-07-12'),
+          allowsWork: false,
+          order: 4,
+          description: 'Production launch and monitoring'
+        }
+      ]
+    }
+  ]
+};
+
+// ===========================================
+// PRODUCT 3: Digital Banking App
+// Secure mobile banking with fraud detection
+// ===========================================
+const product3: Product = {
+  id: 'bank01',
+  name: 'SecureBank - Mobile Banking',
+  releases: [
+    {
+      id: 'bank-r1',
+      name: 'H2 2026 - Summer Release',
+      startDate: new Date('2026-05-04'),
+      endDate: new Date('2026-08-21'),
+      storyPointMapping: SP_PRESETS.fibonacci,
+      features: [
+        {
+          id: 'bank-f1',
+          name: '💰 Account Management',
+          tickets: [
+            {
+              id: 'bank-t1',
+              title: 'Multi-account dashboard',
+              description: 'Priority: High | Display checking, savings, credit cards with real-time balances',
+              startDate: new Date('2026-05-04'),
+              endDate: new Date('2026-05-11'),
+              status: 'completed',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Carlos Martinez'
+            },
+            {
+              id: 'bank-t2',
+              title: 'Transaction history with search',
+              description: 'Priority: High | Filterable transaction list with categorization',
+              startDate: new Date('2026-05-11'),
+              endDate: new Date('2026-05-16'),
+              status: 'completed',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Jennifer Wu'
+            },
+            {
+              id: 'bank-t3',
+              title: 'Spending insights and analytics',
+              description: 'Priority: Medium | Charts showing spending by category and trends',
+              startDate: new Date('2026-05-16'),
+              endDate: new Date('2026-05-21'),
+              status: 'in-progress',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Ahmed Hassan'
+            },
+            {
+              id: 'bank-t4',
+              title: 'Account statements PDF download',
+              description: 'Priority: Low | Generate monthly/quarterly statements',
+              startDate: new Date('2026-05-21'),
+              endDate: new Date('2026-05-23'),
+              status: 'planned',
+              storyPoints: 2,
+              effortDays: 2,
+              assignedTo: 'Sofia Rossi'
+            },
+            {
+              id: 'bank-t5',
+              title: 'Account alerts and notifications',
+              description: 'Priority: Medium | Push notifications for low balance, large transactions',
+              startDate: new Date('2026-05-23'),
+              endDate: new Date('2026-05-28'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Mark Thompson'
+            }
+          ]
+        },
+        {
+          id: 'bank-f2',
+          name: '💸 Fund Transfers',
+          tickets: [
+            {
+              id: 'bank-t6',
+              title: 'Internal account transfers',
+              description: 'Priority: High | Move money between own accounts instantly',
+              startDate: new Date('2026-05-28'),
+              endDate: new Date('2026-06-01'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Carlos Martinez'
+            },
+            {
+              id: 'bank-t7',
+              title: 'External bank transfers (ACH)',
+              description: 'Priority: High | Link external accounts and initiate ACH transfers',
+              startDate: new Date('2026-06-01'),
+              endDate: new Date('2026-06-09'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Jennifer Wu'
+            },
+            {
+              id: 'bank-t8',
+              title: 'Wire transfer functionality',
+              description: 'Priority: Medium | Domestic and international wire transfers',
+              startDate: new Date('2026-06-09'),
+              endDate: new Date('2026-06-16'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Ahmed Hassan'
+            },
+            {
+              id: 'bank-t9',
+              title: 'Transfer scheduling and recurring',
+              description: 'Priority: Medium | Set up one-time or recurring transfers',
+              startDate: new Date('2026-06-16'),
+              endDate: new Date('2026-06-20'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Sofia Rossi'
+            },
+            {
+              id: 'bank-t10',
+              title: 'Transfer limits and approvals',
+              description: 'Priority: High | Implement daily limits and two-factor approval for large transfers',
+              startDate: new Date('2026-06-20'),
+              endDate: new Date('2026-06-24'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Mark Thompson'
+            }
+          ]
+        },
+        {
+          id: 'bank-f3',
+          name: '📱 Bill Payments',
+          tickets: [
+            {
+              id: 'bank-t11',
+              title: 'Payee management system',
+              description: 'Priority: High | Add, edit, and save bill payees',
+              startDate: new Date('2026-06-24'),
+              endDate: new Date('2026-06-29'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Carlos Martinez'
+            },
+            {
+              id: 'bank-t12',
+              title: 'One-time bill payment',
+              description: 'Priority: High | Pay bills with custom amounts and memo',
+              startDate: new Date('2026-06-29'),
+              endDate: new Date('2026-07-03'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Jennifer Wu'
+            },
+            {
+              id: 'bank-t13',
+              title: 'Recurring bill payments (AutoPay)',
+              description: 'Priority: Medium | Set up automatic monthly bill payments',
+              startDate: new Date('2026-07-03'),
+              endDate: new Date('2026-07-08'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Ahmed Hassan'
+            },
+            {
+              id: 'bank-t14',
+              title: 'Payment history and receipts',
+              description: 'Priority: Low | View past payments with confirmation numbers',
+              startDate: new Date('2026-07-08'),
+              endDate: new Date('2026-07-11'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Sofia Rossi'
+            }
+          ]
+        },
+        {
+          id: 'bank-f4',
+          name: '📸 Mobile Deposit',
+          tickets: [
+            {
+              id: 'bank-t15',
+              title: 'Check capture with camera',
+              description: 'Priority: High | Capture front/back of checks with edge detection',
+              startDate: new Date('2026-07-11'),
+              endDate: new Date('2026-07-21'),
+              status: 'planned',
+              storyPoints: 13,
+              effortDays: 13,
+              assignedTo: 'Carlos Martinez'
+            },
+            {
+              id: 'bank-t16',
+              title: 'OCR amount verification',
+              description: 'Priority: High | Extract check amount using AI/ML for validation',
+              startDate: new Date('2026-07-21'),
+              endDate: new Date('2026-07-28'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 8,
+              assignedTo: 'Jennifer Wu'
+            },
+            {
+              id: 'bank-t17',
+              title: 'Deposit status tracking',
+              description: 'Priority: Medium | Show pending, processing, cleared statuses',
+              startDate: new Date('2026-07-28'),
+              endDate: new Date('2026-07-31'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Ahmed Hassan'
+            },
+            {
+              id: 'bank-t18',
+              title: 'Deposit limits and holds',
+              description: 'Priority: Medium | Enforce daily limits and hold periods',
+              startDate: new Date('2026-07-31'),
+              endDate: new Date('2026-08-04'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Sofia Rossi'
+            }
+          ]
+        },
+        {
+          id: 'bank-f5',
+          name: '🔒 Security & Fraud Detection',
+          tickets: [
+            {
+              id: 'bank-t19',
+              title: 'Biometric authentication (Face/Touch ID)',
+              description: 'Priority: High | Implement biometric login for iOS and Android',
+              startDate: new Date('2026-08-04'),
+              endDate: new Date('2026-08-08'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Mark Thompson'
+            },
+            {
+              id: 'bank-t20',
+              title: 'Two-factor authentication (2FA)',
+              description: 'Priority: High | SMS/email verification codes for sensitive actions',
+              startDate: new Date('2026-08-08'),
+              endDate: new Date('2026-08-12'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Carlos Martinez'
+            },
+            {
+              id: 'bank-t21',
+              title: 'Fraud detection alerting',
+              description: 'Priority: High | Real-time notifications for suspicious transactions',
+              startDate: new Date('2026-08-12'),
+              endDate: new Date('2026-08-15'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Jennifer Wu'
+            },
+            {
+              id: 'bank-t22',
+              title: 'Card lock/unlock feature',
+              description: 'Priority: Medium | Instantly freeze/unfreeze debit cards',
+              startDate: new Date('2026-08-15'),
+              endDate: new Date('2026-08-18'),
+              status: 'planned',
+              storyPoints: 3,
+              effortDays: 3,
+              assignedTo: 'Ahmed Hassan'
+            }
+          ]
+        }
+      ],
+      sprints: [
+        {
+          id: 'bank-s1',
+          name: 'Sprint 1',
+          startDate: new Date('2026-05-04'),
+          endDate: new Date('2026-05-17')
+        },
+        {
+          id: 'bank-s2',
+          name: 'Sprint 2',
+          startDate: new Date('2026-05-18'),
+          endDate: new Date('2026-05-31')
+        },
+        {
+          id: 'bank-s3',
+          name: 'Sprint 3',
+          startDate: new Date('2026-06-01'),
+          endDate: new Date('2026-06-14')
+        },
+        {
+          id: 'bank-s4',
+          name: 'Sprint 4',
+          startDate: new Date('2026-06-15'),
+          endDate: new Date('2026-06-28')
+        },
+        {
+          id: 'bank-s5',
+          name: 'Sprint 5',
+          startDate: new Date('2026-06-29'),
+          endDate: new Date('2026-07-12')
+        },
+        {
+          id: 'bank-s6',
+          name: 'Sprint 6',
+          startDate: new Date('2026-07-13'),
+          endDate: new Date('2026-07-26')
+        },
+        {
+          id: 'bank-s7',
+          name: 'Sprint 7',
+          startDate: new Date('2026-07-27'),
+          endDate: new Date('2026-08-09')
+        }
+      ],
+      milestones: [
+        {
+          id: 'bank-m1',
+          releaseId: 'bank-r1',
+          name: 'Security Audit Complete',
+          type: 'Approval',
+          dateType: 'single',
+          startDate: new Date('2026-07-20'),
+          description: 'Third-party security assessment',
+          isBlocking: true,
+          order: 1
+        },
+        {
+          id: 'bank-m2',
+          releaseId: 'bank-r1',
+          name: 'Penetration Testing',
+          type: 'Testing',
+          dateType: 'range',
+          startDate: new Date('2026-07-28'),
+          endDate: new Date('2026-08-01'),
+          description: 'External pen test for vulnerabilities',
+          isBlocking: true,
+          order: 2
+        },
+        {
+          id: 'bank-m3',
+          releaseId: 'bank-r1',
+          name: 'Regulatory Approval (OCC)',
+          type: 'Approval',
+          dateType: 'single',
+          startDate: new Date('2026-08-08'),
+          description: 'Office of Comptroller of Currency approval',
+          isBlocking: true,
+          order: 3
+        },
+        {
+          id: 'bank-m4',
+          releaseId: 'bank-r1',
+          name: 'Soft Launch (Beta Users)',
+          type: 'Launch',
+          dateType: 'single',
+          startDate: new Date('2026-08-15'),
+          description: 'Limited release to 5% of users',
+          isBlocking: false,
+          order: 4
+        },
+        {
+          id: 'bank-m5',
+          releaseId: 'bank-r1',
+          name: 'Public Launch 🏦',
+          type: 'Launch',
+          dateType: 'single',
+          startDate: new Date('2026-08-21'),
+          description: 'Full rollout to all customers',
+          isBlocking: false,
+          order: 5
+        }
+      ],
+      phases: [
+        {
+          id: 'bank-p1',
+          releaseId: 'bank-r1',
+          name: 'Development Window',
+          type: 'DevWindow',
+          startDate: new Date('2026-05-04'),
+          endDate: new Date('2026-07-26'),
+          allowsWork: true,
+          order: 1,
+          description: 'Feature development and testing'
+        },
+        {
+          id: 'bank-p2',
+          releaseId: 'bank-r1',
+          name: 'Security Testing',
+          type: 'Testing',
+          startDate: new Date('2026-07-27'),
+          endDate: new Date('2026-08-05'),
+          allowsWork: false,
+          order: 2,
+          description: 'Security audit and penetration testing'
+        },
+        {
+          id: 'bank-p3',
+          releaseId: 'bank-r1',
+          name: 'UAT & Compliance',
+          type: 'Approval',
+          startDate: new Date('2026-08-06'),
+          endDate: new Date('2026-08-14'),
+          allowsWork: false,
+          order: 3,
+          description: 'Regulatory approval and user testing'
+        },
+        {
+          id: 'bank-p4',
+          releaseId: 'bank-r1',
+          name: 'Phased Launch',
+          type: 'Launch',
+          startDate: new Date('2026-08-15'),
+          endDate: new Date('2026-08-21'),
+          allowsWork: false,
+          order: 4,
+          description: 'Soft launch to public rollout'
+        }
+      ]
+    }
+  ]
+};
+
+// ===========================================
+// TEAM MEMBERS
+// ===========================================
+export const mockTeamMembers: TeamMember[] = [
+  // ═══════════════════════════════════════════
+  // E-COMMERCE PLATFORM TEAM (ecom01)
+  // ═══════════════════════════════════════════
+  {
+    id: 'tm-ecom-1',
+    name: 'Sarah Chen',
+    role: 'Developer',
+    experienceLevel: 'Senior',
+    productId: 'ecom01',
+    velocityMultiplier: 1.3,
+    notes: 'Frontend specialist, React expert',
+    pto: [
+      {
+        id: 'pto-ecom-1',
+        name: 'Spring Break Vacation',
+        startDate: new Date('2026-03-15'),
+        endDate: new Date('2026-03-19')
+      }
+    ]
+  },
+  {
+    id: 'tm-ecom-2',
+    name: 'Michael Rodriguez',
+    role: 'Developer',
+    experienceLevel: 'Senior',
+    productId: 'ecom01',
+    velocityMultiplier: 1.2,
+    notes: 'Backend lead, microservices architecture',
+    pto: [
+      {
+        id: 'pto-ecom-2',
+        name: 'Family Wedding',
+        startDate: new Date('2026-05-25'),
+        endDate: new Date('2026-05-29')
+      }
+    ]
+  },
+  {
+    id: 'tm-ecom-3',
+    name: 'Emily Watson',
+    role: 'Developer',
+    experienceLevel: 'Mid',
+    productId: 'ecom01',
+    velocityMultiplier: 1.0,
+    notes: 'Full-stack developer',
+    pto: [
+      {
+        id: 'pto-ecom-3',
+        name: 'Tech Conference',
+        startDate: new Date('2026-04-20'),
+        endDate: new Date('2026-04-24')
+      }
+    ]
+  },
+  {
+    id: 'tm-ecom-4',
+    name: 'James Kim',
+    role: 'Developer',
+    experienceLevel: 'Mid',
+    productId: 'ecom01',
+    velocityMultiplier: 1.0,
+    notes: 'Backend developer, API specialist',
+    pto: []
+  },
+  {
+    id: 'tm-ecom-5',
+    name: 'David Lee',
+    role: 'QA',
+    experienceLevel: 'Senior',
+    productId: 'ecom01',
+    velocityMultiplier: 1.1,
+    notes: 'Test automation expert',
+    pto: [
+      {
+        id: 'pto-ecom-5',
+        name: 'Medical Procedure',
+        startDate: new Date('2026-05-11'),
+        endDate: new Date('2026-05-16')
+      }
+    ]
+  },
+  {
+    id: 'tm-ecom-6',
+    name: 'Lisa Park',
+    role: 'Designer',
+    experienceLevel: 'Senior',
+    productId: 'ecom01',
+    velocityMultiplier: 1.2,
+    notes: 'UI/UX lead designer',
+    pto: []
+  },
+  {
+    id: 'tm-ecom-7',
+    name: 'Robert Johnson',
+    role: 'Developer',
+    experienceLevel: 'Junior',
+    productId: 'ecom01',
+    velocityMultiplier: 0.7,
+    notes: 'Junior frontend developer',
+    pto: [
+      {
+        id: 'pto-ecom-7',
+        name: 'Moving Week',
+        startDate: new Date('2026-04-06'),
+        endDate: new Date('2026-04-10')
+      }
+    ]
+  },
+  {
+    id: 'tm-ecom-8',
+    name: 'Amanda Smith',
+    role: 'QA',
+    experienceLevel: 'Mid',
+    productId: 'ecom01',
+    velocityMultiplier: 0.9,
+    notes: 'Manual and automation testing',
+    pto: []
+  },
+  {
+    id: 'tm-ecom-9',
+    name: 'Kevin Zhang',
+    role: 'Developer',
+    experienceLevel: 'Junior',
+    productId: 'ecom01',
+    velocityMultiplier: 0.8,
+    notes: 'Backend junior, learning Go',
+    pto: [
+      {
+        id: 'pto-ecom-9',
+        name: 'Summer Vacation',
+        startDate: new Date('2026-06-08'),
+        endDate: new Date('2026-06-15')
+      }
+    ]
+  },
+  {
+    id: 'tm-ecom-10',
+    name: 'Rachel Green',
+    role: 'Designer',
+    experienceLevel: 'Mid',
+    productId: 'ecom01',
+    velocityMultiplier: 1.0,
+    notes: 'Product designer, Figma specialist',
+    pto: []
+  },
+
+  // ═══════════════════════════════════════════
+  // HEALTHCARE PATIENT PORTAL TEAM (health01)
+  // ═══════════════════════════════════════════
+  {
+    id: 'tm-health-1',
+    name: 'Dr. Raj Patel',
+    role: 'Developer',
+    experienceLevel: 'Senior',
+    productId: 'health01',
+    velocityMultiplier: 1.4,
+    notes: 'Healthcare tech lead, FHIR expert',
+    pto: [
+      {
+        id: 'pto-health-1',
+        name: 'Medical Conference',
+        startDate: new Date('2026-06-15'),
+        endDate: new Date('2026-06-19')
+      }
+    ]
+  },
+  {
+    id: 'tm-health-2',
+    name: 'Nina Santos',
+    role: 'Developer',
+    experienceLevel: 'Mid',
+    productId: 'health01',
+    velocityMultiplier: 1.0,
+    notes: 'Frontend developer, healthcare UI',
+    pto: []
+  },
+  {
+    id: 'tm-health-3',
+    name: 'Alex Kim',
+    role: 'Developer',
+    experienceLevel: 'Senior',
+    productId: 'health01',
+    velocityMultiplier: 1.2,
+    notes: 'Security specialist, HIPAA compliance',
+    pto: [
+      {
+        id: 'pto-health-3',
+        name: 'Certification Training',
+        startDate: new Date('2026-04-20'),
+        endDate: new Date('2026-04-24')
+      }
+    ]
+  },
+  {
+    id: 'tm-health-4',
+    name: 'Priya Gupta',
+    role: 'Developer',
+    experienceLevel: 'Mid',
+    productId: 'health01',
+    velocityMultiplier: 0.9,
+    notes: 'Backend developer, API integration',
+    pto: []
+  },
+  {
+    id: 'tm-health-5',
+    name: 'Tom Wilson',
+    role: 'Developer',
+    experienceLevel: 'Senior',
+    productId: 'health01',
+    velocityMultiplier: 1.1,
+    notes: 'DevOps and cloud infrastructure',
+    pto: [
+      {
+        id: 'pto-health-5',
+        name: 'Family Reunion',
+        startDate: new Date('2026-07-01'),
+        endDate: new Date('2026-07-05')
+      }
+    ]
+  },
+  {
+    id: 'tm-health-6',
+    name: 'Maria Lopez',
+    role: 'QA',
+    experienceLevel: 'Senior',
+    productId: 'health01',
+    velocityMultiplier: 1.2,
+    notes: 'Healthcare QA specialist',
+    pto: []
+  },
+  {
+    id: 'tm-health-7',
+    name: 'Daniel Brown',
+    role: 'Designer',
+    experienceLevel: 'Senior',
+    productId: 'health01',
+    velocityMultiplier: 1.1,
+    notes: 'Healthcare UX designer',
+    pto: [
+      {
+        id: 'pto-health-7',
+        name: 'UX Workshop',
+        startDate: new Date('2026-05-25'),
+        endDate: new Date('2026-05-29')
+      }
+    ]
+  },
+  {
+    id: 'tm-health-8',
+    name: 'Samantha White',
+    role: 'QA',
+    experienceLevel: 'Mid',
+    productId: 'health01',
+    velocityMultiplier: 0.9,
+    notes: 'Compliance testing',
+    pto: []
+  },
+  {
+    id: 'tm-health-9',
+    name: 'Eric Davis',
+    role: 'Developer',
+    experienceLevel: 'Junior',
+    productId: 'health01',
+    velocityMultiplier: 0.7,
+    notes: 'Junior developer learning healthcare systems',
+    pto: []
+  },
+  {
+    id: 'tm-health-10',
+    name: 'Jessica Turner',
+    role: 'Designer',
+    experienceLevel: 'Mid',
+    productId: 'health01',
+    velocityMultiplier: 1.0,
+    notes: 'UI designer with healthcare focus',
+    pto: []
+  },
+
+  // ═══════════════════════════════════════════
+  // DIGITAL BANKING APP TEAM (bank01)
+  // ═══════════════════════════════════════════
+  {
+    id: 'tm-bank-1',
+    name: 'Carlos Martinez',
+    role: 'Developer',
+    experienceLevel: 'Senior',
+    productId: 'bank01',
+    velocityMultiplier: 1.3,
+    notes: 'Mobile architect, fintech expert',
+    pto: [
+      {
+        id: 'pto-bank-1',
+        name: 'Wedding Anniversary',
+        startDate: new Date('2026-07-13'),
+        endDate: new Date('2026-07-17')
+      }
+    ]
+  },
+  {
+    id: 'tm-bank-2',
+    name: 'Jennifer Wu',
+    role: 'Developer',
+    experienceLevel: 'Senior',
+    productId: 'bank01',
+    velocityMultiplier: 1.2,
+    notes: 'iOS/Android native development',
+    pto: []
+  },
+  {
+    id: 'tm-bank-3',
+    name: 'Ahmed Hassan',
+    role: 'Developer',
+    experienceLevel: 'Mid',
+    productId: 'bank01',
+    velocityMultiplier: 1.0,
+    notes: 'Backend developer, payment systems',
+    pto: [
+      {
+        id: 'pto-bank-3',
+        name: 'Hajj Pilgrimage',
+        startDate: new Date('2026-06-08'),
+        endDate: new Date('2026-06-15')
+      }
+    ]
+  },
+  {
+    id: 'tm-bank-4',
+    name: 'Sofia Rossi',
+    role: 'Developer',
+    experienceLevel: 'Mid',
+    productId: 'bank01',
+    velocityMultiplier: 1.0,
+    notes: 'Full-stack developer',
+    pto: []
+  },
+  {
+    id: 'tm-bank-5',
+    name: 'Mark Thompson',
+    role: 'Developer',
+    experienceLevel: 'Senior',
+    productId: 'bank01',
+    velocityMultiplier: 1.2,
+    notes: 'Security engineer, fraud detection',
+    pto: [
+      {
+        id: 'pto-bank-5',
+        name: 'Security Conference',
+        startDate: new Date('2026-08-10'),
+        endDate: new Date('2026-08-14')
+      }
+    ]
+  },
+  {
+    id: 'tm-bank-6',
+    name: 'Olivia Martin',
+    role: 'QA',
+    experienceLevel: 'Senior',
+    productId: 'bank01',
+    velocityMultiplier: 1.1,
+    notes: 'Mobile testing specialist',
+    pto: []
+  },
+  {
+    id: 'tm-bank-7',
+    name: 'Lucas Anderson',
+    role: 'Developer',
+    experienceLevel: 'Junior',
+    productId: 'bank01',
+    velocityMultiplier: 0.8,
+    notes: 'Junior mobile developer',
+    pto: [
+      {
+        id: 'pto-bank-7',
+        name: 'Family Vacation',
+        startDate: new Date('2026-05-25'),
+        endDate: new Date('2026-05-29')
+      }
+    ]
+  },
+  {
+    id: 'tm-bank-8',
+    name: 'Emma Johnson',
+    role: 'Designer',
+    experienceLevel: 'Senior',
+    productId: 'bank01',
+    velocityMultiplier: 1.2,
+    notes: 'Mobile UX/UI design lead',
+    pto: []
+  },
+  {
+    id: 'tm-bank-9',
+    name: 'Noah Williams',
+    role: 'QA',
+    experienceLevel: 'Mid',
+    productId: 'bank01',
+    velocityMultiplier: 0.9,
+    notes: 'Test automation engineer',
+    pto: []
+  },
+  {
+    id: 'tm-bank-10',
+    name: 'Sophia Taylor',
+    role: 'Designer',
+    experienceLevel: 'Mid',
+    productId: 'bank01',
+    velocityMultiplier: 1.0,
+    notes: 'Product designer, mobile apps',
+    pto: [
+      {
+        id: 'pto-bank-10',
+        name: 'Design Summit',
+        startDate: new Date('2026-08-17'),
+        endDate: new Date('2026-08-21')
+      }
+    ]
+  }
+];
+
+// ===========================================
+// HOLIDAYS
+// ===========================================
+export const mockHolidays: Holiday[] = [
+  {
+    id: 'holiday-1',
+    name: "Presidents' Day",
+    startDate: new Date('2026-02-17'),
+    endDate: new Date('2026-02-17')
+  },
+  {
+    id: 'holiday-2',
+    name: 'Memorial Day',
+    startDate: new Date('2026-05-25'),
+    endDate: new Date('2026-05-25')
+  },
+  {
+    id: 'holiday-3',
+    name: 'Company Offsite',
+    startDate: new Date('2026-06-05'),
+    endDate: new Date('2026-06-06')
+  },
+  {
+    id: 'holiday-4',
+    name: 'Juneteenth',
+    startDate: new Date('2026-06-19'),
+    endDate: new Date('2026-06-19')
+  },
+  {
+    id: 'holiday-5',
+    name: 'Independence Day',
+    startDate: new Date('2026-07-04'),
+    endDate: new Date('2026-07-04')
+  }
+];
+
+// ===========================================
+// EXPORTS AND HELPER FUNCTIONS
+// ===========================================
+export const mockProducts: Product[] = [product1, product2, product3];
+
+export function findReleaseById(releaseId: string): { product: Product; release: Release } | null {
+  for (const product of mockProducts) {
+    const release = product.releases.find(r => r.id === releaseId);
+    if (release) return { product, release };
+  }
+  return null;
+}
+
+export function getTeamMembersByProduct(productId: string, allMembers: TeamMember[] = mockTeamMembers): TeamMember[] {
+  return allMembers.filter(m => m.productId === productId);
 }
