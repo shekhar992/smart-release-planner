@@ -97,6 +97,8 @@ export interface Release {
   features: Feature[];
   sprints?: Sprint[];
   storyPointMapping?: StoryPointMapping;
+  milestones: Milestone[];
+  phases?: Phase[]; // OPTIONAL for backward compatibility
 }
 
 export interface Product {
@@ -470,6 +472,86 @@ const product1: Product = {
           startDate: new Date('2026-04-13'),
           endDate: new Date('2026-04-24')
         }
+      ],
+      milestones: [],
+      phases: [
+        {
+          id: 'p1-phase1',
+          releaseId: 'r1',
+          name: 'Dev Window',
+          type: 'DevWindow',
+          startDate: new Date('2026-02-17'),
+          endDate: new Date('2026-03-28'),
+          allowsWork: true,
+          order: 1,
+          description: 'Active development period for all features'
+        },
+        {
+          id: 'p1-phase2',
+          releaseId: 'r1',
+          name: 'Code Freeze',
+          type: 'Deployment',
+          startDate: new Date('2026-03-29'),
+          endDate: new Date('2026-03-30'),
+          allowsWork: false,
+          order: 2,
+          description: 'No new code changes, final build preparation'
+        },
+        {
+          id: 'p1-phase3',
+          releaseId: 'r1',
+          name: 'SIT Testing',
+          type: 'Testing',
+          startDate: new Date('2026-03-31'),
+          endDate: new Date('2026-04-10'),
+          allowsWork: false,
+          order: 3,
+          description: 'System Integration Testing with external payment providers'
+        },
+        {
+          id: 'p1-phase4',
+          releaseId: 'r1',
+          name: 'UAT',
+          type: 'Approval',
+          startDate: new Date('2026-04-11'),
+          endDate: new Date('2026-04-18'),
+          allowsWork: false,
+          order: 4,
+          description: 'User Acceptance Testing with merchant partners'
+        },
+        {
+          id: 'p1-phase5',
+          releaseId: 'r1',
+          name: 'Pre-Prod Validation',
+          type: 'Testing',
+          startDate: new Date('2026-04-19'),
+          endDate: new Date('2026-04-21'),
+          allowsWork: false,
+          order: 5,
+          description: 'Final validation in pre-production environment'
+        },
+        {
+          id: 'p1-phase6',
+          releaseId: 'r1',
+          name: 'Production Deployment',
+          type: 'Deployment',
+          startDate: new Date('2026-04-22'),
+          endDate: new Date('2026-04-22'),
+          allowsWork: false,
+          order: 6,
+          description: 'Deploy to production during maintenance window'
+        },
+        {
+          id: 'p1-phase7',
+          releaseId: 'r1',
+          name: 'Hypercare',
+          type: 'Launch',
+          startDate: new Date('2026-04-23'),
+          endDate: new Date('2026-04-24'),
+          allowsWork: false,
+          order: 7,
+          description: 'Post-launch monitoring and immediate issue resolution'
+        }
       ]
     },
     {
@@ -816,6 +898,75 @@ const product1: Product = {
           startDate: new Date('2026-06-22'),
           endDate: new Date('2026-06-26')
         }
+      ],
+      milestones: [],
+      phases: [
+        {
+          id: 'p2-phase1',
+          releaseId: 'r2',
+          name: 'Development Sprint',
+          type: 'DevWindow',
+          startDate: new Date('2026-04-27'),
+          endDate: new Date('2026-06-01'),
+          allowsWork: true,
+          order: 1,
+          description: 'Active development for advanced payment features'
+        },
+        {
+          id: 'p2-phase2',
+          releaseId: 'r2',
+          name: 'Code Complete',
+          type: 'Deployment',
+          startDate: new Date('2026-06-02'),
+          endDate: new Date('2026-06-03'),
+          allowsWork: false,
+          order: 2,
+          description: 'Feature complete, no new development'
+        },
+        {
+          id: 'p2-phase3',
+          releaseId: 'r2',
+          name: 'Integration Testing',
+          type: 'Testing',
+          startDate: new Date('2026-06-04'),
+          endDate: new Date('2026-06-12'),
+          allowsWork: false,
+          order: 3,
+          description: 'End-to-end testing with all payment channels'
+        },
+        {
+          id: 'p2-phase4',
+          releaseId: 'r2',
+          name: 'Security & Compliance Review',
+          type: 'Approval',
+          startDate: new Date('2026-06-13'),
+          endDate: new Date('2026-06-17'),
+          allowsWork: false,
+          order: 4,
+          description: 'PCI-DSS compliance audit and security penetration testing'
+        },
+        {
+          id: 'p2-phase5',
+          releaseId: 'r2',
+          name: 'Staged Rollout',
+          type: 'Deployment',
+          startDate: new Date('2026-06-18'),
+          endDate: new Date('2026-06-20'),
+          allowsWork: false,
+          order: 5,
+          description: 'Gradual rollout to merchant segments'
+        },
+        {
+          id: 'p2-phase6',
+          releaseId: 'r2',
+          name: 'Go-Live',
+          type: 'Launch',
+          startDate: new Date('2026-06-21'),
+          endDate: new Date('2026-06-26'),
+          allowsWork: false,
+          order: 6,
+          description: 'Full production release with enhanced monitoring'
+        }
       ]
     }
   ]
@@ -1156,7 +1307,8 @@ const product2: Product = {
           startDate: new Date('2026-05-11'),
           endDate: new Date('2026-05-15')
         }
-      ]
+      ],
+      milestones: []
     },
     {
       id: 'r4',
@@ -1458,7 +1610,8 @@ const product2: Product = {
           startDate: new Date('2026-07-13'),
           endDate: new Date('2026-07-24')
         }
-      ]
+      ],
+      milestones: []
     }
   ]
 };
@@ -1727,7 +1880,8 @@ const product3: Product = {
           startDate: new Date('2026-04-13'),
           endDate: new Date('2026-04-24')
         }
-      ]
+      ],
+      milestones: []
     }
   ]
 };
@@ -2018,7 +2172,8 @@ const product4: Product = {
           startDate: new Date('2026-04-13'),
           endDate: new Date('2026-04-24')
         }
-      ]
+      ],
+      milestones: []
     }
   ]
 };
@@ -2293,7 +2448,8 @@ const product5: Product = {
           startDate: new Date('2026-04-13'),
           endDate: new Date('2026-04-24')
         }
-      ]
+      ],
+      milestones: []
     }
   ]
 };
@@ -2862,3 +3018,101 @@ export const mockHolidays: Holiday[] = [
     endDate: new Date('2026-06-19')
   }
 ];
+
+// ── Milestones ──
+
+export type MilestoneType = 'Testing' | 'Deployment' | 'Approval' | 'Freeze' | 'Launch' | 'Other';
+
+export interface Milestone {
+  id: string;
+  releaseId: string;
+  name: string;
+  type: MilestoneType;
+  dateType: 'single' | 'range';
+  startDate: Date;
+  endDate?: Date; // required if dateType === 'range'
+  description?: string;
+  isBlocking?: boolean; // if true, warn when tickets overlap
+  order?: number;
+}
+
+// ── Phases ──
+
+export type PhaseType = 'DevWindow' | 'Testing' | 'Deployment' | 'Approval' | 'Launch' | 'Custom';
+
+export interface Phase {
+  id: string;
+  releaseId: string;
+  name: string; // e.g., "Dev Window", "SIT", "UAT", "Go-Live"
+  type: PhaseType;
+  startDate: Date;
+  endDate: Date;
+  allowsWork: boolean; // true only for DevWindow, false for Testing/Deployment/Approval/Launch
+  order: number; // for rendering order (1 = first phase, 2 = second, etc.)
+  description?: string; // optional notes
+}
+/**
+ * Generate mock SDLC phases for any release
+ * This ensures all releases have phases for immediate visualization
+ */
+export function getMockPhasesForRelease(release: Release): Phase[] {
+  // Calculate standard SDLC phases for any release
+  const goLiveDate = new Date(release.endDate);
+  
+  const uatEnd = new Date(goLiveDate);
+  uatEnd.setDate(uatEnd.getDate() - 1);
+  const uatStart = new Date(uatEnd);
+  uatStart.setDate(uatStart.getDate() - 13); // 2 weeks UAT
+  
+  const sitEnd = new Date(uatStart);
+  sitEnd.setDate(sitEnd.getDate() - 1);
+  const sitStart = new Date(sitEnd);
+  sitStart.setDate(sitStart.getDate() - 13); // 2 weeks SIT
+  
+  const devEnd = new Date(sitStart);
+  devEnd.setDate(devEnd.getDate() - 1);
+  const devStart = new Date(release.startDate);
+  
+  return [
+    {
+      id: `phase-dev-${release.id}`,
+      releaseId: release.id,
+      name: 'Dev Window',
+      type: 'DevWindow',
+      startDate: devStart,
+      endDate: devEnd,
+      allowsWork: true,
+      order: 1,
+    },
+    {
+      id: `phase-sit-${release.id}`,
+      releaseId: release.id,
+      name: 'SIT',
+      type: 'Testing',
+      startDate: sitStart,
+      endDate: sitEnd,
+      allowsWork: false,
+      order: 2,
+    },
+    {
+      id: `phase-uat-${release.id}`,
+      releaseId: release.id,
+      name: 'UAT',
+      type: 'Testing',
+      startDate: uatStart,
+      endDate: uatEnd,
+      allowsWork: false,
+      order: 3,
+    },
+    {
+      id: `phase-golive-${release.id}`,
+      releaseId: release.id,
+      name: 'Go-Live',
+      type: 'Launch',
+      startDate: goLiveDate,
+      endDate: goLiveDate,
+      allowsWork: false,
+      order: 4,
+    },
+  ];
+}

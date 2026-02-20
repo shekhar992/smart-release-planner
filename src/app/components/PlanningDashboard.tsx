@@ -1,13 +1,15 @@
 import { Link } from 'react-router';
 import { Plus, Calendar, Package, FolderPlus, Users, ChevronRight, Layers, MoreVertical, Pencil, Trash2, Sparkles } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
-import { mockProducts, Product, Release, mockHolidays, mockTeamMembers, TeamMember } from '../data/mockData';
+import { nanoid } from 'nanoid';
+import { mockProducts, Product, Release, mockHolidays, mockTeamMembers, TeamMember, Phase, SP_PRESETS, Feature, Ticket } from '../data/mockData';
 import { CreateProductModal } from './CreateProductModal';
-import { CreateReleaseModal } from './CreateReleaseModal';
-import { AutoReleaseModal } from './AutoReleaseModal';
+import { ReleaseCreationWizard } from './ReleaseCreationWizard';
 import { PageShell } from './PageShell';
-import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers } from '../lib/localStorage';
+import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers, savePhases, loadHolidays } from '../lib/localStorage';
 import { ModeSwitch } from './ModeSwitch';
+import { buildReleasePlan } from '../../domain/planningEngine';
+import type { TicketInput, ReleaseConfig } from '../../domain/types';
 
 interface PlanningDashboardProps {
   openCreateProduct?: () => void;
@@ -22,9 +24,12 @@ export function PlanningDashboard({
 }: PlanningDashboardProps = {}) {
   // Local state fallback for when rendered via router (without props)
   const [localShowCreateProduct, setLocalShowCreateProduct] = useState(false);
-  const [showCreateRelease, setShowCreateRelease] = useState<string | null>(null);
-  const [showAutoRelease, setShowAutoRelease] = useState<string | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  
+  // Release creation wizard state
+  const [showReleaseWizard, setShowReleaseWizard] = useState(false);
+  const [wizardFlow, setWizardFlow] = useState<'manual' | 'smart'>('manual');
+  const [wizardProductId, setWizardProductId] = useState<string | null>(null);
 
   // Use props if provided, otherwise use local state
   const effectiveShowCreateProduct = showCreateProduct ?? localShowCreateProduct;
@@ -78,22 +83,198 @@ export function PlanningDashboard({
     }
   };
 
-  const handleCreateRelease = (productId: string, name: string, startDate: Date, endDate: Date, _importedData?: any, sprints?: import('../data/mockData').Sprint[], storyPointMapping?: import('../data/mockData').StoryPointMapping) => {
-    const releaseId = `r-${Date.now()}`;
-
+  const handleWizardComplete = (data: {
+    productId: string;
+    name: string;
+    startDate: Date;
+    endDate: Date;
+    sprintLengthDays?: number;
+    phases: Phase[];
+    tickets?: import('../data/mockData').Ticket[];
+    featureGroups?: Record<string, number>;
+    parsedTickets?: any[]; // ParsedTicketRow with feature field
+  }) => {
+    // Process uploaded tickets into features
+    let features: Feature[] = [];
+    let releasePlan: import('../../domain/types').ReleasePlan | null = null;
+    
+    if (data.tickets && data.tickets.length > 0 && data.parsedTickets) {
+      // Step 1: Use planning engine to calculate sequential dates across sprints
+      let ticketsWithSequentialDates = [...data.tickets];
+      
+      if (data.sprintLengthDays) {
+        try {
+          // Load team members and holidays for capacity calculation
+          const teamMembers = loadTeamMembers() || [];
+          const productTeam = teamMembers.filter(tm => tm.productId === data.productId);
+          const holidays = loadHolidays() || [];
+          
+          // Convert tickets to TicketInput format for planning engine
+          const ticketInputs: TicketInput[] = data.tickets.map((ticket, index) => {
+            const parsedTicket = data.parsedTickets![index];
+            return {
+              id: ticket.id || nanoid(),
+              title: ticket.title,
+              epic: parsedTicket?.feature?.trim() || 'Imported Tickets',
+              effortDays: ticket.effortDays || 1,
+              priority: 1, // Default priority (can be enhanced later with CSV priority column)
+              assignedToRaw: ticket.assignedTo,
+            };
+          });
+          
+          // Build release plan using planning engine
+          const config: ReleaseConfig = {
+            releaseStart: data.startDate,
+            releaseEnd: data.endDate,
+            sprintLengthDays: data.sprintLengthDays,
+            numberOfDevelopers: productTeam.length || 1,
+            holidays: holidays.map(h => new Date(h.startDate)),
+            ptoDates: [], // PTO dates would come from team members if needed
+          };
+          
+          releasePlan = buildReleasePlan(ticketInputs, config);
+          
+          // Step 2: Anchor tickets to their sprint's startDate (matching main branch pattern)
+          const updatedTickets: Ticket[] = [];
+          
+          // Process tickets by sprint - all tickets in a sprint start at that sprint's startDate
+          for (const domainSprint of releasePlan.sprints) {
+            for (const ticketInput of domainSprint.tickets) {
+              // Find original ticket by matching ID or title
+              const originalTicket = data.tickets.find(t => 
+                (t.id && t.id === ticketInput.id) || t.title === ticketInput.title
+              );
+              
+              if (originalTicket) {
+                // Calculate end date from sprint's startDate + effort
+                const effortDays = originalTicket.effortDays || 1;
+                const ticketEndDate = new Date(
+                  domainSprint.startDate.getTime() + (effortDays * 24 * 60 * 60 * 1000)
+                );
+                
+                updatedTickets.push({
+                  ...originalTicket,
+                  id: ticketInput.id,
+                  startDate: new Date(domainSprint.startDate), // Anchored to sprint start
+                  endDate: ticketEndDate,
+                });
+              }
+            }
+          }
+          
+          // Handle overflow tickets (place at release end)
+          for (const ticketInput of releasePlan.overflowTickets) {
+            const originalTicket = data.tickets.find(t => 
+              (t.id && t.id === ticketInput.id) || t.title === ticketInput.title
+            );
+            
+            if (originalTicket) {
+              const effortDays = originalTicket.effortDays || 1;
+              const ticketEndDate = new Date(
+                data.endDate.getTime() + (effortDays * 24 * 60 * 60 * 1000)
+              );
+              
+              updatedTickets.push({
+                ...originalTicket,
+                id: ticketInput.id,
+                startDate: new Date(data.endDate), // Start at release end
+                endDate: ticketEndDate,
+              });
+            }
+          }
+          
+          ticketsWithSequentialDates = updatedTickets;
+        } catch (error) {
+          console.warn('Planning engine failed, using simple sequential dates:', error);
+          // Fallback: Simple sequential placement without sprint logic
+          let currentDate = new Date(data.startDate);
+          ticketsWithSequentialDates = data.tickets.map(ticket => {
+            const effortDays = ticket.effortDays || 1;
+            const endDate = new Date(currentDate.getTime() + (effortDays * 24 * 60 * 60 * 1000));
+            const updatedTicket = {
+              ...ticket,
+              id: ticket.id || nanoid(),
+              startDate: new Date(currentDate),
+              endDate: endDate,
+            };
+            currentDate = endDate;
+            return updatedTicket;
+          });
+        }
+      } else {
+        // No sprints: Simple sequential placement
+        let currentDate = new Date(data.startDate);
+        ticketsWithSequentialDates = data.tickets.map(ticket => {
+          const effortDays = ticket.effortDays || 1;
+          const endDate = new Date(currentDate.getTime() + (effortDays * 24 * 60 * 60 * 1000));
+          const updatedTicket = {
+            ...ticket,
+            id: ticket.id || nanoid(),
+            startDate: new Date(currentDate),
+            endDate: endDate,
+          };
+          currentDate = endDate;
+          return updatedTicket;
+        });
+      }
+      
+      // Step 3: Group tickets by feature using parsedTickets (which have the feature field from CSV)
+      const ticketsByFeature = new Map<string, Ticket[]>();
+      
+      ticketsWithSequentialDates.forEach((ticket, index) => {
+        // Get feature name from corresponding parsedTicket (same index)
+        const parsedTicket = data.parsedTickets![index];
+        const featureName = parsedTicket?.feature?.trim() || 'Imported Tickets';
+        
+        if (!ticketsByFeature.has(featureName)) {
+          ticketsByFeature.set(featureName, []);
+        }
+        
+        // Ensure ticket has proper ID
+        const ticketWithId = {
+          ...ticket,
+          id: ticket.id || nanoid(),
+        };
+        
+        ticketsByFeature.get(featureName)!.push(ticketWithId);
+      });
+      
+      // Step 4: Create Feature objects
+      features = Array.from(ticketsByFeature.entries()).map(([featureName, featureTickets]) => ({
+        id: nanoid(),
+        name: featureName,
+        description: `Auto-created from CSV import with ${featureTickets.length} ticket${featureTickets.length !== 1 ? 's' : ''}`,
+        tickets: featureTickets,
+        dependencies: [],
+      }));
+    }
+    
+    // Create the release object
     const newRelease: Release = {
-      id: releaseId,
-      name,
-      startDate,
-      endDate,
-      features: [],
-      sprints: sprints && sprints.length > 0 ? sprints : [],
-      storyPointMapping,
+      id: `r-${Date.now()}`,
+      name: data.name,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      features,
+      sprints: releasePlan ? releasePlan.sprints.map(s => ({
+        id: s.id,
+        name: s.name,
+        startDate: s.startDate,
+        endDate: s.endDate,
+      })) : [],
+      storyPointMapping: SP_PRESETS.linear,
+      milestones: [],
+      phases: data.phases,
     };
+
+    // Save phases if any
+    if (data.phases && data.phases.length > 0) {
+      savePhases(newRelease.id, data.phases);
+    }
 
     // Update products state
     const updatedProducts = products.map(p => {
-      if (p.id === productId) {
+      if (p.id === data.productId) {
         return { ...p, releases: [...p.releases, newRelease] };
       }
       return p;
@@ -101,7 +282,9 @@ export function PlanningDashboard({
     setProducts(updatedProducts);
     saveProducts(updatedProducts);
 
-    setShowCreateRelease(null);
+    // Clean up
+    setShowReleaseWizard(false);
+    setWizardProductId(null);
   };
 
   // ── Product edit / delete ──
@@ -190,8 +373,16 @@ export function PlanningDashboard({
                 key={product.id}
                 product={product}
                 teamCount={teamCounts[product.id] || 0}
-                onNewRelease={() => setShowCreateRelease(product.id)}
-                onAutoGenerate={() => setShowAutoRelease(product.id)}
+                onNewRelease={() => {
+                  setWizardFlow('manual');
+                  setWizardProductId(product.id);
+                  setShowReleaseWizard(true);
+                }}
+                onAutoGenerate={() => {
+                  setWizardFlow('smart');
+                  setWizardProductId(product.id);
+                  setShowReleaseWizard(true);
+                }}
                 onRename={(name) => handleRenameProduct(product.id, name)}
                 onDelete={() => handleDeleteProduct(product.id)}
               />
@@ -233,28 +424,18 @@ export function PlanningDashboard({
         />
       )}
 
-      {showAutoRelease && (() => {
-        const targetProduct = products.find(p => p.id === showAutoRelease);
-        if (!targetProduct) return null;
-        return (
-          <AutoReleaseModal
-            product={targetProduct}
-            onClose={() => {
-              // Refresh products from localStorage
-              const storedProducts = loadProducts();
-              setProducts(storedProducts || []);
-              setShowAutoRelease(null);
-            }}
-          />
-        );
-      })()}
-
-      {showCreateRelease && products.length > 0 && (
-        <CreateReleaseModal
-          onClose={() => setShowCreateRelease(null)}
-          onCreate={handleCreateRelease}
+      {/* Release Creation Wizard - handles both Manual and Smart flows */}
+      {showReleaseWizard && wizardProductId && (
+        <ReleaseCreationWizard
+          isOpen={showReleaseWizard}
+          onClose={() => {
+            setShowReleaseWizard(false);
+            setWizardProductId(null);
+          }}
+          onComplete={handleWizardComplete}
+          flow={wizardFlow}
           products={products}
-          defaultProductId={showCreateRelease !== 'any' ? showCreateRelease : undefined}
+          defaultProductId={wizardProductId}
         />
       )}
 

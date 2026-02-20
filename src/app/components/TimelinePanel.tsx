@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, GripVertical, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
-import { Release, Ticket, Holiday, TeamMember } from '../data/mockData';
+import { AlertTriangle, GripVertical, ChevronDown, Calendar } from 'lucide-react';
+import { Release, Ticket, Holiday, TeamMember, Milestone, MilestoneType, Phase, PhaseType, getMockPhasesForRelease } from '../data/mockData';
 import { SprintCreationPopover } from './SprintCreationPopover';
 import { TicketConflict, hasConflict } from '../lib/conflictDetection';
 import { SprintCapacity, getCapacityStatusColor } from '../lib/capacityCalculation';
@@ -9,6 +9,8 @@ import designTokens, { getTicketColors, getConflictColors } from '../lib/designT
 import { TruncatedText } from './Tooltip';
 import { resolveEffortDays, getAdjustedDuration } from '../lib/effortResolver';
 import { calculateWorkingDays } from '../lib/teamCapacityCalculation';
+import { loadMilestones, saveMilestones, loadPhases, savePhases } from '../lib/localStorage';
+import { AddMilestoneModal } from './AddMilestoneModal';
 
 // Helper: Count working days (Mon-Fri) between two dates
 function countWorkingDays(start: Date, end: Date): number {
@@ -83,6 +85,83 @@ function getPTOOverlapInfo(ticket: Ticket, assignedMember: TeamMember | undefine
   };
 }
 
+// Helper: Check if a ticket overlaps with blocking milestones
+function getBlockingMilestonesForTicket(ticket: Ticket, milestones: Milestone[]): Milestone[] {
+  const ticketStart = new Date(ticket.startDate);
+  ticketStart.setHours(0, 0, 0, 0);
+  const ticketEnd = new Date(ticket.endDate);
+  ticketEnd.setHours(0, 0, 0, 0);
+
+  return milestones.filter(m => {
+    if (!m.isBlocking) return false;
+    
+    const milestoneStart = new Date(m.startDate);
+    milestoneStart.setHours(0, 0, 0, 0);
+    const milestoneEnd = m.endDate ? new Date(m.endDate) : milestoneStart;
+    milestoneEnd.setHours(0, 0, 0, 0);
+
+    // Check if ticket overlaps with milestone
+    return ticketStart <= milestoneEnd && ticketEnd >= milestoneStart;
+  });
+}
+
+// Helper: Check if a ticket falls within Dev Window phases
+function isTicketInDevWindow(ticket: Ticket, phases: Phase[]): boolean {
+  const devPhases = phases.filter(p => p.allowsWork);
+  
+  if (devPhases.length === 0) return true; // No phases = all tickets valid
+  
+  const ticketStart = new Date(ticket.startDate);
+  ticketStart.setHours(0, 0, 0, 0);
+  const ticketEnd = new Date(ticket.endDate);
+  ticketEnd.setHours(0, 0, 0, 0);
+  
+  // Check if ticket falls entirely within any Dev Window
+  return devPhases.some(phase => {
+    const phaseStart = new Date(phase.startDate);
+    phaseStart.setHours(0, 0, 0, 0);
+    const phaseEnd = new Date(phase.endDate);
+    phaseEnd.setHours(0, 0, 0, 0);
+    
+    return ticketStart >= phaseStart && ticketEnd <= phaseEnd;
+  });
+}
+
+// Helper: Get ticket color scheme based on spillover status
+function getTicketColorScheme(
+  ticket: Ticket, 
+  isInDevWindow: boolean,
+  hasConflict: boolean
+): { background: string; border: string; accent: string; text: string } {
+  // Conflict takes precedence
+  if (hasConflict) {
+    return {
+      background: getConflictColors('warning').bg,
+      border: getConflictColors('warning').border,
+      accent: getConflictColors('warning').border,
+      text: '#000000',
+    };
+  }
+  
+  // Spillover color scheme (orange/red warning)
+  if (!isInDevWindow) {
+    return {
+      background: '#fed7aa', // Orange-200
+      border: '#f97316', // Orange-500
+      accent: '#f97316', // Orange-500
+      text: '#9a3412', // Orange-900
+    };
+  }
+  
+  // Normal color scheme (existing logic)
+  return {
+    background: getTicketColors(ticket.status).bg,
+    border: getTicketColors(ticket.status).border,
+    accent: getTicketColors(ticket.status).accent,
+    text: '#000000',
+  };
+}
+
 interface TimelinePanelProps {
   release: Release;
   holidays: Holiday[];
@@ -98,6 +177,8 @@ interface TimelinePanelProps {
   sprintCapacities: Map<string, SprintCapacity>;
   showSprintCreation?: boolean;
   onShowSprintCreationChange?: (show: boolean) => void;
+  showAddMilestoneModal?: boolean;
+  onShowAddMilestoneModalChange?: (show: boolean) => void;
 }
 
 const DAY_WIDTH = 40;
@@ -105,9 +186,10 @@ const ROW_HEIGHT = 48;
 const FEATURE_HEADER_HEIGHT = 40;
 const SIDEBAR_WIDTH = 320; // Fixed left sidebar width
 
-export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, sprintCapacities, showSprintCreation: externalShowSprintCreation, onShowSprintCreationChange }: TimelinePanelProps) {
+export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, sprintCapacities, showSprintCreation: externalShowSprintCreation, onShowSprintCreationChange, showAddMilestoneModal: externalShowAddMilestoneModal, onShowAddMilestoneModalChange }: TimelinePanelProps) {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [internalShowSprintCreation, setInternalShowSprintCreation] = useState(false);
+  const [internalShowAddMilestoneModal, setInternalShowAddMilestoneModal] = useState(false);
   const showSprintCreation = externalShowSprintCreation ?? internalShowSprintCreation;
   const setShowSprintCreation = (show: boolean) => {
     if (onShowSprintCreationChange) {
@@ -116,11 +198,20 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
       setInternalShowSprintCreation(show);
     }
   };
+  const showAddMilestoneModal = externalShowAddMilestoneModal ?? internalShowAddMilestoneModal;
+  const setShowAddMilestoneModal = (show: boolean) => {
+    if (onShowAddMilestoneModalChange) {
+      onShowAddMilestoneModalChange(show);
+    } else {
+      setInternalShowAddMilestoneModal(show);
+    }
+  };
   const [showHolidays, setShowHolidays] = useState(true);
   const [showPTO, setShowPTO] = useState(true);
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
-  const [showSprintSummary, setShowSprintSummary] = useState(false);
   const [selectedDeveloperId, setSelectedDeveloperId] = useState<'all' | 'unassigned' | string>('all');
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [phases, setPhases] = useState<Phase[]>([]);
   
   // Refs for scroll synchronization
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -131,6 +222,34 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
 
   const startDate = new Date(release.startDate);
   const endDate = new Date(release.endDate);
+  
+  // Load milestones for this release
+  useEffect(() => {
+    const loaded = loadMilestones(release.id);
+    setMilestones(loaded);
+  }, [release.id]);
+  
+  // Load phases for this release (auto-create mock phases if none exist)
+  useEffect(() => {
+    let loaded = loadPhases(release.id);
+    
+    // If no phases exist, create mock phases for immediate visualization
+    if (loaded.length === 0) {
+      const mockPhases = getMockPhasesForRelease(release);
+      savePhases(release.id, mockPhases);
+      loaded = mockPhases;
+    }
+    
+    setPhases(loaded);
+  }, [release.id]);
+  
+  // Handler to save new milestone
+  const handleSaveMilestone = (milestone: Milestone) => {
+    const updated = [...milestones, milestone];
+    setMilestones(updated);
+    saveMilestones(release.id, updated);
+    setShowAddMilestoneModal(false);
+  };
   
   // Synchronize vertical scroll positions
   const handleSidebarScroll = () => {
@@ -291,7 +410,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
       `}</style>
       
       {/* Sticky Header Row */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 flex">
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 flex relative">
         {/* Left Sidebar Header */}
         <div 
           className="border-r border-gray-200 bg-gray-50"
@@ -333,29 +452,6 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
         </div>
       </div>
 
-      {/* Sprint Summary Strip - always visible, no scroll required */}
-      {showSprintSummary && (release.sprints || []).length > 0 && (
-        <div className="mt-2">
-          <SprintSummaryStrip 
-            sprints={release.sprints || []}
-            sprintCapacities={sprintCapacities}
-            allTickets={release.features.flatMap(f => f.tickets)}
-            onCollapse={() => setShowSprintSummary(false)}
-          />
-        </div>
-      )}
-      
-      {/* Collapsed sprint summary toggle */}
-      {!showSprintSummary && (release.sprints || []).length > 0 && (
-        <button
-          onClick={() => setShowSprintSummary(true)}
-          className="w-full flex items-center justify-center gap-1.5 py-1 bg-gray-50 border-b border-gray-200 text-xs text-gray-500 hover:bg-gray-100 transition-colors"
-        >
-          <ChevronDown className="w-3 h-3" />
-          Show Sprint Summary
-        </button>
-      )}
-
       {/* Scrollable Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar - Ticket Names */}
@@ -365,6 +461,73 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
           style={{ width: SIDEBAR_WIDTH, minWidth: SIDEBAR_WIDTH }}
           onScroll={handleSidebarScroll}
         >
+          {/* Sticky Phases Label - Only visible when phases exist */}
+          {phases.length > 0 && (
+            <div 
+              className="sticky top-0 px-4 flex items-center border-b border-gray-200 bg-gray-50"
+              style={{ 
+                height: 60,
+                zIndex: 20
+              }}
+            >
+              <span
+                style={{
+                  fontSize: designTokens.typography.fontSize.xs,
+                  fontWeight: designTokens.typography.fontWeight.semibold,
+                  color: designTokens.colors.neutral[700],
+                  letterSpacing: designTokens.typography.letterSpacing.wide
+                }}
+              >
+                PHASES
+              </span>
+            </div>
+          )}
+
+          {/* Sticky Milestones Label */}
+          <div 
+            className="sticky px-4 flex items-center border-b border-gray-200 bg-white"
+            style={{ 
+              height: 50,
+              top: phases.length > 0 ? 60 : 0,
+              zIndex: 20
+            }}
+          >
+            <span
+              style={{
+                fontSize: designTokens.typography.fontSize.xs,
+                fontWeight: designTokens.typography.fontWeight.semibold,
+                color: designTokens.colors.neutral[700],
+                letterSpacing: designTokens.typography.letterSpacing.wide
+              }}
+            >
+              MILESTONES
+            </span>
+          </div>
+
+          {/* Timeline Legend - No more spillover warning here */}
+          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+            {/* Timeline Legend */}
+            <div className="flex items-center gap-4 text-xs">
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 bg-blue-200 border-2 border-blue-500 rounded" />
+                <span className="text-gray-700">Planned</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-4 h-4 bg-yellow-200 border-2 border-yellow-500 rounded" />
+                <span className="text-gray-700">In Progress</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div 
+                  className="w-4 h-4 bg-orange-200 border-2 border-orange-500 rounded" 
+                  style={{
+                    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(249, 115, 22, 0.2) 2px, rgba(249, 115, 22, 0.2) 4px)'
+                  }}
+                />
+                <span className="text-gray-700">Spillover</span>
+              </div>
+            </div>
+          </div>
+
           {visibleFeatures.map((feature, featureIndex) => {
             const isCollapsed = collapsedFeatures.has(feature.id);
             const ticketCount = feature.tickets.length;
@@ -461,34 +624,83 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
           onScroll={handleTimelineScroll}
         >
           <div className="relative" style={{ width: timelineWidth, minHeight: '100%' }}>
-            
-            {/* LAYER 1: TIME GRID */}
-            <TimeGrid 
-              totalDays={totalDays} 
-              dayWidth={DAY_WIDTH} 
-              contentHeight={contentHeight}
-              startDate={startDate}
-            />
 
-            {/* LAYER 2: SPRINT BANDS */}
-            <SprintBands
-              sprints={release.sprints || []}
-              getPositionFromDate={getPositionFromDate}
-              getDaysDifference={getDaysDifference}
-              dayWidth={DAY_WIDTH}
-            />
+            {/* STICKY PHASES ROW - Scrolls horizontally, sticky vertically */}
+            {phases.length > 0 && (
+              <div 
+                className="sticky"
+                style={{ 
+                  top: 0,
+                  zIndex: 10
+                }}
+              >
+                <PhasesBandRow
+                  phases={phases}
+                  startDate={startDate}
+                  endDate={endDate}
+                  getPositionFromDate={getPositionFromDate}
+                  getDaysDifference={getDaysDifference}
+                  dayWidth={DAY_WIDTH}
+                />
+              </div>
+            )}
 
-            {/* LAYER 3: HOLIDAYS */}
-            {showHolidays && (
-              <HolidayBands
-                holidays={holidays}
+            {/* STICKY MILESTONES ROW - Scrolls horizontally, sticky vertically */}
+            <div 
+              className="sticky"
+              style={{ 
+                top: phases.length > 0 ? 60 : 0,
+                zIndex: 10
+              }}
+            >
+              <MilestonesRow
+                milestones={milestones}
                 startDate={startDate}
                 endDate={endDate}
                 getPositionFromDate={getPositionFromDate}
                 getDaysDifference={getDaysDifference}
                 dayWidth={DAY_WIDTH}
               />
-            )}
+            </div>
+            
+            {/* Spacer to push content below sticky strips */}
+            <div style={{ height: phases.length > 0 ? 110 : 50 }} />
+            
+            {/* Absolute layers container - positioned after spacer */}
+            <div className="absolute" style={{ 
+              top: phases.length > 0 ? 110 : 50,
+              left: 0, 
+              right: 0, 
+              height: contentHeight
+            }}>
+              {/* LAYER 1: TIME GRID */}
+              <TimeGrid 
+                totalDays={totalDays} 
+                dayWidth={DAY_WIDTH} 
+                contentHeight={contentHeight}
+                startDate={startDate}
+              />
+
+              {/* LAYER 2: SPRINT BANDS */}
+              <SprintBands
+                sprints={release.sprints || []}
+                getPositionFromDate={getPositionFromDate}
+                getDaysDifference={getDaysDifference}
+                dayWidth={DAY_WIDTH}
+              />
+
+              {/* LAYER 3: HOLIDAYS */}
+              {showHolidays && (
+                <HolidayBands
+                  holidays={holidays}
+                  startDate={startDate}
+                  endDate={endDate}
+                  getPositionFromDate={getPositionFromDate}
+                  getDaysDifference={getDaysDifference}
+                  dayWidth={DAY_WIDTH}
+                />
+              )}
+            </div>
 
             {/* LAYER 4: TICKET BARS - Rendered in natural flow matching sidebar */}
             {visibleFeatures.map((feature) => {
@@ -532,6 +744,8 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                         hasConflict={hasConflict(ticket.id, conflicts)}
                         conflicts={conflicts}
                         teamMembers={teamMembers}
+                        milestones={milestones}
+                        phases={phases}
                         isLastInFeature={ticketIndex === feature.tickets.length - 1}
                       />
                     </div>
@@ -554,6 +768,17 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
           onDeleteSprint={onDeleteSprint}
           defaultStartDate={release.startDate}
           existingSprints={release.sprints || []}
+        />
+      )}
+
+      {showAddMilestoneModal && (
+        <AddMilestoneModal
+          isOpen={showAddMilestoneModal}
+          onClose={() => setShowAddMilestoneModal(false)}
+          releaseId={release.id}
+          onSave={handleSaveMilestone}
+          releaseStartDate={release.startDate}
+          releaseEndDate={release.endDate}
         />
       )}
     </div>
@@ -770,17 +995,25 @@ function HolidayBands({
               borderRight: `1px solid ${designTokens.colors.overlay.holiday.secondary}`,
             }}
           >
-            {/* Always-visible holiday name badge */}
-            <div className="absolute top-2 left-0 right-0 text-center">
-              <div 
-                className="inline-block px-2 py-0.5 text-[9px] font-medium rounded shadow-sm"
+            {/* Vertical holiday name text - positioned at top */}
+            <div 
+              className="absolute left-1 pointer-events-none"
+              style={{
+                top: '8px',
+                transformOrigin: 'top left',
+                transform: 'rotate(90deg)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span
+                className="text-[12px] font-semibold tracking-wide"
                 style={{
-                  backgroundColor: designTokens.colors.overlay.holiday.badge,
-                  color: 'white',
+                  color: designTokens.colors.overlay.holiday.badge,
+                  textShadow: '0 1px 2px rgba(255, 255, 255, 0.8)',
                 }}
               >
-                🏖️ {holiday.name}
-              </div>
+                {holiday.name}
+              </span>
             </div>
           </div>
         );
@@ -1088,7 +1321,7 @@ function SprintHeaderRow({
                   </span>
                 </div>
 
-                {/* Story points / days summary */}
+                {/* Effort summary */}
                 <div className="text-[10px]" style={{ color: designTokens.colors.neutral[600], fontWeight: designTokens.typography.fontWeight.medium }}>
                   <span className="font-semibold">{Math.round(capacity.plannedDays * 10) / 10}d planned</span>
                   <span style={{ color: designTokens.colors.neutral[400] }}> · </span>
@@ -1152,120 +1385,6 @@ function SprintHeaderRow({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-// SPRINT SUMMARY STRIP: Always-visible sprint capacity overview
-function SprintSummaryStrip({
-  sprints,
-  sprintCapacities,
-  allTickets,
-  onCollapse
-}: {
-  sprints: any[];
-  sprintCapacities: Map<string, SprintCapacity>;
-  allTickets: any[];
-  onCollapse: () => void;
-}) {
-  const totalPlannedDays = sprintCapacities ? Array.from(sprintCapacities.values()).reduce((sum, c) => sum + (c.plannedDays ?? 0), 0) : 0;
-  const totalTeamDays = sprintCapacities ? Array.from(sprintCapacities.values()).reduce((sum, c) => sum + (c.totalTeamDays ?? 0), 0) : 0;
-  const totalPlannedStoryPoints = sprintCapacities ? Array.from(sprintCapacities.values()).reduce((sum, c) => sum + (c.plannedStoryPoints ?? 0), 0) : 0;
-  const overallUtil = totalTeamDays > 0 ? Math.round((totalPlannedDays / totalTeamDays) * 100) : 0;
-
-  return (
-    <div className="bg-white border-b border-gray-200 px-4 py-2.5">
-      {/* Header row */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-semibold text-gray-700 uppercase tracking-wider">Sprint Overview</span>
-          <div className="flex items-center gap-2 text-[11px] text-gray-500">
-            <span>{sprints.length} sprint{sprints.length > 1 ? 's' : ''}</span>
-            <span className="text-gray-300">|</span>
-            <span>{totalPlannedStoryPoints} SP · {Math.round(totalPlannedDays * 10) / 10}d / {totalTeamDays}d</span>
-            <span className="text-gray-300">|</span>
-            <span 
-              className="font-semibold"
-              style={{ color: getCapacityStatusColor(overallUtil) }}
-            >
-              {overallUtil}% utilized
-            </span>
-          </div>
-        </div>
-        <button
-          onClick={onCollapse}
-          className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-400 hover:text-gray-600"
-          title="Collapse sprint summary"
-        >
-          <ChevronUp className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* Sprint cards row */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {sprints.map(sprint => {
-          const capacity = sprintCapacities?.get(sprint.id);
-          if (!capacity) return null;
-
-          const util = capacity?.utilizationPercent ?? 0;
-          const statusColor = getCapacityStatusColor(util);
-          const ticketsInSprint = allTickets.filter(t => {
-            const ticketStart = t.startDate.getTime();
-            return ticketStart >= sprint.startDate.getTime() && ticketStart <= sprint.endDate.getTime();
-          });
-
-          return (
-            <div 
-              key={sprint.id} 
-              className="flex-shrink-0 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 min-w-[180px] hover:border-gray-300 transition-colors"
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs font-semibold text-gray-800 truncate">{sprint.name}</span>
-                <span 
-                  className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                  style={{ 
-                    backgroundColor: `${statusColor}15`,
-                    color: statusColor,
-                    border: `1px solid ${statusColor}30`
-                  }}
-                >
-                  {Math.round(util)}%
-                </span>
-              </div>
-              
-              {/* Mini progress bar */}
-              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-1.5">
-                <div 
-                  className="h-full rounded-full transition-all"
-                  style={{ 
-                    width: `${Math.min(util, 100)}%`,
-                    backgroundColor: statusColor
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-[10px] text-gray-500">
-                <span>
-                  <span className="font-semibold text-gray-700">{Math.round((capacity?.plannedDays ?? 0) * 10) / 10}d</span> / {capacity?.totalTeamDays ?? 0}d capacity
-                </span>
-                <span>{ticketsInSprint.length} ticket{ticketsInSprint.length !== 1 ? 's' : ''}</span>
-              </div>
-              
-              <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-400">
-                <span>{sprint.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                <span>-</span>
-                <span>{sprint.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                {capacity?.overCapacity && (
-                  <span className="ml-auto text-red-500 font-medium flex items-center gap-0.5">
-                    <AlertTriangle className="w-2.5 h-2.5" />
-                    Over by {Math.round((capacity.plannedDays - capacity.totalTeamDays) * 10) / 10}d
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -1460,6 +1579,8 @@ function TicketTimelineBar({
   endDate,
   hasConflict,
   teamMembers,
+  milestones,
+  phases,
   isLastInFeature: _isLastInFeature
 }: {
   ticket: Ticket;
@@ -1480,6 +1601,8 @@ function TicketTimelineBar({
   hasConflict: boolean;
   conflicts: Map<string, TicketConflict>;
   teamMembers: TeamMember[];
+  milestones: Milestone[];
+  phases: Phase[];
   isLastInFeature?: boolean;
 }) {
   const [isDragging, setIsDragging] = useState(false);
@@ -1490,6 +1613,13 @@ function TicketTimelineBar({
   const assignedMember = teamMembers.find(m => m.name === ticket.assignedTo);
   const ptoEntries = assignedMember?.pto || [];
   const ptoOverlapInfo = getPTOOverlapInfo(ticket, assignedMember);
+
+  // Check if ticket is within Dev Window
+  const isInDevWindow = isTicketInDevWindow(ticket, phases);
+  const colorScheme = getTicketColorScheme(ticket, isInDevWindow, hasConflict);
+
+  const blockingMilestones = getBlockingMilestonesForTicket(ticket, milestones);
+  const hasBlockingConstraint = blockingMilestones.length > 0;
 
   const ticketLeft = getPositionFromDate(ticket.startDate);
   
@@ -1642,7 +1772,7 @@ function TicketTimelineBar({
         );
       })}
 
-      {/* LAYER 5: TICKET BAR (Enhanced with 1.2 interactions) */}
+      {/* LAYER 5: TICKET BAR (Enhanced with 1.2 interactions + spillover detection) */}
       <div
         ref={ticketRef}
         className="absolute group relative transition-all duration-200 shadow-sm hover:shadow-md"
@@ -1652,39 +1782,35 @@ function TicketTimelineBar({
           minWidth: 80,
           top: 8,
           height: 32,
-          // Status-based background colors with conflict override
-          backgroundColor: hasConflict 
-            ? getConflictColors('warning').bg 
-            : getTicketColors(ticket.status).bg,
+          // Use dynamic color scheme (includes spillover, conflict, and status colors)
+          backgroundColor: colorScheme.background,
+          // Add diagonal stripe pattern for spillover tickets
+          backgroundImage: !isInDevWindow && !hasConflict
+            ? 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(249, 115, 22, 0.1) 10px, rgba(249, 115, 22, 0.1) 20px)'
+            : undefined,
           // Left border accent (4px status indicator)
-          borderLeft: hasConflict
-            ? `4px solid ${getConflictColors('warning').border}`
-            : `4px solid ${getTicketColors(ticket.status).accent}`,
+          borderLeft: `4px solid ${colorScheme.accent}`,
           // Right, top, bottom borders
-          borderRight: hasConflict
-            ? `1px solid ${getConflictColors('warning').border}`
-            : isSelected 
-              ? `2px solid ${getTicketColors(ticket.status).border}`
-              : `1px solid rgba(0, 0, 0, 0.08)`,
-          borderTop: hasConflict
-            ? `1px solid ${getConflictColors('warning').border}`
-            : isSelected 
-              ? `2px solid ${getTicketColors(ticket.status).border}`
-              : `1px solid rgba(0, 0, 0, 0.08)`,
-          borderBottom: hasConflict
-            ? `1px solid ${getConflictColors('warning').border}`
-            : isSelected 
-              ? `2px solid ${getTicketColors(ticket.status).border}`
-              : `1px solid rgba(0, 0, 0, 0.08)`,
+          borderRight: isSelected 
+            ? `2px solid ${colorScheme.border}`
+            : `1px solid rgba(0, 0, 0, 0.08)`,
+          borderTop: isSelected 
+            ? `2px solid ${colorScheme.border}`
+            : `1px solid rgba(0, 0, 0, 0.08)`,
+          borderBottom: isSelected 
+            ? `2px solid ${colorScheme.border}`
+            : `1px solid rgba(0, 0, 0, 0.08)`,
           borderRadius: designTokens.borderRadius.md,
           zIndex: isSelected ? designTokens.zIndex.ticketSelected : designTokens.zIndex.tickets,
           opacity: isDragging ? 0.7 : 1,
           // Enhanced shadow with glow for selection (overrides base shadow-sm)
           boxShadow: hasConflict 
             ? `0 1px 3px rgba(251, 192, 45, 0.3), 0 0 0 3px rgba(251, 192, 45, 0.1)`
-            : isSelected 
-              ? `0 1px 3px rgba(59, 130, 246, 0.2), 0 0 0 3px rgba(59, 130, 246, 0.15)`
-              : undefined,  // Let Tailwind shadow-sm handle default
+            : !isInDevWindow && !hasConflict
+              ? `0 1px 3px rgba(249, 115, 22, 0.3), 0 0 0 3px rgba(249, 115, 22, 0.1)`
+              : isSelected 
+                ? `0 1px 3px rgba(59, 130, 246, 0.2), 0 0 0 3px rgba(59, 130, 246, 0.15)`
+                : undefined,  // Let Tailwind shadow-sm handle default
           // Enhanced hover lift with scale
           transform: isDragging 
               ? 'translateY(-1px) rotate(1deg)' 
@@ -1698,35 +1824,60 @@ function TicketTimelineBar({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onMouseDown={handleMouseDown}
+        title={`${ticket.title}${!isInDevWindow ? ' ⚠️ OUTSIDE DEV WINDOW' : ''}`}
       >
         {/* 1.2.4: Drag handle affordance (visible on hover) */}
         <div 
           className="absolute left-0 top-0 bottom-0 w-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-150"
           style={{
             cursor: 'grab',
-            backgroundColor: hasConflict 
-              ? 'rgba(251, 192, 45, 0.1)'
-              : `${getTicketColors(ticket.status).accent}15`,
+            backgroundColor: `${colorScheme.accent}15`,
           }}
         >
           <GripVertical 
             className="w-3 h-3" 
             style={{ 
-              color: hasConflict 
-                ? getConflictColors('warning').border
-                : getTicketColors(ticket.status).accent,
+              color: colorScheme.accent,
               opacity: 0.6
             }} 
           />
         </div>
 
+        {/* Spillover Warning Indicator - prominent icon when outside Dev Window */}
+        {!isInDevWindow && !hasConflict && (
+          <div
+            className="absolute top-0 right-0 z-10 bg-orange-500 text-white px-1 rounded-bl text-xs font-bold"
+            title="Scheduled outside Dev Window"
+          >
+            ⚠️
+          </div>
+        )}
+
         {/* PTO Risk Indicator - subtle icon in top-left */}
-        {!hasConflict && ptoOverlapInfo.hasPtoRisk && (
+        {!hasConflict && !isInDevWindow && ptoOverlapInfo.hasPtoRisk && (
           <div
             className="absolute top-0.5 left-1 z-10"
             title={`PTO overlap: ${ptoOverlapInfo.overlapDays} working day${ptoOverlapInfo.overlapDays > 1 ? 's' : ''}\n${ptoOverlapInfo.overlappingPTO.map(p => `${p.name}: ${p.startDate.toLocaleDateString()} - ${p.endDate.toLocaleDateString()}`).join('\n')}`}
           >
             <Calendar className="w-3 h-3 text-amber-600 opacity-70" />
+          </div>
+        )}
+        {isInDevWindow && !hasConflict && ptoOverlapInfo.hasPtoRisk && (
+          <div
+            className="absolute top-0.5 left-1 z-10"
+            title={`PTO overlap: ${ptoOverlapInfo.overlapDays} working day${ptoOverlapInfo.overlapDays > 1 ? 's' : ''}\n${ptoOverlapInfo.overlappingPTO.map(p => `${p.name}: ${p.startDate.toLocaleDateString()} - ${p.endDate.toLocaleDateString()}`).join('\n')}`}
+          >
+            <Calendar className="w-3 h-3 text-amber-600 opacity-70" />
+          </div>
+        )}
+
+        {/* Blocking Milestone Indicator - red icon when ticket overlaps blocking milestone */}
+        {hasBlockingConstraint && (
+          <div
+            className="absolute top-0.5 left-4 z-10"
+            title={`Scheduled during ${blockingMilestones[0].name}`}
+          >
+            <span className="text-red-600 text-xs">🚫</span>
           </div>
         )}
 
@@ -1831,6 +1982,12 @@ function TicketTimelineBar({
           {hasConflict && (
             <div className="text-xs text-amber-600 mt-2">
               ⚠ Overallocated in sprint
+            </div>
+          )}
+
+          {hasBlockingConstraint && (
+            <div className="text-xs text-red-600 mt-2">
+              ⚠ Overlaps {blockingMilestones[0].name}
             </div>
           )}
         </div>,
@@ -1949,6 +2106,291 @@ export function SaveIndicator({
           <span className="text-green-600">Saved</span>
         </>
       )}
+    </div>
+  );
+}
+
+// PHASES BAND ROW: Display phase bands for release phases
+function PhasesBandRow({
+  phases,
+  startDate,
+  endDate,
+  getPositionFromDate,
+  getDaysDifference,
+  dayWidth
+}: {
+  phases: Phase[];
+  startDate: Date;
+  endDate: Date;
+  getPositionFromDate: (date: Date) => number;
+  getDaysDifference: (date1: Date, date2: Date) => number;
+  dayWidth: number;
+}) {
+  // Early exit if no phases
+  if (!phases || phases.length === 0) return null;
+
+  const getPhaseColor = (type: PhaseType): string => {
+    const colors: Record<PhaseType, string> = {
+      DevWindow: '#3b82f6', // blue
+      Testing: '#eab308', // yellow
+      Deployment: '#a855f7', // purple
+      Approval: '#06b6d4', // cyan
+      Launch: '#22c55e', // green
+      Custom: '#6b7280', // gray
+    };
+    return colors[type];
+  };
+
+  try {
+    return (
+      <div 
+        className="relative bg-white/80 backdrop-blur-sm border-b border-gray-200"
+        style={{ 
+          height: 60,
+          zIndex: 4
+        }}
+      >
+        {phases
+          .sort((a, b) => a.order - b.order)
+          .map((phase) => {
+            // Only render if phase overlaps visible timeline
+            if (phase.endDate < startDate || phase.startDate > endDate) {
+              return null;
+            }
+
+            const color = getPhaseColor(phase.type);
+            const left = getPositionFromDate(phase.startDate);
+            const width = getDaysDifference(phase.startDate, phase.endDate) * dayWidth;
+
+            return (
+              <div
+                key={phase.id}
+                className="absolute group"
+                style={{
+                  left,
+                  width,
+                  top: 0,
+                  height: '100%',
+                  backgroundColor: `${color}08`, // 8% opacity
+                  borderLeft: `3px solid ${color}`,
+                  borderRight: `3px solid ${color}`,
+                  borderTop: `1px solid ${color}30`,
+                  borderBottom: `1px solid ${color}30`,
+                }}
+                title={`${phase.name}: ${phase.startDate.toLocaleDateString()} - ${phase.endDate.toLocaleDateString()}`}
+              >
+                {/* Phase label */}
+                <div
+                  className="absolute text-xs font-semibold px-2 py-1 rounded"
+                  style={{
+                    top: 8,
+                    left: 8,
+                    backgroundColor: `${color}20`,
+                    color: color,
+                    border: `1px solid ${color}50`,
+                    maxWidth: 'calc(100% - 16px)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {phase.name}
+                  {!phase.allowsWork && (
+                    <span className="ml-1.5 text-[10px] opacity-70">(Non-Work)</span>
+                  )}
+                </div>
+
+                {/* Duration indicator at bottom */}
+                <div
+                  className="absolute text-[10px] font-medium px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{
+                    bottom: 4,
+                    right: 8,
+                    backgroundColor: `${color}15`,
+                    color: color,
+                  }}
+                >
+                  {getDaysDifference(phase.startDate, phase.endDate)}d
+                </div>
+              </div>
+            );
+          })}
+      </div>
+    );
+  } catch (error) {
+    console.warn('Error rendering phase bands:', error);
+    return null;
+  }
+}
+
+// MILESTONES ROW: Display milestones with single-date or date-range visualization
+function MilestonesRow({
+  milestones,
+  startDate,
+  endDate,
+  getPositionFromDate,
+  getDaysDifference,
+  dayWidth
+}: {
+  milestones: Milestone[];
+  startDate: Date;
+  endDate: Date;
+  getPositionFromDate: (date: Date) => number;
+  getDaysDifference: (date1: Date, date2: Date) => number;
+  dayWidth: number;
+}) {
+  const getMilestoneColor = (type: MilestoneType): string => {
+    const colors: Record<MilestoneType, string> = {
+      Testing: '#eab308',
+      Deployment: '#a855f7',
+      Approval: '#3b82f6',
+      Freeze: '#ef4444',
+      Launch: '#22c55e',
+      Other: '#6b7280',
+    };
+    return colors[type];
+  };
+
+  return (
+    <div 
+      className="relative bg-white/80 backdrop-blur-sm border-b border-gray-200"
+      style={{ 
+        height: 50,
+        zIndex: 5
+      }}
+    >
+      {milestones.map((milestone) => {
+        if (milestone.startDate > endDate || (milestone.endDate && milestone.endDate < startDate)) {
+          return null;
+        }
+
+        const color = getMilestoneColor(milestone.type);
+        const left = getPositionFromDate(milestone.startDate);
+
+        if (milestone.dateType === 'single') {
+          return (
+            <div
+              key={milestone.id}
+              className="absolute"
+              style={{
+                left,
+                width: 2,
+                top: 0,
+                height: '100%',
+                backgroundColor: color,
+              }}
+            >
+              <div 
+                className="absolute flex items-center justify-center"
+                style={{
+                  top: 4,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 10,
+                  height: 10,
+                  backgroundColor: color,
+                  clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+                }}
+              />
+              <div
+                className="absolute text-xs font-bold whitespace-nowrap px-1.5 py-0.5 rounded"
+                style={{
+                  top: 18,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  backgroundColor: `${color}15`,
+                  color: color,
+                  border: `1px solid ${color}30`,
+                }}
+              >
+                {milestone.name}
+              </div>
+            </div>
+          );
+        } else {
+          const width = milestone.endDate 
+            ? getDaysDifference(milestone.startDate, milestone.endDate) * dayWidth
+            : dayWidth;
+
+          return (
+            <div
+              key={milestone.id}
+              className="absolute"
+              style={{
+                left,
+                width,
+                top: 0,
+                height: '100%',
+                backgroundColor: `${color}10`,
+                border: `1px solid ${color}30`,
+              }}
+            >
+              <div
+                className="absolute"
+                style={{
+                  left: 0,
+                  width: 2,
+                  top: 0,
+                  height: '100%',
+                  backgroundColor: color,
+                }}
+              >
+                <div
+                  className="absolute"
+                  style={{
+                    top: 4,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 10,
+                    height: 10,
+                    backgroundColor: color,
+                    clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+                  }}
+                />
+              </div>
+
+              <div
+                className="absolute text-xs font-bold px-1.5 py-0.5 rounded"
+                style={{
+                  top: 18,
+                  left: 8,
+                  backgroundColor: `${color}20`,
+                  color: color,
+                  border: `1px solid ${color}40`,
+                }}
+              >
+                {milestone.name}
+              </div>
+
+              {milestone.endDate && (
+                <div
+                  className="absolute"
+                  style={{
+                    right: 0,
+                    width: 2,
+                    top: 0,
+                    height: '100%',
+                    backgroundColor: color,
+                  }}
+                >
+                  <div
+                    className="absolute"
+                    style={{
+                      top: 4,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 10,
+                      height: 10,
+                      backgroundColor: color,
+                      clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        }
+      })}
     </div>
   );
 }

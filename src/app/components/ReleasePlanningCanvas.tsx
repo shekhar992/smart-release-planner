@@ -7,14 +7,142 @@ import { TicketDetailsPanel } from './TicketDetailsPanel';
 import { TicketCreationModal } from './TicketCreationModal';
 import { BulkTicketImportModal } from './BulkTicketImportModal';
 import { ConflictResolutionPanel } from './ConflictResolutionPanel';
-import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct, storyPointsToDays } from '../data/mockData';
+import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct, storyPointsToDays, Phase } from '../data/mockData';
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
-import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage } from '../lib/localStorage';
+import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
 import { calculateEffortFromDates } from '../lib/dateUtils';
 import { calculateDurationDays } from '../lib/durationCalculator';
 import { addDays } from 'date-fns';
 import { exportReleaseTimelinePptx } from '../lib/exporters/exportReleaseTimelinePptx';
+
+// Helper function to check if ticket is in dev window
+function isTicketInDevWindow(ticket: Ticket, phases: Phase[]): boolean {
+  const devPhases = phases.filter(p => p.allowsWork);
+  
+  if (devPhases.length === 0) return true;
+  
+  const ticketStart = new Date(ticket.startDate);
+  ticketStart.setHours(0, 0, 0, 0);
+  const ticketEnd = new Date(ticket.endDate);
+  ticketEnd.setHours(0, 0, 0, 0);
+  
+  return devPhases.some(phase => {
+    const phaseStart = new Date(phase.startDate);
+    phaseStart.setHours(0, 0, 0, 0);
+    const phaseEnd = new Date(phase.endDate);
+    phaseEnd.setHours(0, 0, 0, 0);
+    
+    return ticketStart >= phaseStart && ticketEnd <= phaseEnd;
+  });
+}
+
+// Header Alerts Panel - Inline component for header bar
+function HeaderAlertsPanel({ 
+  tickets, 
+  phases, 
+  conflictCount, 
+  onViewConflicts 
+}: { 
+  tickets: Ticket[]; 
+  phases: Phase[]; 
+  conflictCount: number;
+  onViewConflicts: () => void;
+}) {
+  const spilloverTickets = tickets.filter(t => !isTicketInDevWindow(t, phases));
+  const spilloverCount = spilloverTickets.length;
+  const totalAlerts = spilloverCount + conflictCount;
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  if (totalAlerts === 0) return null;
+  
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-all text-sm font-medium hover:shadow-sm"
+        style={{
+          backgroundColor: 'rgba(251, 192, 45, 0.15)',
+          border: '1px solid rgba(251, 192, 45, 0.3)',
+          color: '#b45309',
+        }}
+      >
+        <AlertTriangle className="w-3.5 h-3.5" />
+        <span>Alerts</span>
+        <div className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{
+          backgroundColor: '#b45309',
+          color: 'white',
+        }}>
+          {totalAlerts}
+        </div>
+      </button>
+      
+      {isExpanded && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsExpanded(false)} />
+          <div className="absolute right-0 top-full mt-2 w-80 bg-white border-2 border-orange-200 rounded-lg shadow-xl z-50 overflow-hidden animate-fade-in">
+            {/* Dev Window Issues */}
+            {spilloverCount > 0 && (
+              <div className="border-b border-orange-100 p-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg mt-0.5">⚠️</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-orange-900">
+                      Dev Window Issues ({spilloverCount})
+                    </p>
+                    <p className="text-xs text-orange-700 mt-1">
+                      Tickets scheduled during Testing, Deployment, or other non-dev phases.
+                    </p>
+                    <div className="mt-2 text-xs text-orange-800 space-y-1">
+                      {spilloverTickets.slice(0, 3).map((ticket) => (
+                        <div key={ticket.id} className="truncate">
+                          • {ticket.title} ({ticket.assignedTo || 'Unassigned'})
+                        </div>
+                      ))}
+                      {spilloverCount > 3 && (
+                        <div className="text-orange-600 font-medium">
+                          +{spilloverCount - 3} more
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Resource Conflicts */}
+            {conflictCount > 0 && (
+              <div className="p-3">
+                <div className="flex items-start gap-2">
+                  <span className="text-lg mt-0.5">⚡</span>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-900">
+                      Resource Conflicts ({conflictCount})
+                    </p>
+                    <p className="text-xs text-amber-700 mt-1">
+                      Multiple tickets assigned to same developer with overlapping dates.
+                    </p>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsExpanded(false);
+                        onViewConflicts();
+                      }}
+                      className="mt-3 w-full px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-2"
+                    >
+                      <AlertTriangle className="w-3 h-3" />
+                      Resolve Conflicts
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 export function ReleasePlanningCanvas() {
   const { releaseId } = useParams();
@@ -44,6 +172,10 @@ export function ReleasePlanningCanvas() {
   // Load products, holidays, and team members from localStorage or use mock data
   const products = useMemo(() => loadProducts() || mockProducts, [initialized]);
   const holidays = useMemo(() => loadHolidays() || mockHolidays, [initialized]);
+  const milestones = useMemo(() => {
+    if (!releaseId) return [];
+    return loadMilestones(releaseId);
+  }, [initialized, releaseId]);
   
   // Find the release by ID
   const releaseData = useMemo(() => 
@@ -65,6 +197,12 @@ export function ReleasePlanningCanvas() {
     if (!releaseData) return null;
     return releaseData.releases.find(r => r.id === releaseId) || releaseData.releases[0];
   }, [releaseData, releaseId]);
+  
+  // Load phases for the release
+  const phases = useMemo(() => {
+    if (!releaseId) return [];
+    return loadPhases(releaseId);
+  }, [releaseId]);
 
   // All hooks MUST be above any conditional returns (React Rules of Hooks)
   const [release, setRelease] = useState(currentRelease);
@@ -81,6 +219,7 @@ export function ReleasePlanningCanvas() {
   const [draftEndDate, setDraftEndDate] = useState('');
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showSprintCreation, setShowSprintCreation] = useState(false);
+  const [showAddMilestoneModal, setShowAddMilestoneModal] = useState(false);
 
   // SCENARIO SIMULATION STATE (Phase 1)
   // Feature flag: disabled per user request
@@ -220,7 +359,7 @@ export function ReleasePlanningCanvas() {
   // Enhanced conflicts with suggestions
   const enhancedConflicts = useMemo(() => {
     // Get the latest end date from sprints to determine timeline end
-    const timelineEndDate = release?.sprints.length 
+    const timelineEndDate = release?.sprints?.length 
       ? new Date(Math.max(...release.sprints.map(s => s.endDate.getTime())))
       : undefined;
     
@@ -609,29 +748,13 @@ export function ReleasePlanningCanvas() {
             <span>New Ticket</span>
           </button>
 
-          {/* Alerts - Shown when conflicts exist */}
-          {conflictSummary.totalConflicts > 0 && (
-            <div className="relative">
-              <button
-                onClick={() => setShowConflictResolution(true)}
-                className="flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-all text-sm font-medium hover:shadow-sm"
-                style={{
-                  backgroundColor: 'rgba(251, 192, 45, 0.15)',
-                  border: '1px solid rgba(251, 192, 45, 0.3)',
-                  color: '#b45309',
-                }}
-              >
-                <AlertTriangle className="w-3.5 h-3.5" />
-                <span>Alerts</span>
-                <div className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{
-                  backgroundColor: '#b45309',
-                  color: 'white',
-                }}>
-                  {conflictSummary.totalConflicts}
-                </div>
-              </button>
-            </div>
-          )}
+          {/* Header Alerts Panel */}
+          <HeaderAlertsPanel
+            tickets={allTickets}
+            phases={phases}
+            conflictCount={conflictSummary.totalConflicts}
+            onViewConflicts={() => setShowConflictResolution(true)}
+          />
 
           {/* Actions Menu (overflow) */}
           <div className="relative">
@@ -659,6 +782,16 @@ export function ReleasePlanningCanvas() {
                   >
                     <Plus className="w-4 h-4" />
                     <span>Add Sprint</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowAddMilestoneModal(true);
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span>Add Milestone</span>
                   </button>
                   <div className="my-1 border-t border-border" />
                   <button
@@ -914,6 +1047,8 @@ export function ReleasePlanningCanvas() {
           sprintCapacities={sprintCapacities}
           showSprintCreation={showSprintCreation}
           onShowSprintCreationChange={setShowSprintCreation}
+          showAddMilestoneModal={showAddMilestoneModal}
+          onShowAddMilestoneModalChange={setShowAddMilestoneModal}
         />
       </div>
 
@@ -932,6 +1067,7 @@ export function ReleasePlanningCanvas() {
           featureId={selectedTicket.featureId}
           release={release}
           teamMembers={teamMembers}
+          milestones={milestones}
           onClose={() => setSelectedTicket(null)}
           onUpdate={handleUpdateTicket}
           onDelete={handleDeleteTicket}

@@ -1,127 +1,76 @@
-import { useState } from 'react';
-import * as Popover from '@radix-ui/react-popover';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
-import { 
-  format, 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
-  isSameDay, 
-  isSameMonth,
-  addMonths,
-  subMonths,
-  startOfWeek,
-  endOfWeek,
-  isToday
-} from 'date-fns';
+import { forwardRef } from 'react';
+import { Calendar } from 'lucide-react';
 
 interface DatePickerProps {
-  value: Date;
-  onChange: (date: Date) => void;
+  value: string; // ISO date string (yyyy-MM-dd)
+  onChange: (value: string) => void;
   label?: string;
+  helperText?: string;
+  placeholder?: string;
+  minDate?: string;
+  maxDate?: string;
+  required?: boolean;
+  className?: string;
+  error?: string;
 }
 
-export function DatePicker({ value, onChange, label }: DatePickerProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(value || new Date());
+export const DatePicker = forwardRef<HTMLInputElement, DatePickerProps>(
+  ({ 
+    value, 
+    onChange, 
+    label, 
+    helperText,
+    error,
+    placeholder = 'dd/mm/yyyy',
+    minDate,
+    maxDate,
+    required = false,
+    className = '',
+  }, ref) => {
+    return (
+      <div className={`flex flex-col gap-1.5 ${className}`}>
+        {label && (
+          <label className="text-sm font-medium text-foreground">
+            {label}
+            {required && <span className="text-destructive ml-1">*</span>}
+          </label>
+        )}
+        
+        <div className="relative">
+          <input
+            ref={ref}
+            type="date"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            min={minDate}
+            max={maxDate}
+            required={required}
+            placeholder={placeholder}
+            className={`w-full px-3 py-2 pr-10 border bg-background rounded-md text-sm 
+              focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent 
+              transition-colors
+              ${error ? 'border-destructive' : 'border-input'}
+            `}
+          />
+          <Calendar 
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" 
+          />
+        </div>
+        
+        {helperText && !error && (
+          <p className="text-xs text-muted-foreground">
+            {helperText}
+          </p>
+        )}
+        
+        {error && (
+          <p className="text-xs text-destructive">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
+);
 
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
-  const calendarStart = startOfWeek(monthStart);
-  const calendarEnd = endOfWeek(monthEnd);
-
-  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-
-  const handleDateSelect = (date: Date) => {
-    onChange(date);
-    setIsOpen(false);
-  };
-
-  const handlePrevMonth = () => {
-    setCurrentMonth(subMonths(currentMonth, 1));
-  };
-
-  const handleNextMonth = () => {
-    setCurrentMonth(addMonths(currentMonth, 1));
-  };
-
-  return (
-    <div>
-      {label && <label className="block text-sm font-medium mb-1.5">{label}</label>}
-      <Popover.Root open={isOpen} onOpenChange={setIsOpen}>
-        <Popover.Trigger asChild>
-          <button
-            type="button"
-            className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background hover:bg-accent/50 transition-colors flex items-center gap-2 justify-between"
-          >
-            <span>{format(value, 'MMM dd, yyyy')}</span>
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </Popover.Trigger>
-
-        <Popover.Portal>
-          <Popover.Content
-            className="z-50 bg-card border border-border rounded-lg shadow-xl p-4 w-[280px]"
-            sideOffset={5}
-            align="start"
-          >
-            {/* Month Navigation */}
-            <div className="flex items-center justify-between mb-4">
-              <button
-                type="button"
-                onClick={handlePrevMonth}
-                className="p-1 hover:bg-accent rounded transition-colors"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <div className="text-sm font-semibold">
-                {format(currentMonth, 'MMMM yyyy')}
-              </div>
-              <button
-                type="button"
-                onClick={handleNextMonth}
-                className="p-1 hover:bg-accent rounded transition-colors"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Weekday Headers */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
-                <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1">
-              {days.map((day) => {
-                const isSelected = isSameDay(day, value);
-                const isCurrentMonth = isSameMonth(day, currentMonth);
-                const isTodayDate = isToday(day);
-
-                return (
-                  <button
-                    key={day.toISOString()}
-                    type="button"
-                    onClick={() => handleDateSelect(day)}
-                    className={`
-                      p-2 text-sm rounded transition-colors
-                      ${!isCurrentMonth ? 'text-muted-foreground/40' : 'text-foreground'}
-                      ${isSelected ? 'bg-primary text-primary-foreground font-semibold' : 'hover:bg-accent'}
-                      ${isTodayDate && !isSelected ? 'border border-primary/50' : ''}
-                    `}
-                  >
-                    {format(day, 'd')}
-                  </button>
-                );
-              })}
-            </div>
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
-    </div>
-  );
-}
+DatePicker.displayName = 'DatePicker';

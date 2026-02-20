@@ -8,13 +8,15 @@ import { Ticket, TeamMember, Feature, Sprint, Release } from '../data/mockData';
 
 /**
  * Ticket Import Mapping
- * Required columns: id, title, startDate, endDate, status, storyPoints, assignedTo
+ * Required columns: title, assignedTo
+ * Optional columns: epic/feature, effortDays, storyPoints, priority, description, id, startDate, endDate, status
+ * Note: id, startDate, endDate, status are auto-generated if missing
  */
 export const ticketImportMapping: ColumnMapping[] = [
   {
     csvColumn: 'id',
     dataField: 'id',
-    required: true,
+    required: false, // Auto-generated if missing
     transformer: transformers.toString,
     validator: validators.isNotEmpty
   },
@@ -28,28 +30,35 @@ export const ticketImportMapping: ColumnMapping[] = [
   {
     csvColumn: 'startDate',
     dataField: 'startDate',
-    required: true,
+    required: false, // Auto-generated if missing
     transformer: transformers.toDate,
     validator: validators.isDate
   },
   {
     csvColumn: 'endDate',
     dataField: 'endDate',
-    required: true,
+    required: false, // Auto-generated if missing
     transformer: transformers.toDate,
     validator: validators.isDate
   },
   {
     csvColumn: 'status',
     dataField: 'status',
-    required: true,
+    required: false, // Defaults to 'planned'
     transformer: transformers.toEnum(['planned', 'in-progress', 'completed']),
     validator: (value) => ['planned', 'in-progress', 'completed'].includes(value)
   },
   {
+    csvColumn: 'effortDays',
+    dataField: 'effortDays',
+    required: false, // Optional - can use storyPoints as fallback
+    transformer: transformers.toNumber,
+    validator: validators.isPositive
+  },
+  {
     csvColumn: 'storyPoints',
     dataField: 'storyPoints',
-    required: true,
+    required: false, // Optional - backward compatibility
     transformer: transformers.toNumber,
     validator: validators.isPositive
   },
@@ -61,6 +70,12 @@ export const ticketImportMapping: ColumnMapping[] = [
     validator: validators.isNotEmpty
   },
   {
+    csvColumn: 'priority',
+    dataField: 'priority',
+    required: false,
+    transformer: transformers.toString,
+  },
+  {
     csvColumn: 'description',
     dataField: 'description',
     required: false,
@@ -69,6 +84,12 @@ export const ticketImportMapping: ColumnMapping[] = [
   {
     csvColumn: 'feature',
     dataField: 'feature',
+    required: false,
+    transformer: transformers.toString,
+  },
+  {
+    csvColumn: 'epic',
+    dataField: 'feature', // Map 'epic' to 'feature' field
     required: false,
     transformer: transformers.toString,
   }

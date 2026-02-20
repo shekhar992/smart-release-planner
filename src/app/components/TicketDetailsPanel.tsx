@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check, AlertTriangle } from 'lucide-react';
-import { Ticket, Release, TeamMember } from '../data/mockData';
+import { Ticket, Release, TeamMember, Milestone } from '../data/mockData';
 import { resolveEffortDays } from '../lib/effortResolver';
 import { calculateEndDate, calculateEndDateFromEffort, calculateEffortFromDates } from '../lib/dateUtils';
 
@@ -77,11 +77,32 @@ function getPTOOverlapInfo(ticket: Ticket, assignedMember: TeamMember | undefine
   };
 }
 
+// Helper: Check if a ticket overlaps with blocking milestones
+function getBlockingMilestonesForTicket(ticket: Ticket, milestones: Milestone[]): Milestone[] {
+  const ticketStart = new Date(ticket.startDate);
+  ticketStart.setHours(0, 0, 0, 0);
+  const ticketEnd = new Date(ticket.endDate);
+  ticketEnd.setHours(0, 0, 0, 0);
+
+  return milestones.filter(m => {
+    if (!m.isBlocking) return false;
+    
+    const milestoneStart = new Date(m.startDate);
+    milestoneStart.setHours(0, 0, 0, 0);
+    const milestoneEnd = m.endDate ? new Date(m.endDate) : milestoneStart;
+    milestoneEnd.setHours(0, 0, 0, 0);
+
+    // Check if ticket overlaps with milestone
+    return ticketStart <= milestoneEnd && ticketEnd >= milestoneStart;
+  });
+}
+
 interface TicketDetailsPanelProps {
   ticket: Ticket;
   featureId: string;
   release: Release;
   teamMembers: TeamMember[];
+  milestones: Milestone[];
   onClose: () => void;
   onUpdate: (featureId: string, ticketId: string, updates: Partial<Ticket>) => void;
   onDelete: (featureId: string, ticketId: string) => void;
@@ -93,6 +114,7 @@ export function TicketDetailsPanel({
   featureId, 
   release, 
   teamMembers,
+  milestones,
   onClose, 
   onUpdate,
   onDelete,
@@ -160,6 +182,9 @@ export function TicketDetailsPanel({
   // Compute PTO overlap for the assigned developer
   const assignedDeveloper = teamMembers.find(m => m.name === ticket.assignedTo);
   const ptoOverlapInfo = getPTOOverlapInfo(ticket, assignedDeveloper);
+
+  // Compute blocking milestone constraints
+  const blockingMilestones = getBlockingMilestonesForTicket(ticket, milestones);
 
   const handleDelete = () => {
     onDelete(featureId, ticket.id);
@@ -606,6 +631,20 @@ export function TicketDetailsPanel({
               <span className="font-normal text-gray-900">{featureName}</span>
             </div>
           </div>
+
+          {/* Scheduling Constraints */}
+          {blockingMilestones.length > 0 && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="text-sm font-semibold text-red-800 mb-1">Scheduling Constraint</div>
+              <div className="text-xs text-red-700">
+                This ticket overlaps {blockingMilestones[0].name} ({blockingMilestones[0].startDate.toLocaleDateString()}
+                {blockingMilestones[0].endDate ? ` – ${blockingMilestones[0].endDate.toLocaleDateString()}` : ''}).
+              </div>
+              <div className="text-xs text-red-600 mt-2">
+                Suggested: Move ticket start after milestone or adjust scope.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

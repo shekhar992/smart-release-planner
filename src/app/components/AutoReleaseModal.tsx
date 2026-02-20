@@ -1,16 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, BarChart3, Check, Download, AlertCircle, Upload } from 'lucide-react';
+import { nanoid } from 'nanoid';
 import { buildReleasePlanSafe } from '../../domain/planningEngine';
 import type { TicketInput, ReleaseConfig, ReleasePlan } from '../../domain/types';
 import { parseCSV } from '../lib/csvParser';
 import { mapReleasePlanToAppRelease } from '../../domain/adapters/domainToAppMapper';
-import type { Product } from '../data/mockData';
+import type { Product, Phase } from '../data/mockData';
 import { loadProducts, saveProducts, loadTeamMembersByProduct } from '../lib/localStorage';
+import { savePhases } from '../lib/localStorage';
 import { DatePicker } from './DatePicker';
 import { FeasibilityMeter } from './FeasibilityMeter';
 import { ReviewStatsGrid } from './ReviewStatsGrid';
 import { DataInsightsPanel } from './DataInsightsPanel';
 import { CsvPreviewTable } from './CsvPreviewTable';
+import { PhaseSetupModal } from './PhaseSetupModal';
 import { generatePlanningInsights } from '../lib/planningAdvisor';
 import { detectEnhancedConflicts } from '../lib/conflictDetection';
 
@@ -27,32 +30,77 @@ export function AutoReleaseModal({ product, onClose }: AutoReleaseModalProps) {
     new Date(Date.now() + 1000 * 60 * 60 * 24 * 30)
   );
   const [sprintLengthWeeks, setSprintLengthWeeks] = useState(2);
-  const [csvInput, setCsvInput] = useState(`title,epic,effort,priority,assigned
-User Authentication,Core,5,High,Sarah Chen
-Payment Integration,Core,8,High,Marcus Rivera
-OAuth 2.0 Setup,Core,3,1,Elena Zhang
-Dashboard UI,Frontend,5,Medium,Sarah Chen
-Data Visualization,Frontend,8,2,Priya Patel
-Settings Page,Frontend,2,Low,
-API Documentation,Backend,4,Medium,James Wilson
-Rate Limiting,Backend,3,High,Marcus Rivera
-Error Handling,Backend,2,Medium,
-Unit Tests,Testing,5,Low,Elena Zhang
-Integration Tests,Testing,8,3,Unknown Developer
-Security Audit,Security,5,High,James Wilson`);
+  const [csvInput, setCsvInput] = useState('');
 
   const [plannerPreview, setPlannerPreview] = useState<ReleasePlan | null>(null);
   const [parsedTickets, setParsedTickets] = useState<TicketInput[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [showCsvInput, setShowCsvInput] = useState(false);
   
   // Assignment analytics (display only, doesn't affect capacity)
   const [uniqueAssignedDevelopers, setUniqueAssignedDevelopers] = useState<string[]>([]);
   const [ticketsWithoutAssignment, setTicketsWithoutAssignment] = useState(0);
 
+  // Phase setup state
+  const [showPhaseSetup, setShowPhaseSetup] = useState(false);
+  const [pendingReleaseId, setPendingReleaseId] = useState<string>('');
+
   // File upload ref
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-parse CSV when input changes
+  useEffect(() => {
+    if (!csvInput.trim()) {
+      setParsedTickets(null);
+      setError(null);
+      setWarning(null);
+      return;
+    }
+
+    try {
+      const { headers, rows } = parseCSV(csvInput);
+      
+      if (rows.length === 0) {
+        setParsedTickets(null);
+        return;
+      }
+
+      // Find column indices
+      const titleIdx = headers.findIndex(h => h.toLowerCase() === 'title');
+      const epicIdx = headers.findIndex(h => h.toLowerCase() === 'epic');
+      const effortIdx = headers.findIndex(h => h.toLowerCase().includes('effort'));
+      const priorityIdx = headers.findIndex(h => h.toLowerCase() === 'priority');
+      const assignedIdx = headers.findIndex(h => h.toLowerCase() === 'assigned' || h.toLowerCase() === 'assignedto');
+
+      if (titleIdx === -1 || effortIdx === -1) {
+        setParsedTickets(null);
+        return;
+      }
+
+      // Parse rows into TicketInput format
+      const tickets: TicketInput[] = rows.map((row, idx) => {
+        const effortValue = parseFloat(row[effortIdx]);
+        const priorityValue = parsePriority(priorityIdx !== -1 ? row[priorityIdx] : undefined);
+        const assignedToRaw = assignedIdx !== -1 && row[assignedIdx] ? row[assignedIdx].trim() : undefined;
+
+        return {
+          id: crypto.randomUUID(),
+          title: row[titleIdx] || `Ticket ${idx + 1}`,
+          epic: epicIdx !== -1 && row[epicIdx] ? row[epicIdx] : 'General',
+          effortDays: isNaN(effortValue) ? 1 : effortValue,
+          priority: priorityValue,
+          assignedToRaw
+        };
+      });
+
+      setParsedTickets(tickets);
+      setError(null);
+    } catch (err) {
+      setParsedTickets(null);
+    }
+  }, [csvInput]);
 
   // Auto-update assignment analytics when parsedTickets changes
   useEffect(() => {
@@ -167,6 +215,11 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
     setError(null);
     setWarning(null);
     
+    if (!parsedTickets || parsedTickets.length === 0) {
+      setError('Please provide valid CSV data with tickets');
+      return;
+    }
+
     try {
       // Check team members first
       const teamMembers = loadTeamMembersByProduct(product.id) || [];
@@ -176,62 +229,11 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
         return;
       }
 
-      // Parse CSV
-      const { headers, rows } = parseCSV(csvInput);
-      
-      if (rows.length === 0) {
-        setError('CSV is empty or invalid');
-        return;
-      }
-
-      // Find column indices
-      const titleIdx = headers.findIndex(h => h.toLowerCase() === 'title');
-      const epicIdx = headers.findIndex(h => h.toLowerCase() === 'epic');
-      const effortIdx = headers.findIndex(h => h.toLowerCase().includes('effort'));
-      const priorityIdx = headers.findIndex(h => h.toLowerCase() === 'priority');
-      const assignedIdx = headers.findIndex(h => h.toLowerCase() === 'assigned' || h.toLowerCase() === 'assignedto');
-
-      if (titleIdx === -1 || effortIdx === -1) {
-        setError('CSV must have at least "title" and "effort" columns');
-        return;
-      }
-
-      // Parse rows into TicketInput format
-      const tickets: TicketInput[] = rows.map((row, idx) => {
-        const effortValue = parseFloat(row[effortIdx]);
-        const priorityValue = parsePriority(priorityIdx !== -1 ? row[priorityIdx] : undefined);
-        const assignedToRaw = assignedIdx !== -1 && row[assignedIdx] ? row[assignedIdx].trim() : undefined;
-
-        return {
-          id: crypto.randomUUID(),
-          title: row[titleIdx] || `Ticket ${idx + 1}`,
-          epic: epicIdx !== -1 && row[epicIdx] ? row[epicIdx] : 'General',
-          effortDays: isNaN(effortValue) ? 1 : effortValue,
-          priority: priorityValue,
-          assignedToRaw
-        };
-      });
-
-      // Collect assignment analytics (display only, doesn't affect capacity)
-      const uniqueAssigned = new Set<string>();
-      let unassignedCount = 0;
-      
-      tickets.forEach(ticket => {
-        if (ticket.assignedToRaw && ticket.assignedToRaw.trim()) {
-          uniqueAssigned.add(ticket.assignedToRaw);
-        } else {
-          unassignedCount++;
-        }
-      });
-      
-      setUniqueAssignedDevelopers(Array.from(uniqueAssigned));
-      setTicketsWithoutAssignment(unassignedCount);
-
       // Validate assignments against team roster
       const teamMemberNames = new Set(teamMembers.map(tm => tm.name));
       const unknownAssignments = new Set<string>();
       
-      tickets.forEach(ticket => {
+      parsedTickets.forEach(ticket => {
         if (ticket.assignedToRaw && !teamMemberNames.has(ticket.assignedToRaw)) {
           unknownAssignments.add(ticket.assignedToRaw);
         }
@@ -241,8 +243,6 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
         const unknownList = Array.from(unknownAssignments);
         setWarning(`${unknownAssignments.size} unmatched assignment(s): ${unknownList.join(', ')}. These will be set to "Unassigned".`);
       }
-
-      setParsedTickets(tickets);
 
       // Build release config
       const config: ReleaseConfig = {
@@ -255,7 +255,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
       };
 
       // Call planner
-      const result = buildReleasePlanSafe(tickets, config);
+      const result = buildReleasePlanSafe(parsedTickets, config);
       
       if (result.success === true) {
         setPlannerPreview(result.data);
@@ -270,6 +270,14 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
 
   const handleConfirmCreate = () => {
     if (!plannerPreview) return;
+    // Generate release ID and show phase setup modal
+    const releaseId = nanoid();
+    setPendingReleaseId(releaseId);
+    setShowPhaseSetup(true);
+  };
+
+  const handlePhaseSetupComplete = (phases: Phase[]) => {
+    if (!plannerPreview || !pendingReleaseId) return;
 
     setIsCreating(true);
 
@@ -285,6 +293,15 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
         releaseEnd,
         teamMembers
       );
+
+      // Use the pre-generated release ID
+      appRelease.id = pendingReleaseId;
+
+      // Add phases to the release
+      appRelease.phases = phases;
+
+      // Save phases to localStorage
+      savePhases(appRelease.id, phases);
 
       // Load current products and add the new release
       const currentProducts = loadProducts() || [];
@@ -322,7 +339,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               <BarChart3 className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Auto Generate Release Plan</h2>
+              <h2 className="text-lg font-semibold">Smart Release Flow</h2>
               <p className="text-sm text-muted-foreground">AI-powered sprint planning wizard</p>
             </div>
           </div>
@@ -395,15 +412,31 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               <div>
                 <h3 className="text-base font-semibold mb-2">Import Your Backlog</h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Download the CSV template, fill in your ticket data, and upload or paste below.
+                  Download the CSV template, fill in your ticket data, and upload it below.
                 </p>
+              </div>
+
+              {/* Info banner */}
+              <div className="flex items-start gap-3 px-3.5 py-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <Download className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-blue-800 leading-relaxed">
+                  <p className="font-semibold mb-1">Download a pre-filled template with 29 sample tickets</p>
+                  <p>
+                    Covers infrastructure setup, authentication, AI foundation, content creation, and localization workflows. 
+                    Edit with your data and upload. Include{' '}
+                    <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">title</code>,{' '}
+                    <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">epic</code>,{' '}
+                    <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">effortDays</code>, and{' '}
+                    <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">priority</code> columns.
+                  </p>
+                </div>
               </div>
 
               {/* Download Template Button */}
               <div className="flex justify-center">
                 <button
                   onClick={downloadCsvTemplate}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors shadow-sm"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
                 >
                   <Download className="w-4 h-4" />
                   Download CSV Template
@@ -440,27 +473,39 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                 />
               </div>
 
-              {/* CSV Input Area */}
-              <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  CSV Input (or paste directly)
-                </label>
-                <textarea
-                  value={csvInput}
-                  onChange={(e) => setCsvInput(e.target.value)}
-                  placeholder="title,epic,effortDays,priority,assignedTo&#10;Feature A,Core,5,High,Sarah Chen&#10;Feature B,Core,3,Medium,Marcus Rivera&#10;Feature C,UI,8,Low,"
-                  className="w-full h-48 px-3 py-2 text-sm border border-border rounded-lg bg-background font-mono"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  <span className="font-medium">Priority:</span> High→1, Medium→3, Low→5 (or use numeric 1-5) · 
-                  <span className="font-medium ml-2">Assigned:</span> Must match team roster names or leave empty
-                </p>
+              {/* Toggle button for CSV paste option */}
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setShowCsvInput(!showCsvInput)}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+                >
+                  {showCsvInput ? '− Hide CSV paste option' : '+ Or paste CSV directly'}
+                </button>
               </div>
 
-              {/* CSV Preview Table */}
+              {/* CSV Input Area - Collapsible */}
+              {showCsvInput && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium">
+                    CSV Input
+                  </label>
+                  <textarea
+                    value={csvInput}
+                    onChange={(e) => setCsvInput(e.target.value)}
+                    placeholder="title,epic,effortDays,priority,assignedTo&#10;Feature A,Core,5,High,Sarah Chen&#10;Feature B,Core,3,Medium,Marcus Rivera&#10;Feature C,UI,8,Low,"
+                    className="w-full h-48 px-3 py-2 text-sm border border-border rounded-lg bg-background font-mono"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-medium">Priority:</span> High→1, Medium→3, Low→5 (or use numeric 1-5) · 
+                    <span className="font-medium ml-2">Assigned:</span> Must match team roster names or leave empty
+                  </p>
+                </div>
+              )}
+
+              {/* Backlog Preview - Show dynamically when CSV is parsed */}
               {parsedTickets && parsedTickets.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">Parsed Tickets Preview</label>
+                  <label className="block text-sm font-medium mb-2">Backlog Preview</label>
                   <CsvPreviewTable tickets={parsedTickets} />
                 </div>
               )}
@@ -493,16 +538,16 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                 <div>
                   <DatePicker
                     label="Start Date"
-                    value={releaseStart}
-                    onChange={setReleaseStart}
+                    value={releaseStart.toISOString().split('T')[0]}
+                    onChange={(dateStr) => setReleaseStart(new Date(dateStr))}
                   />
                 </div>
                 
                 <div>
                   <DatePicker
                     label="End Date"
-                    value={releaseEnd}
-                    onChange={setReleaseEnd}
+                    value={releaseEnd.toISOString().split('T')[0]}
+                    onChange={(dateStr) => setReleaseEnd(new Date(dateStr))}
                   />
                 </div>
                 
@@ -735,7 +780,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
             {step === 1 && (
               <button
                 onClick={() => setStep(2)}
-                disabled={!csvInput.trim()}
+                disabled={!parsedTickets || parsedTickets.length === 0}
                 className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Next: Configure Strategy
@@ -763,6 +808,18 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           </div>
         </div>
       </div>
+
+      {/* Phase Setup Modal */}
+      {showPhaseSetup && pendingReleaseId && (
+        <PhaseSetupModal
+          isOpen={true}
+          onClose={() => setShowPhaseSetup(false)}
+          releaseId={pendingReleaseId}
+          releaseStartDate={releaseStart}
+          releaseEndDate={releaseEnd}
+          onConfirm={handlePhaseSetupComplete}
+        />
+      )}
     </div>
   );
 }

@@ -182,8 +182,8 @@ export function ConflictResolutionPanel({
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Story points:</span>
-                            <span className="font-medium text-gray-900">{ticket.storyPoints}</span>
+                            <span className="text-gray-600">Effort:</span>
+                            <span className="font-medium text-gray-900">{ticket.effortDays ?? ticket.storyPoints ?? 1}d</span>
                           </div>
                         </>
                       )}

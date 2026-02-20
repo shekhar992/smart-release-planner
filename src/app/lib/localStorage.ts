@@ -3,7 +3,7 @@
  * Handles serialization/deserialization with proper date handling
  */
 
-import { Product, Release, Ticket, Holiday, TeamMember } from '../data/mockData';
+import { Product, Release, Ticket, Holiday, TeamMember, Milestone, Phase } from '../data/mockData';
 
 // Data version - increment this to force refresh of all localStorage data
 const DATA_VERSION = '4.0.0'; // Updated for new FinTech + Life Sciences mock data
@@ -103,6 +103,43 @@ export function loadHolidays(): Holiday[] | null {
   } catch (error) {
     console.error('Failed to load holidays from localStorage:', error);
     return null;
+  }
+}
+
+/**
+ * Save milestones for a specific release to localStorage
+ */
+export function saveMilestones(releaseId: string, milestones: Milestone[]): void {
+  try {
+    const key = `milestones_${releaseId}`;
+    const serialized = milestones.map(m => ({
+      ...m,
+      startDate: m.startDate.toISOString(),
+      endDate: m.endDate?.toISOString(),
+    }));
+    localStorage.setItem(key, JSON.stringify(serialized));
+  } catch (error) {
+    console.error('Failed to save milestones to localStorage:', error);
+  }
+}
+
+/**
+ * Load milestones for a specific release from localStorage
+ */
+export function loadMilestones(releaseId: string): Milestone[] {
+  try {
+    const key = `milestones_${releaseId}`;
+    const stored = localStorage.getItem(key);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    return parsed.map((m: any) => ({
+      ...m,
+      startDate: new Date(m.startDate),
+      endDate: m.endDate ? new Date(m.endDate) : undefined,
+    }));
+  } catch (error) {
+    console.error('Failed to load milestones from localStorage:', error);
+    return [];
   }
 }
 
@@ -259,6 +296,16 @@ export function initializeStorage(
     saveProducts(mockProducts);
     if (mockHolidays) saveHolidays(mockHolidays);
     if (mockTeamMembers) saveTeamMembers(mockTeamMembers);
+    
+    // Save phases for releases that have them
+    mockProducts.forEach(product => {
+      product.releases.forEach(release => {
+        if (release.phases && release.phases.length > 0) {
+          savePhases(release.id, release.phases);
+        }
+      });
+    });
+    
     // Mark current version
     localStorage.setItem(STORAGE_KEYS.DATA_VERSION, DATA_VERSION);
   }
@@ -275,8 +322,18 @@ export function forceRefreshStorage(
   clearStorage();
   saveProducts(mockProducts);
   if (mockHolidays) saveHolidays(mockHolidays);
-  localStorage.setItem(STORAGE_KEYS.DATA_VERSION, DATA_VERSION);
   if (mockTeamMembers) saveTeamMembers(mockTeamMembers);
+  
+  // Save phases for releases that have them
+  mockProducts.forEach(product => {
+    product.releases.forEach(release => {
+      if (release.phases && release.phases.length > 0) {
+        savePhases(release.id, release.phases);
+      }
+    });
+  });
+  
+  localStorage.setItem(STORAGE_KEYS.DATA_VERSION, DATA_VERSION);
 }
 
 /**
@@ -324,5 +381,39 @@ export function updateTicket(
     saveProducts(updatedProducts);
   } catch (error) {
     console.error('Failed to update ticket:', error);
+  }
+}
+
+/**
+ * Save phases for a specific release to localStorage
+ */
+export function savePhases(releaseId: string, phases: Phase[]): void {
+  const key = `phases_${releaseId}`;
+  const serialized = phases.map(p => ({
+    ...p,
+    startDate: p.startDate.toISOString(),
+    endDate: p.endDate.toISOString(),
+  }));
+  localStorage.setItem(key, JSON.stringify(serialized));
+}
+
+/**
+ * Load phases for a specific release from localStorage
+ */
+export function loadPhases(releaseId: string): Phase[] {
+  const key = `phases_${releaseId}`;
+  const stored = localStorage.getItem(key);
+  if (!stored) return [];
+  
+  try {
+    const parsed = JSON.parse(stored);
+    return parsed.map((p: any) => ({
+      ...p,
+      startDate: new Date(p.startDate),
+      endDate: new Date(p.endDate),
+    }));
+  } catch (error) {
+    console.warn(`Failed to load phases for release ${releaseId}:`, error);
+    return [];
   }
 }

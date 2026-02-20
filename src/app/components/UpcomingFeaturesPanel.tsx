@@ -4,7 +4,7 @@ import { Sparkles, Zap } from 'lucide-react';
 interface UpcomingFeature {
   id: string;
   title: string;
-  status: 'Coming soon' | 'In progress' | 'Planned';
+  status: 'Coming soon' | 'In progress' | 'Planned' | 'Now Available';
   description: string;
 }
 
@@ -17,9 +17,9 @@ const DEFAULT_FEATURES: UpcomingFeature[] = [
   },
   {
     id: 'milestones',
-    title: 'Add Milestones',
-    status: 'Coming soon',
-    description: 'Mark critical checkpoints, key deliverables, and project gates with visual milestone markers on timeline.'
+    title: 'Milestone Markers & Phase-wise Release',
+    status: 'Now Available',
+    description: 'Now available! Mark critical checkpoints, key deliverables, and organize your release with visual milestone markers and phase bands on the timeline. Give it a try!'
   },
   {
     id: 'prd-splitter',
@@ -36,18 +36,9 @@ export function UpcomingFeaturesPanel() {
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    // Load from localStorage or use defaults
-    const stored = localStorage.getItem('upcomingFeatures');
-    if (stored) {
-      try {
-        setFeatures(JSON.parse(stored));
-      } catch {
-        setFeatures(DEFAULT_FEATURES);
-      }
-    } else {
-      setFeatures(DEFAULT_FEATURES);
-      localStorage.setItem('upcomingFeatures', JSON.stringify(DEFAULT_FEATURES));
-    }
+    // Always use latest default features to ensure updates are visible
+    setFeatures(DEFAULT_FEATURES);
+    localStorage.setItem('upcomingFeatures', JSON.stringify(DEFAULT_FEATURES));
   }, []);
 
   useEffect(() => {
@@ -80,12 +71,15 @@ export function UpcomingFeaturesPanel() {
   }, [isOpen]);
 
   const getStatusIcon = (status: string) => {
+    if (status === 'Now Available') return <Zap className="w-3 h-3" />;
     if (status === 'In progress') return <Zap className="w-3 h-3" />;
     return <Sparkles className="w-3 h-3" />;
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'Now Available':
+        return 'bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md shadow-emerald-500/20';
       case 'Coming soon':
         return 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-400';
       case 'In progress':
@@ -98,7 +92,21 @@ export function UpcomingFeaturesPanel() {
   };
 
   return (
-    <div className="relative">
+    <>
+      <style>{`
+        @keyframes pulse-glow {
+          0%, 100% {
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.1), 0 2px 4px -1px rgba(16, 185, 129, 0.06);
+          }
+          50% {
+            box-shadow: 0 8px 12px -1px rgba(16, 185, 129, 0.2), 0 4px 8px -1px rgba(16, 185, 129, 0.1);
+          }
+        }
+        .animate-pulse-glow {
+          animation: pulse-glow 2s ease-in-out infinite;
+        }
+      `}</style>
+      <div className="relative">
       <button
         ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
@@ -148,7 +156,11 @@ export function UpcomingFeaturesPanel() {
                 {features.map((feature) => (
                   <div
                     key={feature.id}
-                    className="group p-3 rounded-lg border border-border bg-card hover:bg-accent/50 hover:border-primary/20 transition-all duration-200"
+                    className={`group p-3 rounded-lg border transition-all duration-200 ${
+                      feature.status === 'Now Available'
+                        ? 'border-emerald-500/50 bg-gradient-to-br from-emerald-50/50 to-green-50/50 dark:from-emerald-950/20 dark:to-green-950/20 shadow-md shadow-emerald-500/10 hover:shadow-lg hover:shadow-emerald-500/20 animate-pulse-glow'
+                        : 'border-border bg-card hover:bg-accent/50 hover:border-primary/20'
+                    }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${getStatusColor(feature.status)}`}>
@@ -156,7 +168,11 @@ export function UpcomingFeaturesPanel() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
+                          <h4 className={`text-sm font-semibold transition-colors ${
+                            feature.status === 'Now Available'
+                              ? 'text-emerald-700 dark:text-emerald-400'
+                              : 'text-foreground group-hover:text-primary'
+                          }`}>
                             {feature.title}
                           </h4>
                           <span
@@ -184,6 +200,7 @@ export function UpcomingFeaturesPanel() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

@@ -14,6 +14,14 @@ function getDevColorVar(memberId: string): string {
   return DEV_COLOR_VARS[hash % DEV_COLOR_VARS.length];
 }
 
+// Helper function to convert Date to YYYY-MM-DD string
+const dateToString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export function PTOCalendar() {
   const { productId } = useParams();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -22,8 +30,8 @@ export function PTOCalendar() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [calendarView, setCalendarView] = useState<'team' | 'individual'>('team');
   const [showAddPTO, setShowAddPTO] = useState(false);
-  const [ptoStartDate, setPTOStartDate] = useState<Date>(new Date());
-  const [ptoEndDate, setPTOEndDate] = useState<Date>(new Date());
+  const [ptoStartDate, setPTOStartDate] = useState<string>(dateToString(new Date()));
+  const [ptoEndDate, setPTOEndDate] = useState<string>(dateToString(new Date()));
   const [ptoName, setPTOName] = useState('');
   const [overflowPopup, setOverflowPopup] = useState<{ dateKey: string; members: TeamMember[]; ptoNames: string[] } | null>(null);
 
@@ -112,8 +120,9 @@ export function PTOCalendar() {
   };
 
   const handleQuickAddPTO = (date: Date) => {
-    setPTOStartDate(date);
-    setPTOEndDate(date);
+    const dateStr = dateToString(date);
+    setPTOStartDate(dateStr);
+    setPTOEndDate(dateStr);
     setPTOName('');
     setShowAddPTO(true);
   };
@@ -127,8 +136,8 @@ export function PTOCalendar() {
     const newPTO: PTOEntry = {
       id: `pto-${Date.now()}`,
       name: ptoName.trim(),
-      startDate: ptoStartDate,
-      endDate: ptoEndDate
+      startDate: new Date(ptoStartDate + 'T00:00:00'),
+      endDate: new Date(ptoEndDate + 'T00:00:00')
     };
 
     const updatedMembers = teamMembers.map(m =>
@@ -144,8 +153,8 @@ export function PTOCalendar() {
     window.dispatchEvent(new Event('teamMembersUpdated'));
 
     // Reset form
-    setPTOStartDate(new Date());
-    setPTOEndDate(new Date());
+    setPTOStartDate(dateToString(new Date()));
+    setPTOEndDate(dateToString(new Date()));
     setPTOName('');
     setShowAddPTO(false);
   };
@@ -289,8 +298,8 @@ export function PTOCalendar() {
           {/* Primary Add PTO CTA */}
           <button
             onClick={() => {
-              setPTOStartDate(new Date());
-              setPTOEndDate(new Date());
+              setPTOStartDate(dateToString(new Date()));
+              setPTOEndDate(dateToString(new Date()));
               setPTOName('');
               setShowAddPTO(true);
             }}
@@ -563,8 +572,8 @@ export function PTOCalendar() {
               <button
                 onClick={() => {
                   setShowAddPTO(false);
-                  setPTOStartDate(new Date());
-                  setPTOEndDate(new Date());
+                  setPTOStartDate(dateToString(new Date()));
+                  setPTOEndDate(dateToString(new Date()));
                   setPTOName('');
                 }}
                 className="px-4 py-2 text-sm text-foreground hover:bg-muted border border-border rounded-md transition-colors"

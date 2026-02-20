@@ -323,7 +323,7 @@ function TemplatesStep() {
       name: 'Tickets Template',
       description: 'Your planned work items including features and tasks with dates and assignments',
       required: true,
-      columns: ['id', 'title', 'startDate', 'endDate', 'status', 'storyPoints', 'assignedTo'],
+      columns: ['id', 'title', 'startDate', 'endDate', 'status', 'effortDays', 'assignedTo'],
       exampleData: [
         ['t1', 'User Authentication', '2026-03-01', '2026-03-05', 'planned', '5', 'Alice Chen'],
         ['t2', 'Database Schema', '2026-03-04', '2026-03-08', 'planned', '8', 'Bob Smith'],
@@ -851,7 +851,7 @@ function ReviewStep({
                   {parsedData.tickets.map((ticket, index) => (
                     <div key={index} className="flex items-start gap-2 text-xs">
                       <div className="flex-shrink-0 w-6 h-6 rounded bg-accent flex items-center justify-center text-[10px] font-medium text-muted-foreground mt-0.5">
-                        {ticket.storyPoints}
+                        {ticket.effortDays ?? ticket.storyPoints ?? 1}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground truncate">{ticket.title}</p>

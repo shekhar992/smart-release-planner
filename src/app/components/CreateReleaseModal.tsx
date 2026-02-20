@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
-import { X, ChevronRight, ChevronLeft, Zap, Calendar, Settings2 } from 'lucide-react';
-import { Product, Sprint, StoryPointMapping, SP_PRESETS, SPMappingPreset, SPMappingEntry } from '../data/mockData';
+import { X, ChevronRight, ChevronLeft, Zap, Calendar } from 'lucide-react';
+import { Product, Sprint } from '../data/mockData';
+import { DatePicker } from './DatePicker';
 
 interface CreateReleaseModalProps {
   onClose: () => void;
-  onCreate: (productId: string, name: string, startDate: Date, endDate: Date, importedData?: any, sprints?: Sprint[], storyPointMapping?: StoryPointMapping) => void;
+  onCreate: (productId: string, name: string, startDate: Date, endDate: Date, importedData?: any, sprints?: Sprint[]) => void;
   products: Product[];
   /** When provided, the product is pre-selected and the dropdown is hidden */
   defaultProductId?: string;
@@ -30,19 +31,6 @@ export function CreateReleaseModal({ onClose, onCreate, products, defaultProduct
   // ── Step 2 state ──
   const [sprintDuration, setSprintDuration] = useState(14);
   const [wantSprints, setWantSprints] = useState(true);
-
-  // ── SP mapping state ──
-  const [spPreset, setSpPreset] = useState<SPMappingPreset>('fibonacci');
-  const [customEntries, setCustomEntries] = useState<SPMappingEntry[]>([
-    { sp: 1, days: 1 }, { sp: 2, days: 2 }, { sp: 3, days: 3 },
-    { sp: 5, days: 5 }, { sp: 8, days: 8 }, { sp: 13, days: 13 },
-  ]);
-  const [showMappingDetail, setShowMappingDetail] = useState(false);
-
-  const currentMapping: StoryPointMapping = useMemo(() => {
-    if (spPreset === 'custom') return { preset: 'custom', entries: customEntries };
-    return SP_PRESETS[spPreset];
-  }, [spPreset, customEntries]);
 
   const datesInvalid = startDate && endDate && endDate < startDate;
   const step1Valid = productId && name.trim() && startDate && endDate && !datesInvalid;
@@ -90,8 +78,7 @@ export function CreateReleaseModal({ onClose, onCreate, products, defaultProduct
       new Date(startDate + 'T00:00:00'),
       new Date(endDate + 'T00:00:00'),
       undefined,
-      sprintsToCreate,
-      currentMapping,
+      sprintsToCreate
     );
     onClose();
   };
@@ -160,129 +147,22 @@ export function CreateReleaseModal({ onClose, onCreate, products, defaultProduct
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Start Date</label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">End Date</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  />
-                </div>
-              </div>
-
-              {datesInvalid && (
-                <p className="text-xs text-red-500">End date must be on or after start date</p>
-              )}
-
-              {/* ── Story Points → Days Mapping ── */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-                    <Settings2 className="w-3.5 h-3.5 text-gray-400" />
-                    Story Points Scale
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setShowMappingDetail(!showMappingDetail)}
-                    className="text-[11px] text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    {showMappingDetail ? 'Hide details' : 'View mapping'}
-                  </button>
-                </div>
-
-                <div className="flex gap-2">
-                  {(['fibonacci', 'linear', 'custom'] as SPMappingPreset[]).map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setSpPreset(preset)}
-                      className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
-                        spPreset === preset
-                          ? 'bg-blue-50 border-blue-300 text-blue-700'
-                          : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {preset === 'fibonacci' ? 'Fibonacci' : preset === 'linear' ? 'Linear (1:1)' : 'Custom'}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Mapping detail table */}
-                {showMappingDetail && (
-                  <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="grid grid-cols-[1fr_1fr] gap-x-4 px-3 py-1.5 bg-gray-50 border-b border-gray-200">
-                      <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Story Points</span>
-                      <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Days</span>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                      {currentMapping.entries.map((entry, i) => (
-                        <div key={i} className="grid grid-cols-[1fr_1fr] gap-x-4 px-3 py-2 items-center">
-                          {spPreset === 'custom' ? (
-                            <>
-                              <input
-                                type="number"
-                                min={1}
-                                value={entry.sp}
-                                onChange={(e) => {
-                                  const updated = [...customEntries];
-                                  updated[i] = { ...updated[i], sp: parseInt(e.target.value) || 1 };
-                                  setCustomEntries(updated);
-                                }}
-                                className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-center"
-                              />
-                              <input
-                                type="number"
-                                min={0.25}
-                                step={0.25}
-                                value={entry.days}
-                                onChange={(e) => {
-                                  const updated = [...customEntries];
-                                  updated[i] = { ...updated[i], days: parseFloat(e.target.value) || 0.5 };
-                                  setCustomEntries(updated);
-                                }}
-                                className="w-full px-2 py-1 border border-gray-200 rounded text-sm text-center"
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <span className="text-sm text-gray-900 font-medium">{entry.sp} SP</span>
-                              <span className="text-sm text-gray-600">{entry.days} day{entry.days !== 1 ? 's' : ''}</span>
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {spPreset === 'custom' && (
-                      <div className="px-3 py-2 bg-gray-50 border-t border-gray-200">
-                        <button
-                          type="button"
-                          onClick={() => setCustomEntries([...customEntries, { sp: customEntries.length > 0 ? customEntries[customEntries.length - 1].sp + 1 : 1, days: customEntries.length > 0 ? customEntries[customEntries.length - 1].days + 1 : 1 }])}
-                          className="text-[11px] text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          + Add row
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <p className="text-[11px] text-gray-400 mt-1.5">
-                  {spPreset === 'fibonacci'
-                    ? 'Fibonacci: 1 SP = 0.5d, 3 SP = 2d, 8 SP = 5d'
-                    : spPreset === 'linear'
-                      ? 'Linear: 1 SP = 1 day (story points equal days)'
-                      : 'Custom mapping — edit the table above'}
-                </p>
+                <DatePicker
+                  label="Start Date"
+                  value={startDate}
+                  onChange={setStartDate}
+                  required
+                  helperText="Defines the overall release period for phase planning"
+                />
+                <DatePicker
+                  label="End Date"
+                  value={endDate}
+                  onChange={setEndDate}
+                  minDate={startDate}
+                  required
+                  error={datesInvalid ? "End date must be on or after start date" : undefined}
+                  helperText={!datesInvalid ? "All release phases must fit within this period" : undefined}
+                />
               </div>
             </div>
 

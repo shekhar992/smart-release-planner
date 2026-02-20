@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Plus, Calendar, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useParams } from 'react-router';
+import { PageShell } from './PageShell';
 import { mockHolidays, Holiday } from '../data/mockData';
 import { loadHolidays, saveHolidays } from '../lib/localStorage';
 import { DatePicker } from './DatePicker';
 
 export function HolidayManagement() {
+  const { releaseId } = useParams();
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showAddForm, setShowAddForm] = useState(false);
@@ -87,51 +90,66 @@ export function HolidayManagement() {
   const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <div className="bg-card border-b border-border px-6 py-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-medium text-foreground">Holidays Calendar</h1>
-            <p className="text-sm text-muted-foreground">{holidays.length} holidays configured</p>
+    <PageShell
+      breadcrumbs={
+        releaseId
+          ? [
+              { label: 'Products', to: '/' },
+              { label: 'Release', to: `/release/${releaseId}` },
+              { label: 'Holidays' }
+            ]
+          : [
+              { label: 'Products', to: '/' },
+              { label: 'Holidays' }
+            ]
+      }
+    >
+      <div className="max-w-6xl mx-auto">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground mb-2">Holidays Calendar</h1>
+          <p className="text-sm text-muted-foreground">Manage company and regional holidays. Changes automatically update capacity planning across all releases.</p>
+        </div>
+
+        {/* Toolbar with Primary Add CTA */}
+        <div className="mb-4 flex items-center justify-between gap-4 p-3 bg-card border border-border rounded-lg">
+          <div className="text-sm text-muted-foreground">
+            {holidays.length} holiday{holidays.length !== 1 ? 's' : ''} configured
           </div>
+
+          {/* Primary Add Holiday CTA */}
           <button
             onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded hover:bg-primary/90 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 text-sm text-primary-foreground bg-primary hover:bg-primary-hover rounded-md transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add Holiday
           </button>
         </div>
-      </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="max-w-6xl mx-auto">
-          {/* Calendar Grid */}
-          <div className="bg-card rounded-lg border border-border overflow-hidden">
-            {/* Calendar Header */}
-            <div className="flex items-center justify-between px-6 py-4 bg-muted border-b border-border">
-              <button
-                onClick={goToPreviousMonth}
-                className="p-2 hover:bg-card rounded transition-colors"
-                title="Previous month"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
+        {/* Calendar Grid */}
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
+          {/* Calendar Header */}
+          <div className="flex items-center justify-between px-6 py-4 bg-muted border-b border-border">
+            <button
+              onClick={goToPreviousMonth}
+              className="p-2 hover:bg-card rounded transition-colors"
+              title="Previous month"
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
 
-              <h2 className="text-xl font-semibold text-foreground">{monthName}</h2>
+            <h2 className="text-xl font-semibold text-foreground">{monthName}</h2>
 
-              <button
-                onClick={goToNextMonth}
-                className="p-2 hover:bg-card rounded transition-colors"
-                title="Next month"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            </div>
+            <button
+              onClick={goToNextMonth}
+              className="p-2 hover:bg-card rounded transition-colors"
+              title="Next month"
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </div>
 
-            {/* Day of week headers */}
+          {/* Day of week headers */}
             <div className="grid grid-cols-7 bg-muted border-b border-border">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                 <div key={day} className="px-3 py-5 text-center text-base font-semibold text-muted-foreground">
@@ -252,7 +270,6 @@ export function HolidayManagement() {
               </div>
             </div>
           )}
-        </div>
       </div>
 
       {/* Add Holiday Modal */}
@@ -265,7 +282,7 @@ export function HolidayManagement() {
           }}
         />
       )}
-    </div>
+    </PageShell>
   );
 }
 
@@ -326,8 +343,8 @@ function AddHolidayModal({ onClose, onAdd }: AddHolidayModalProps) {
                 Start Date
               </label>
               <DatePicker
-                value={startDate}
-                onChange={setStartDate}
+                value={startDate.toISOString().split('T')[0]}
+                onChange={(dateStr) => setStartDate(new Date(dateStr))}
               />
             </div>
 
@@ -336,8 +353,8 @@ function AddHolidayModal({ onClose, onAdd }: AddHolidayModalProps) {
                 End Date
               </label>
               <DatePicker
-                value={endDate}
-                onChange={setEndDate}
+                value={endDate.toISOString().split('T')[0]}
+                onChange={(dateStr) => setEndDate(new Date(dateStr))}
               />
             </div>
 
