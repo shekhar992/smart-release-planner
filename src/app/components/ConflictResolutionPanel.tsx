@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { X, AlertTriangle, ArrowRight, CalendarClock, Users as UsersIcon, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, AlertTriangle, ArrowRight, CalendarClock, Users as UsersIcon, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
+import { cn } from './ui/utils';
 import { Conflict } from '../lib/conflictDetection';
 import { Ticket } from '../data/mockData';
 
@@ -36,9 +37,9 @@ export function ConflictResolutionPanel({
 
   const getSeverityBadge = (severity: "high" | "medium" | "low") => {
     const styles = {
-      high: "bg-red-100 text-red-800 border-red-300",
-      medium: "bg-amber-100 text-amber-800 border-amber-300",
-      low: "bg-yellow-100 text-yellow-800 border-yellow-300"
+      high: "bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/50 dark:to-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700",
+      medium: "bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/50 dark:to-amber-900/30 text-amber-800 dark:text-amber-300 border-amber-300 dark:border-amber-700",
+      low: "bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950/50 dark:to-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700"
     };
     const labels = {
       high: "High Priority",
@@ -46,7 +47,7 @@ export function ConflictResolutionPanel({
       low: "Low Priority"
     };
     return (
-      <span className={`px-2 py-0.5 text-xs font-medium rounded border ${styles[severity]}`}>
+      <span className={cn("px-2.5 py-1 text-xs font-semibold rounded-lg border", styles[severity])}>
         {labels[severity]}
       </span>
     );
@@ -77,34 +78,36 @@ export function ConflictResolutionPanel({
   };
 
   return (
-    <div className="w-[480px] h-full bg-white border-l border-gray-200 flex flex-col">
+    <div className="w-[480px] h-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-l border-slate-200 dark:border-slate-700 flex flex-col shadow-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-amber-50 to-red-50">
-        <div className="flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-amber-600" />
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-br from-amber-50/50 to-red-50/50 dark:from-amber-950/30 dark:to-red-950/30">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+            <AlertTriangle className="w-5 h-5 text-white" />
+          </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">Conflict Resolution</h2>
-            <p className="text-xs text-gray-600">{conflicts.length} conflict{conflicts.length > 1 ? 's' : ''} detected</p>
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Conflict Resolution</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">{conflicts.length} conflict{conflicts.length > 1 ? 's' : ''} detected</p>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="p-1 hover:bg-gray-200 rounded transition-all duration-200 hover:-translate-y-0.5"
+          className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
           title="Close panel"
         >
-          <X className="w-4 h-4 text-gray-600" />
+          <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
         </button>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/30 dark:bg-slate-800/30">
         {conflicts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mb-3">
-              <span className="text-3xl">✓</span>
+            <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-950/50 dark:to-emerald-900/30 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+              <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <p className="text-sm font-medium text-gray-900">No Conflicts</p>
-            <p className="text-xs text-gray-500 mt-1">All tickets are scheduled without conflicts</p>
+            <p className="text-base font-semibold text-slate-900 dark:text-white">No Conflicts</p>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">All tickets are scheduled without conflicts</p>
           </div>
         ) : (
           conflicts.map((conflict) => {
@@ -122,39 +125,42 @@ export function ConflictResolutionPanel({
             return (
               <div 
                 key={conflict.ticketId}
-                className="border rounded-lg overflow-hidden shadow-sm"
+                className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden shadow-sm bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl"
               >
                 {/* Conflict Header */}
                 <div 
-                  className={`p-3 cursor-pointer transition-colors ${
-                    isExpanded ? 'bg-amber-50' : 'bg-white hover:bg-gray-50'
-                  }`}
+                  className={cn(
+                    "p-4 cursor-pointer transition-colors duration-200",
+                    isExpanded ? 'bg-amber-50/50 dark:bg-amber-950/30' : 'bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  )}
                   onClick={() => toggleConflict(conflict.ticketId)}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-start gap-2 flex-1 min-w-0">
-                      <span className="text-lg mt-0.5 flex-shrink-0">{getTypeEmoji(conflict.type)}</span>
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      <span className="text-xl mt-0.5 flex-shrink-0">{getTypeEmoji(conflict.type)}</span>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="text-sm font-medium text-gray-900 truncate">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                             {ticket?.title || conflict.ticketId}
                           </h3>
                           {getSeverityBadge(conflict.severity)}
                         </div>
-                        <p className="text-xs text-gray-600">{conflict.message}</p>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{conflict.message}</p>
                         {conflict.impactedDays && (
-                          <p className="text-xs text-amber-700 mt-1">
-                            ⏱ {conflict.impactedDays} day{conflict.impactedDays > 1 ? 's' : ''} impacted
+                          <p className="text-xs text-amber-700 dark:text-amber-300 mt-2 flex items-center gap-1">
+                            <CalendarClock className="w-3.5 h-3.5" />
+                            {conflict.impactedDays} day{conflict.impactedDays > 1 ? 's' : ''} impacted
                           </p>
                         )}
                         {conflict.overflowDays && (
-                          <p className="text-xs text-red-700 mt-1">
-                            📅 Extends {conflict.overflowDays} day{conflict.overflowDays > 1 ? 's' : ''} beyond timeline
+                          <p className="text-xs text-red-700 dark:text-red-300 mt-2 flex items-center gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            Extends {conflict.overflowDays} day{conflict.overflowDays > 1 ? 's' : ''} beyond timeline
                           </p>
                         )}
                       </div>
                     </div>
-                    <button className="flex-shrink-0 text-gray-400 hover:text-gray-600">
+                    <button className="flex-shrink-0 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4" />
                       ) : (
@@ -166,42 +172,42 @@ export function ConflictResolutionPanel({
 
                 {/* Conflict Details */}
                 {isExpanded && (
-                  <div className="p-3 bg-gray-50 border-t border-gray-200 space-y-3">
+                  <div className="p-4 bg-slate-50/50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 space-y-3">
                     {/* Ticket Details */}
-                    <div className="text-xs space-y-1">
+                    <div className="text-sm space-y-2">
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Assigned to:</span>
-                        <span className="font-medium text-gray-900">{conflict.developer}</span>
+                        <span className="text-slate-600 dark:text-slate-400">Assigned to:</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{conflict.developer}</span>
                       </div>
                       {ticket && (
                         <>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Date range:</span>
-                            <span className="font-medium text-gray-900">
+                            <span className="text-slate-600 dark:text-slate-400">Date range:</span>
+                            <span className="font-medium text-slate-900 dark:text-white">
                               {ticket.startDate.toLocaleDateString()} - {ticket.endDate.toLocaleDateString()}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-gray-600">Effort:</span>
-                            <span className="font-medium text-gray-900">{ticket.effortDays ?? ticket.storyPoints ?? 1}d</span>
+                            <span className="text-slate-600 dark:text-slate-400">Effort:</span>
+                            <span className="font-medium text-slate-900 dark:text-white">{ticket.effortDays ?? ticket.storyPoints ?? 1}d</span>
                           </div>
                         </>
                       )}
                       {conflict.conflictingTickets && conflict.conflictingTickets.length > 0 && (
-                        <div className="pt-2 border-t border-gray-300">
-                          <span className="text-gray-600">Conflicts with:</span>
-                          <div className="mt-1 space-y-1">
+                        <div className="pt-2 border-t border-slate-300 dark:border-slate-600">
+                          <span className="text-slate-600 dark:text-slate-400 font-medium">Conflicts with:</span>
+                          <div className="mt-2 space-y-1.5">
                             {conflict.conflictingTickets.slice(0, 3).map(cId => {
                               const cTicket = getTicketById(cId);
                               return (
-                                <div key={cId} className="text-gray-900 flex items-center gap-1">
-                                  <span className="text-red-500">•</span>
+                                <div key={cId} className="text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                                  <span className="text-red-500 text-lg">•</span>
                                   <span className="truncate">{cTicket?.title || cId}</span>
                                 </div>
                               );
                             })}
                             {conflict.conflictingTickets.length > 3 && (
-                              <div className="text-gray-500 italic">
+                              <div className="text-xs text-slate-500 dark:text-slate-400 italic">
                                 +{conflict.conflictingTickets.length - 3} more...
                               </div>
                             )}
@@ -212,24 +218,24 @@ export function ConflictResolutionPanel({
 
                     {/* Suggestions */}
                     {hasAnySuggestions ? (
-                      <div className="space-y-2">
-                        <h4 className="text-xs font-semibold text-gray-700 flex items-center gap-1">
-                          <span>💡</span>
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span className="text-lg">💡</span>
                           Suggested Actions
                         </h4>
 
                         {/* Reassignment Suggestions */}
                         {conflict.suggestions?.possibleReassignments && conflict.suggestions.possibleReassignments.length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-xs text-gray-600">Reassign to available developer:</p>
-                            <div className="flex flex-wrap gap-1">
+                          <div className="space-y-2">
+                            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Reassign to available developer:</p>
+                            <div className="flex flex-wrap gap-2">
                               {conflict.suggestions.possibleReassignments.map(dev => (
                                 <button
                                   key={dev}
                                   onClick={() => handleApplySuggestion(conflict.ticketId, 'reassign', dev)}
-                                  className="px-2 py-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded transition-colors flex items-center gap-1"
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 dark:from-blue-950/50 dark:to-blue-900/30 dark:hover:from-blue-900/50 dark:hover:to-blue-800/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg transition-all duration-200 flex items-center gap-1.5 font-medium"
                                 >
-                                  <UsersIcon className="w-3 h-3" />
+                                  <UsersIcon className="w-3.5 h-3.5" />
                                   {dev}
                                 </button>
                               ))}
@@ -239,16 +245,16 @@ export function ConflictResolutionPanel({
 
                         {/* Sprint Move Suggestions */}
                         {conflict.suggestions?.possibleSprintMoves && conflict.suggestions.possibleSprintMoves.length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-xs text-gray-600">Move to different sprint:</p>
-                            <div className="flex flex-wrap gap-1">
+                          <div className="space-y-2">
+                            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Move to different sprint:</p>
+                            <div className="flex flex-wrap gap-2">
                               {conflict.suggestions.possibleSprintMoves.map(sprintId => (
                                 <button
                                   key={sprintId}
                                   onClick={() => handleApplySuggestion(conflict.ticketId, 'sprint', sprintId)}
-                                  className="px-2 py-1 text-xs bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded transition-colors flex items-center gap-1"
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 dark:from-purple-950/50 dark:to-purple-900/30 dark:hover:from-purple-900/50 dark:hover:to-purple-800/30 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 rounded-lg transition-all duration-200 flex items-center gap-1.5 font-medium"
                                 >
-                                  <ArrowRight className="w-3 h-3" />
+                                  <ArrowRight className="w-3.5 h-3.5" />
                                   Next Sprint
                                 </button>
                               ))}
@@ -258,16 +264,16 @@ export function ConflictResolutionPanel({
 
                         {/* Shift Days Suggestions */}
                         {conflict.suggestions?.possibleShiftDays && conflict.suggestions.possibleShiftDays.length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-xs text-gray-600">Shift schedule:</p>
-                            <div className="flex flex-wrap gap-1">
+                          <div className="space-y-2">
+                            <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Shift schedule:</p>
+                            <div className="flex flex-wrap gap-2">
                               {conflict.suggestions.possibleShiftDays.map(days => (
                                 <button
                                   key={days}
                                   onClick={() => handleApplySuggestion(conflict.ticketId, 'shift', days)}
-                                  className="px-2 py-1 text-xs bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded transition-colors flex items-center gap-1"
+                                  className="px-3 py-1.5 text-xs bg-gradient-to-br from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 dark:from-green-950/50 dark:to-green-900/30 dark:hover:from-green-900/50 dark:hover:to-green-800/30 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700 rounded-lg transition-all duration-200 flex items-center gap-1.5 font-medium"
                                 >
-                                  <CalendarClock className="w-3 h-3" />
+                                  <CalendarClock className="w-3.5 h-3.5" />
                                   +{days} day{days > 1 ? 's' : ''}
                                 </button>
                               ))}
@@ -279,31 +285,31 @@ export function ConflictResolutionPanel({
                         {conflict.type === 'timelineOverflow' && (
                           <>
                             {conflict.suggestions?.extendTimeline && (
-                              <div className="space-y-1">
-                                <p className="text-xs text-gray-600">Timeline adjustments:</p>
-                                <div className="flex flex-wrap gap-1">
-                                  <div className="px-2 py-1 text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded flex items-center gap-1">
-                                    <CalendarClock className="w-3 h-3" />
+                              <div className="space-y-2">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Timeline adjustments:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  <div className="px-3 py-1.5 text-xs bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950/50 dark:to-indigo-900/30 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-700 rounded-lg flex items-center gap-1.5">
+                                    <CalendarClock className="w-3.5 h-3.5" />
                                     Extend timeline end date by {conflict.overflowDays} day{(conflict.overflowDays || 0) > 1 ? 's' : ''}
                                   </div>
                                 </div>
                               </div>
                             )}
                             {conflict.suggestions?.reduceScope && (
-                              <div className="space-y-1">
-                                <p className="text-xs text-gray-600">Scope adjustments:</p>
-                                <div className="flex flex-wrap gap-1">
-                                  <div className="px-2 py-1 text-xs bg-orange-50 text-orange-700 border border-orange-200 rounded flex items-center gap-1">
+                              <div className="space-y-2">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Scope adjustments:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  <div className="px-3 py-1.5 text-xs bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/50 dark:to-orange-900/30 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-700 rounded-lg flex items-center gap-1.5">
                                     ✂️ Reduce ticket scope/effort to fit within timeline
                                   </div>
                                 </div>
                               </div>
                             )}
                             {conflict.suggestions?.splitTicket && (
-                              <div className="space-y-1">
-                                <p className="text-xs text-gray-600">Ticket breakdown:</p>
-                                <div className="flex flex-wrap gap-1">
-                                  <div className="px-2 py-1 text-xs bg-teal-50 text-teal-700 border border-teal-200 rounded flex items-center gap-1">
+                              <div className="space-y-2">
+                                <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Ticket breakdown:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  <div className="px-3 py-1.5 text-xs bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-950/50 dark:to-teal-900/30 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700 rounded-lg flex items-center gap-1.5">
                                     🔀 Split into smaller tickets across multiple sprints
                                   </div>
                                 </div>
@@ -313,16 +319,16 @@ export function ConflictResolutionPanel({
                         )}
                       </div>
                     ) : (
-                      <div className="text-xs text-gray-500 italic">
+                      <div className="text-sm text-slate-500 dark:text-slate-400 italic">
                         No automatic suggestions available. Manual resolution required.
                       </div>
                     )}
 
                     {/* Ignore Button */}
-                    <div className="pt-2 border-t border-gray-300">
+                    <div className="pt-3 border-t border-slate-300 dark:border-slate-600">
                       <button
                         onClick={() => onIgnoreConflict?.(conflict.ticketId)}
-                        className="w-full px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded transition-colors"
+                        className="w-full px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all duration-200 font-medium"
                       >
                         Ignore This Conflict
                       </button>
@@ -336,9 +342,9 @@ export function ConflictResolutionPanel({
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-gray-200 bg-gray-50">
-        <p className="text-xs text-gray-600 text-center">
-          💡 <span className="font-medium">Tip:</span> Click suggestions to apply changes. No changes are made automatically.
+      <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700 bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
+        <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
+          💡 <span className="font-semibold">Tip:</span> Click suggestions to apply changes. No changes are made automatically.
         </p>
       </div>
     </div>

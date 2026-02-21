@@ -16,6 +16,7 @@ import { CsvPreviewTable } from './CsvPreviewTable';
 import { PhaseSetupModal } from './PhaseSetupModal';
 import { generatePlanningInsights } from '../lib/planningAdvisor';
 import { detectEnhancedConflicts } from '../lib/conflictDetection';
+import { cn } from './ui/utils';
 
 interface AutoReleaseModalProps {
   product: Product;
@@ -330,73 +331,93 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 dark:bg-black/40 backdrop-blur-sm">
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[80vh] flex flex-col mx-4">
         {/* Header */}
-        <div className="bg-card border-b border-border px-6 py-4 flex items-center justify-between rounded-t-xl">
+        <div className="bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between rounded-t-2xl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-primary" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <BarChart3 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold">Smart Release Flow</h2>
-              <p className="text-sm text-muted-foreground">AI-powered sprint planning wizard</p>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Smart Release Flow</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">AI-powered sprint planning wizard</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-xl hover:bg-slate-200/60 dark:hover:bg-slate-700 flex items-center justify-center transition-all duration-200"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 text-slate-500 dark:text-slate-400" />
           </button>
         </div>
 
         {/* Step Ribbon */}
-        <div className="border-b border-border px-6 py-4 bg-muted/30">
+        <div className="border-b border-slate-200 dark:border-slate-700 px-6 py-4 bg-slate-50/50 dark:bg-slate-800/50">
           <div className="flex items-center justify-between max-w-2xl mx-auto">
             {/* Step 1 */}
             <div className="flex items-center gap-3 flex-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                step === 1 ? 'bg-primary text-primary-foreground' :
-                step > 1 ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'
-              }`}>
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-200",
+                step === 1 
+                  ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30' 
+                  : step > 1 
+                    ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30' 
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+              )}>
                 {step > 1 ? <Check className="w-4 h-4" /> : '1'}
               </div>
               <div className="flex-1">
-                <div className={`text-sm font-medium ${step === 1 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                <div className={cn(
+                  "text-sm font-medium",
+                  step === 1 ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'
+                )}>
                   Backlog
                 </div>
               </div>
             </div>
 
-            <div className="w-16 h-0.5 bg-border mx-2" />
+            <div className="w-16 h-0.5 bg-slate-200 dark:bg-slate-700 mx-2" />
 
             {/* Step 2 */}
             <div className="flex items-center gap-3 flex-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                step === 2 ? 'bg-primary text-primary-foreground' :
-                step > 2 ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'
-              }`}>
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-200",
+                step === 2 
+                  ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30' 
+                  : step > 2 
+                    ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30' 
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+              )}>
                 {step > 2 ? <Check className="w-4 h-4" /> : '2'}
               </div>
               <div className="flex-1">
-                <div className={`text-sm font-medium ${step === 2 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                <div className={cn(
+                  "text-sm font-medium",
+                  step === 2 ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'
+                )}>
                   Strategy
                 </div>
               </div>
             </div>
 
-            <div className="w-16 h-0.5 bg-border mx-2" />
+            <div className="w-16 h-0.5 bg-slate-200 dark:bg-slate-700 mx-2" />
 
             {/* Step 3 */}
             <div className="flex items-center gap-3 flex-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors ${
-                step === 3 ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-              }`}>
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-200",
+                step === 3 
+                  ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30' 
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+              )}>
                 3
               </div>
               <div className="flex-1">
-                <div className={`text-sm font-medium ${step === 3 ? 'text-foreground' : 'text-muted-foreground'}`}>
+                <div className={cn(
+                  "text-sm font-medium",
+                  step === 3 ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'
+                )}>
                   Review
                 </div>
               </div>
@@ -410,24 +431,24 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           {step === 1 && (
             <div className="space-y-6 max-w-3xl mx-auto">
               <div>
-                <h3 className="text-base font-semibold mb-2">Import Your Backlog</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-2">Import Your Backlog</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                   Download the CSV template, fill in your ticket data, and upload it below.
                 </p>
               </div>
 
               {/* Info banner */}
-              <div className="flex items-start gap-3 px-3.5 py-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <Download className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                <div className="text-xs text-blue-800 leading-relaxed">
+              <div className="flex items-start gap-3 px-3.5 py-3 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
+                <Download className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
                   <p className="font-semibold mb-1">Download a pre-filled template with 29 sample tickets</p>
                   <p>
                     Covers infrastructure setup, authentication, AI foundation, content creation, and localization workflows. 
                     Edit with your data and upload. Include{' '}
-                    <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">title</code>,{' '}
-                    <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">epic</code>,{' '}
-                    <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">effortDays</code>, and{' '}
-                    <code className="px-1 py-0.5 bg-blue-100 rounded text-[11px]">priority</code> columns.
+                    <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/40 rounded text-[11px]">title</code>,{' '}
+                    <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/40 rounded text-[11px]">epic</code>,{' '}
+                    <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/40 rounded text-[11px]">effortDays</code>, and{' '}
+                    <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/40 rounded text-[11px]">priority</code> columns.
                   </p>
                 </div>
               </div>
@@ -436,7 +457,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               <div className="flex justify-center">
                 <button
                   onClick={downloadCsvTemplate}
-                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white transition-all duration-200 shadow-lg shadow-blue-500/30"
                 >
                   <Download className="w-4 h-4" />
                   Download CSV Template
@@ -445,7 +466,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
 
               {/* Drag & Drop Upload Area */}
               <div
-                className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer bg-muted/30"
+                className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-8 text-center hover:border-blue-300 dark:hover:border-blue-600 transition-colors cursor-pointer bg-slate-50/50 dark:bg-slate-800/50"
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
@@ -456,9 +477,9 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                   }
                 }}
               >
-                <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                <p className="text-lg font-medium mb-1">Drag & Drop CSV Here</p>
-                <p className="text-sm text-muted-foreground">or click to browse</p>
+                <Upload className="w-12 h-12 mx-auto mb-3 text-slate-400 dark:text-slate-500" />
+                <p className="text-lg font-medium text-slate-900 dark:text-white mb-1">Drag & Drop CSV Here</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">or click to browse</p>
 
                 <input
                   ref={fileInputRef}
@@ -477,7 +498,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               <div className="flex justify-center">
                 <button
                   onClick={() => setShowCsvInput(!showCsvInput)}
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+                  className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors underline underline-offset-2"
                 >
                   {showCsvInput ? '− Hide CSV paste option' : '+ Or paste CSV directly'}
                 </button>
@@ -486,16 +507,16 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               {/* CSV Input Area - Collapsible */}
               {showCsvInput && (
                 <div className="space-y-2">
-                  <label className="block text-sm font-medium">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                     CSV Input
                   </label>
                   <textarea
                     value={csvInput}
                     onChange={(e) => setCsvInput(e.target.value)}
                     placeholder="title,epic,effortDays,priority,assignedTo&#10;Feature A,Core,5,High,Sarah Chen&#10;Feature B,Core,3,Medium,Marcus Rivera&#10;Feature C,UI,8,Low,"
-                    className="w-full h-48 px-3 py-2 text-sm border border-border rounded-lg bg-background font-mono"
+                    className="w-full h-48 px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-slate-900 dark:text-white placeholder-slate-400"
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     <span className="font-medium">Priority:</span> High→1, Medium→3, Low→5 (or use numeric 1-5) · 
                     <span className="font-medium ml-2">Assigned:</span> Must match team roster names or leave empty
                   </p>
@@ -505,7 +526,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               {/* Backlog Preview - Show dynamically when CSV is parsed */}
               {parsedTickets && parsedTickets.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">Backlog Preview</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Backlog Preview</label>
                   <CsvPreviewTable tickets={parsedTickets} />
                 </div>
               )}
@@ -516,8 +537,8 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           {step === 2 && (
             <div className="space-y-6 max-w-3xl mx-auto">
               <div>
-                <h3 className="text-base font-semibold mb-2">Configure Release Strategy</h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-2">Configure Release Strategy</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                   Set your release parameters and team capacity.
                 </p>
               </div>
@@ -525,12 +546,12 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               {/* Release Configuration */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1.5">Release Name</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Release Name</label>
                   <input
                     type="text"
                     value={releaseName}
                     onChange={(e) => setReleaseName(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-slate-900 dark:text-white placeholder-slate-400"
                     placeholder="Q1 2026 Release"
                   />
                 </div>
@@ -552,18 +573,18 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-1.5">Sprint Length</label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Sprint Length</label>
                   <select
                     value={sprintLengthWeeks}
                     onChange={(e) => setSprintLengthWeeks(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background"
+                    className="w-full px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-slate-900 dark:text-white"
                   >
                     <option value="1">1 Week</option>
                     <option value="2">2 Weeks</option>
                     <option value="3">3 Weeks</option>
                     <option value="4">4 Weeks</option>
                   </select>
-                  <p className="text-xs text-muted-foreground mt-1.5">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
                     Sprint Length: {sprintLengthWeeks} Week{sprintLengthWeeks !== 1 ? 's' : ''} ({sprintLengthWeeks * 7} Days)
                   </p>
                 </div>
@@ -616,8 +637,8 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
             return (
               <div className="space-y-6 max-w-3xl mx-auto">
                 <div className="text-center">
-                  <h3 className="text-lg font-semibold mb-1">Review Plan & Confirm</h3>
-                  <p className="text-sm text-muted-foreground">
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">Review Plan & Confirm</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
                     Release feasibility analysis complete
                   </p>
                 </div>
@@ -636,20 +657,21 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                 />
 
                 {/* AI Planning Insights Panel */}
-                <div className="border border-border rounded-lg p-5 bg-gradient-to-br from-blue-50/50 to-purple-50/50">
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-5 bg-gradient-to-br from-blue-50/50 to-violet-50/50 dark:from-blue-950/20 dark:to-violet-950/20 shadow-sm">
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                       <span className="text-lg">🤖</span>
                       AI Planning Insights
                     </h4>
                     <span
-                      className={`px-2.5 py-1 text-xs font-medium rounded-full ${
+                      className={cn(
+                        "px-2.5 py-1 text-xs font-medium rounded-full shadow-sm",
                         aiInsights.riskLevel === 'low'
-                          ? 'bg-green-100 text-green-700 border border-green-200'
+                          ? 'bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
                           : aiInsights.riskLevel === 'medium'
-                          ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                          : 'bg-red-100 text-red-700 border border-red-200'
-                      }`}
+                          ? 'bg-amber-100 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                          : 'bg-red-100 dark:bg-red-950/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+                      )}
                     >
                       {aiInsights.riskLevel === 'low' && '✓ Low Risk'}
                       {aiInsights.riskLevel === 'medium' && '⚠ Medium Risk'}
@@ -658,20 +680,20 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                   </div>
 
                   {/* Assessment */}
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                  <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
                     {aiInsights.sections.assessment}
                   </p>
 
                   {/* Impact */}
                   {aiInsights.sections.impact.length > 0 && (
                     <div className="mb-4">
-                      <h5 className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">
+                      <h5 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">
                         Impact
                       </h5>
                       <ul className="space-y-2">
                         {aiInsights.sections.impact.map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
-                            <span className="text-amber-600 mt-0.5 flex-shrink-0">⚠</span>
+                          <li key={idx} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                            <span className="text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0">⚠</span>
                             <span className="flex-1">{item}</span>
                           </li>
                         ))}
@@ -682,13 +704,13 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                   {/* Recommendations */}
                   {aiInsights.sections.recommendations.length > 0 && (
                     <div>
-                      <h5 className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">
+                      <h5 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">
                         Recommendations
                       </h5>
                       <ul className="space-y-2">
                         {aiInsights.sections.recommendations.map((rec, idx) => (
-                          <li key={idx} className="flex items-start gap-2 text-sm text-foreground">
-                            <span className="text-blue-600 mt-0.5 flex-shrink-0">•</span>
+                          <li key={idx} className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
+                            <span className="text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0">•</span>
                             <span className="flex-1">{rec}</span>
                           </li>
                         ))}
@@ -697,8 +719,8 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                   )}
 
                   {/* Disclaimer */}
-                  <div className="mt-4 pt-3 border-t border-border">
-                    <p className="text-xs text-muted-foreground italic">
+                  <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-700">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic">
                       💡 These insights are advisory only. Review carefully before proceeding.
                     </p>
                   </div>
@@ -719,21 +741,21 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           {/* Error Display */}
           {error && (
             <div className="max-w-3xl mx-auto mt-4">
-              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <div className="p-4 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800 rounded-xl shadow-sm">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-red-600 mb-1">Configuration Required</div>
-                    <div className="text-sm text-red-600">{error}</div>
+                    <div className="text-sm font-medium text-red-600 dark:text-red-400 mb-1">Configuration Required</div>
+                    <div className="text-sm text-red-600 dark:text-red-400">{error}</div>
                     
                     {error.includes('team members') && (
-                      <div className="mt-3 pt-3 border-t border-red-500/20">
-                        <div className="text-xs font-medium text-red-600 mb-2">Quick Start:</div>
+                      <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+                        <div className="text-xs font-medium text-red-600 dark:text-red-400 mb-2">Quick Start:</div>
                         <div className="flex gap-2">
                           <a
                             href="/sample-data/team_template.csv"
                             download
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-700 rounded border border-red-200 transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white/60 dark:bg-red-950/30 hover:bg-white dark:hover:bg-red-950/50 text-red-700 dark:text-red-300 rounded-lg border border-red-200 dark:border-red-800 transition-colors shadow-sm"
                           >
                             <Download className="w-3 h-3" />
                             Team Roster Template
@@ -741,7 +763,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                           <a
                             href="/sample-data/pto_template.csv"
                             download
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-50 hover:bg-red-100 text-red-700 rounded border border-red-200 transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white/60 dark:bg-red-950/30 hover:bg-white dark:hover:bg-red-950/50 text-red-700 dark:text-red-300 rounded-lg border border-red-200 dark:border-red-800 transition-colors shadow-sm"
                           >
                             <Download className="w-3 h-3" />
                             PTO Template
@@ -757,21 +779,21 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
 
           {/* Warning Display */}
           {warning && (
-            <div className="max-w-3xl mx-auto mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+            <div className="max-w-3xl mx-auto mt-4 p-3 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl shadow-sm">
               <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-yellow-700">{warning}</div>
+                <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-700 dark:text-amber-300">{warning}</div>
               </div>
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t border-border px-6 py-4 bg-muted/30 rounded-b-xl flex items-center justify-between">
+        <div className="border-t border-slate-200 dark:border-slate-700 px-6 py-4 bg-slate-50/50 dark:bg-slate-800/50 rounded-b-2xl flex items-center justify-between">
           <button
             onClick={() => setStep((step - 1) as 1 | 2 | 3)}
             disabled={step === 1}
-            className="px-4 py-2 text-sm font-medium text-foreground border border-border rounded-lg hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
           >
             Back
           </button>
@@ -781,7 +803,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               <button
                 onClick={() => setStep(2)}
                 disabled={!parsedTickets || parsedTickets.length === 0}
-                className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-blue-500/30"
               >
                 Next: Configure Strategy
               </button>
@@ -790,7 +812,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
             {step === 2 && (
               <button
                 onClick={handleAnalyzeFeasibility}
-                className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+                className="px-4 py-2 text-sm font-medium bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/30"
               >
                 Analyze Feasibility
               </button>
@@ -800,7 +822,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               <button
                 onClick={handleConfirmCreate}
                 disabled={isCreating}
-                className="px-4 py-2 text-sm font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 text-sm font-medium bg-gradient-to-br from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-emerald-500/30"
               >
                 {isCreating ? 'Creating...' : 'Confirm & Create Release'}
               </button>

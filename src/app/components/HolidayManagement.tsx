@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Plus, Calendar, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Calendar, Trash2, ChevronLeft, ChevronRight, X, Sparkles } from 'lucide-react';
 import { useParams } from 'react-router';
+import { cn } from './ui/utils';
 import { PageShell } from './PageShell';
 import { mockHolidays, Holiday } from '../data/mockData';
 import { loadHolidays, saveHolidays } from '../lib/localStorage';
@@ -106,20 +107,27 @@ export function HolidayManagement() {
     >
       <div className="max-w-6xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-foreground mb-2">Holidays Calendar</h1>
-          <p className="text-sm text-muted-foreground">Manage company and regional holidays. Changes automatically update capacity planning across all releases.</p>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+              <Calendar className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Holidays Calendar</h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">Manage company and regional holidays. Changes automatically update capacity planning across all releases.</p>
+            </div>
+          </div>
         </div>
 
         {/* Toolbar with Primary Add CTA */}
-        <div className="mb-4 flex items-center justify-between gap-4 p-3 bg-card border border-border rounded-lg">
-          <div className="text-sm text-muted-foreground">
+        <div className="mb-4 flex items-center justify-between gap-4 p-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
+          <div className="text-sm text-slate-600 dark:text-slate-400 font-medium">
             {holidays.length} holiday{holidays.length !== 1 ? 's' : ''} configured
           </div>
 
           {/* Primary Add Holiday CTA */}
           <button
             onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm text-primary-foreground bg-primary hover:bg-primary-hover rounded-md transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-lg transition-all duration-200 shadow-lg shadow-amber-500/30"
           >
             <Plus className="w-4 h-4" />
             Add Holiday
@@ -127,32 +135,32 @@ export function HolidayManagement() {
         </div>
 
         {/* Calendar Grid */}
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-lg">
           {/* Calendar Header */}
-          <div className="flex items-center justify-between px-6 py-4 bg-muted border-b border-border">
+          <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50 border-b border-slate-200 dark:border-slate-700">
             <button
               onClick={goToPreviousMonth}
-              className="p-2 hover:bg-card rounded transition-colors"
+              className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
               title="Previous month"
             >
-              <ChevronLeft className="w-6 h-6" />
+              <ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" />
             </button>
 
-            <h2 className="text-xl font-semibold text-foreground">{monthName}</h2>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white">{monthName}</h2>
 
             <button
               onClick={goToNextMonth}
-              className="p-2 hover:bg-card rounded transition-colors"
+              className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
               title="Next month"
             >
-              <ChevronRight className="w-6 h-6" />
+              <ChevronRight className="w-5 h-5 text-slate-600 dark:text-slate-400" />
             </button>
           </div>
 
           {/* Day of week headers */}
-            <div className="grid grid-cols-7 bg-muted border-b border-border">
+            <div className="grid grid-cols-7 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="px-3 py-5 text-center text-base font-semibold text-muted-foreground">
+                <div key={day} className="px-3 py-5 text-center text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                   {day}
                 </div>
               ))}
@@ -168,14 +176,20 @@ export function HolidayManagement() {
                 return (
                   <div
                     key={index}
-                    className={`group relative min-h-[125px] border-r border-b border-border p-3 ${
-                      date ? 'bg-card' : 'bg-muted'
-                    } ${isWeekend ? 'bg-muted' : ''} ${hasHoliday ? 'bg-amber-50 dark:bg-amber-950/20' : ''}`}
+                    className={cn(
+                      "group relative min-h-[125px] border-r border-b border-slate-200 dark:border-slate-700 p-3 transition-colors duration-200",
+                      date ? 'bg-white dark:bg-slate-900' : 'bg-slate-50 dark:bg-slate-800',
+                      isWeekend && 'bg-slate-50 dark:bg-slate-800/50',
+                      hasHoliday && 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20'
+                    )}
                   >
                     {date && (
                       <>
                         <div className="flex items-start justify-between mb-2">
-                          <div className="text-lg font-medium text-foreground">
+                          <div className={cn(
+                            "text-lg font-semibold",
+                            hasHoliday ? 'text-amber-700 dark:text-amber-300' : 'text-slate-900 dark:text-white'
+                          )}>
                             {date.getDate()}
                           </div>
                           {/* Quick add icon - visible on hover */}
@@ -184,21 +198,21 @@ export function HolidayManagement() {
                               e.stopPropagation();
                               handleQuickAddHoliday(date);
                             }}
-                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded transition-all"
+                            className="opacity-0 group-hover:opacity-100 w-7 h-7 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-all duration-200"
                             aria-label={`Add holiday for ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`}
                             title="Add holiday for this day"
                           >
-                            <Plus className="w-5 h-5 text-muted-foreground" />
+                            <Plus className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                           </button>
                         </div>
 
                         {/* Holiday indicators */}
                         {dayHolidays.length > 0 && (
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             {dayHolidays.map((holiday) => (
                               <div
                                 key={holiday.id}
-                                className="group/holiday flex items-center justify-between text-sm px-2 py-1.5 rounded-sm bg-amber-500 text-white font-medium"
+                                className="group/holiday flex items-center justify-between text-xs px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold shadow-sm"
                                 title={holiday.name}
                               >
                                 <span className="truncate flex-1">{holiday.name}</span>
@@ -207,7 +221,7 @@ export function HolidayManagement() {
                                     e.stopPropagation();
                                     deleteHoliday(holiday.id);
                                   }}
-                                  className="opacity-0 group-hover/holiday:opacity-100 ml-1 p-0.5 hover:bg-amber-600 rounded transition-all"
+                                  className="opacity-0 group-hover/holiday:opacity-100 ml-1 w-5 h-5 flex items-center justify-center hover:bg-amber-600 rounded transition-all duration-200"
                                   aria-label={`Delete ${holiday.name}`}
                                   title="Delete holiday"
                                 >
@@ -227,10 +241,13 @@ export function HolidayManagement() {
 
           {/* Holiday List below calendar */}
           {holidays.length > 0 && (
-            <div className="mt-6 bg-card rounded-lg border border-border p-6">
-              <h3 className="text-sm font-semibold text-foreground mb-4">
-                All Holidays ({holidays.length})
-              </h3>
+            <div className="mt-6 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-700 p-6 shadow-lg">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  All Holidays ({holidays.length})
+                </h3>
+              </div>
               <div className="space-y-2">
                 {holidays.map(holiday => {
                   const formatDateRange = (startDate: Date, endDate: Date) => {
@@ -244,22 +261,22 @@ export function HolidayManagement() {
                   return (
                     <div
                       key={holiday.id}
-                      className="flex items-center justify-between p-3 bg-muted rounded-md border border-border"
+                      className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-amber-300 dark:hover:border-amber-600 transition-all duration-200"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/30 flex items-center justify-center flex-shrink-0">
-                          <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-500" />
+                        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-950/50 dark:to-orange-950/30 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                         </div>
                         <div>
-                          <div className="font-medium text-sm text-foreground">{holiday.name}</div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
+                          <div className="font-semibold text-sm text-slate-900 dark:text-white">{holiday.name}</div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
                             {formatDateRange(holiday.startDate, holiday.endDate)}
                           </div>
                         </div>
                       </div>
                       <button
                         onClick={() => deleteHoliday(holiday.id)}
-                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-card rounded transition-colors"
+                        className="w-8 h-8 flex items-center justify-center text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all duration-200"
                         title="Delete holiday"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -313,79 +330,110 @@ function AddHolidayModal({ onClose, onAdd }: AddHolidayModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-card rounded-lg shadow-xl w-full max-w-md mx-4 border border-border">
-        <form onSubmit={handleSubmit}>
-          {/* Header */}
-          <div className="px-6 py-4 border-b border-border">
-            <h3 className="text-lg font-semibold text-foreground">Add Holiday</h3>
-          </div>
-
-          {/* Content */}
-          <div className="px-6 py-4 space-y-4">
-            <div>
-              <label htmlFor="holiday-name" className="block text-sm font-medium text-foreground mb-1">
-                Holiday Name
-              </label>
-              <input
-                id="holiday-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g., Memorial Day, Company Shutdown"
-                autoFocus
-                className="w-full px-3 py-2 border border-border rounded-md text-sm bg-card text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
+    <>
+      <style>{`
+        .modal-appear {
+          animation: modalAppear 0.2s ease-out;
+        }
+        @keyframes modalAppear {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+      `}</style>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-md mx-4 border border-slate-200 dark:border-slate-700 modal-appear">
+          <form onSubmit={handleSubmit}>
+            {/* Header */}
+            <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-br from-amber-50/50 to-orange-50/50 dark:from-amber-950/30 dark:to-orange-950/20 flex items-center justify-between rounded-t-2xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                  <Plus className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">Add Holiday</h3>
+              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors duration-200"
+              >
+                <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              </button>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                Start Date
-              </label>
-              <DatePicker
-                value={startDate.toISOString().split('T')[0]}
-                onChange={(dateStr) => setStartDate(new Date(dateStr))}
-              />
+            {/* Content */}
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label htmlFor="holiday-name" className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
+                  Holiday Name
+                </label>
+                <input
+                  id="holiday-name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g., Memorial Day, Company Shutdown"
+                  autoFocus
+                  className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
+                  Start Date
+                </label>
+                <DatePicker
+                  value={startDate.toISOString().split('T')[0]}
+                  onChange={(dateStr) => setStartDate(new Date(dateStr))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
+                  End Date
+                </label>
+                <DatePicker
+                  value={endDate.toISOString().split('T')[0]}
+                  onChange={(dateStr) => setEndDate(new Date(dateStr))}
+                />
+              </div>
+
+              {datesInvalid && (
+                <p className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                  <span>⚠️</span> End date must be on or after start date
+                </p>
+              )}
+
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                For single-day holidays, set the same start and end date.
+              </p>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1">
-                End Date
-              </label>
-              <DatePicker
-                value={endDate.toISOString().split('T')[0]}
-                onChange={(dateStr) => setEndDate(new Date(dateStr))}
-              />
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-end gap-3 bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50 rounded-b-2xl">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!name.trim() || !!datesInvalid}
+                className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 rounded-lg transition-all duration-200 shadow-lg shadow-amber-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+              >
+                Add Holiday
+              </button>
             </div>
-
-            {datesInvalid && (
-              <p className="text-xs text-red-500">End date must be on or after start date</p>
-            )}
-
-            <p className="text-xs text-muted-foreground">
-              For single-day holidays, set the same start and end date.
-            </p>
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-border flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-foreground hover:bg-muted border border-border rounded-md transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!name.trim() || !!datesInvalid}
-              className="px-4 py-2 text-sm text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Add Holiday
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }

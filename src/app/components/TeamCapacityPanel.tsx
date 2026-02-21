@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { ChevronDown, ChevronRight, Users, Calendar, AlertTriangle, TrendingUp, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Users, Calendar, AlertTriangle, TrendingUp, X, CheckCircle2 } from 'lucide-react';
+import { cn } from './ui/utils';
 import { TeamMemberCapacity } from '../lib/teamCapacityCalculation';
 import { ConflictSummary } from '../lib/conflictDetection';
 import { resolveEffortDays } from '../lib/effortResolver';
@@ -48,10 +49,10 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
 
   const getStatusColor = (status: 'over' | 'near' | 'good' | 'low') => {
     switch (status) {
-      case 'over': return 'bg-red-50 text-red-700 border-red-200';
-      case 'near': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
-      case 'good': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'low': return 'bg-gray-50 text-gray-600 border-gray-200';
+      case 'over': return 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/50 dark:to-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700';
+      case 'near': return 'bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950/50 dark:to-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700';
+      case 'good': return 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700';
+      case 'low': return 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 text-slate-600 dark:text-slate-400 border-slate-300 dark:border-slate-600';
     }
   };
 
@@ -75,10 +76,10 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'Developer': return 'bg-blue-50 text-blue-700';
-      case 'Designer': return 'bg-purple-50 text-purple-700';
-      case 'QA': return 'bg-emerald-50 text-emerald-700';
-      default: return 'bg-gray-50 text-gray-700';
+      case 'Developer': return 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 text-blue-700 dark:text-blue-300';
+      case 'Designer': return 'bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/50 dark:to-purple-900/30 text-purple-700 dark:text-purple-300';
+      case 'QA': return 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/30 text-emerald-700 dark:text-emerald-300';
+      default: return 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-600 text-slate-700 dark:text-slate-300';
     }
   };
 
@@ -112,48 +113,52 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
   }
 
   return (
-    <div className="w-96 h-full bg-white border-l border-gray-200 flex flex-col">
+    <div className="w-96 h-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-l border-slate-200 dark:border-slate-700 flex flex-col shadow-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-50">
-        <div className="flex items-center gap-2">
-          <Users className="w-4 h-4 text-gray-600" />
-          <h2 className="text-sm font-medium text-gray-900">Team Capacity</h2>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-br from-blue-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+            <Users className="w-5 h-5 text-white" />
+          </div>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-white">Team Capacity</h2>
         </div>
         <button
           onClick={onClose}
-          className="p-1 hover:bg-gray-200 rounded transition-all duration-200 hover:-translate-y-0.5"
+          className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
           title="Close panel"
         >
-          <X className="w-4 h-4 text-gray-600" />
+          <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
         </button>
       </div>
 
       {/* Conflict Alert */}
       {conflictSummary && conflictSummary.totalConflicts > 0 && (
-        <div className="px-4 py-3 bg-amber-50 border-b border-amber-200">
+        <div className="px-5 py-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border-b border-amber-200 dark:border-amber-800">
           <div className="flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5 animate-pulse" style={{ animationDuration: '2s' }} />
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 flex-shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5 text-white animate-pulse" style={{ animationDuration: '2s' }} />
+            </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold text-amber-900 mb-2">
+              <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-2">
                 Scheduling Conflicts Detected
               </h3>
               {/* Structured Summary */}
-              <div className="text-xs text-amber-800 mb-2 space-y-1">
-                <div className="flex items-center gap-2">
+              <div className="text-xs text-amber-800 dark:text-amber-200 mb-2 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
                   {(conflictSummary.overlapConflicts ?? 0) > 0 && (
-                    <span>🔴 {conflictSummary.overlapConflicts} Overlap{(conflictSummary.overlapConflicts ?? 0) > 1 ? 's' : ''}</span>
+                    <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 rounded-lg">🔴 {conflictSummary.overlapConflicts} Overlap{(conflictSummary.overlapConflicts ?? 0) > 1 ? 's' : ''}</span>
                   )}
                   {(conflictSummary.developerOverloadConflicts ?? 0) > 0 && (
-                    <span>🟠 {conflictSummary.developerOverloadConflicts} Overloaded Dev{(conflictSummary.developerOverloadConflicts ?? 0) > 1 ? 's' : ''}</span>
+                    <span className="px-2 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-lg">🟠 {conflictSummary.developerOverloadConflicts} Overloaded Dev{(conflictSummary.developerOverloadConflicts ?? 0) > 1 ? 's' : ''}</span>
                   )}
                   {(conflictSummary.sprintOverCapacityConflicts ?? 0) > 0 && (
-                    <span>🟡 {conflictSummary.sprintOverCapacityConflicts} Sprint Over Capacity</span>
+                    <span className="px-2 py-1 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">🟡 {conflictSummary.sprintOverCapacityConflicts} Sprint Over Capacity</span>
                   )}
                 </div>
               </div>
               {conflictSummary.affectedDevelopers.length > 0 && (
-                <div className="text-xs text-amber-700 mb-2">
-                  <span className="font-medium">Affected: </span>
+                <div className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                  <span className="font-semibold">Affected: </span>
                   {conflictSummary.affectedDevelopers.slice(0, 3).join(', ')}
                   {conflictSummary.affectedDevelopers.length > 3 && ` +${conflictSummary.affectedDevelopers.length - 3} more`}
                 </div>
@@ -161,7 +166,7 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
               {onViewConflicts && (
                 <button
                   onClick={onViewConflicts}
-                  className="text-xs font-medium text-amber-700 hover:text-amber-800 underline hover:no-underline"
+                  className="text-xs font-semibold text-amber-800 dark:text-amber-200 hover:text-amber-900 dark:hover:text-amber-100 underline hover:no-underline transition-colors"
                 >
                   View Conflict Details →
                 </button>
@@ -172,27 +177,48 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
       )}
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-slate-50/30 dark:bg-slate-800/30">
         {teamCapacities.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-            <Users className="w-12 h-12 text-gray-400 mb-3" />
-            <p className="text-sm text-gray-500">No team members assigned to this release</p>
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center shadow-lg mb-4">
+              <Users className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-400">No team members assigned to this release</p>
           </div>
         ) : (
           <div className="p-4 space-y-4">
             {/* Overall Team Summary with Conflict Integration */}
-            <div className={`border rounded-lg p-3 ${conflictSummary && conflictSummary.totalConflicts > 0 ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
-              <div className="flex items-center gap-2 mb-2">
+            <div className={cn(
+              "border rounded-xl p-4 shadow-sm",
+              conflictSummary && conflictSummary.totalConflicts > 0
+                ? 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 border-amber-200 dark:border-amber-800'
+                : 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200 dark:border-blue-800'
+            )}>
+              <div className="flex items-center gap-2 mb-3">
                 {conflictSummary && conflictSummary.totalConflicts > 0 ? (
-                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                    <AlertTriangle className="w-4 h-4 text-white" />
+                  </div>
                 ) : (
-                  <TrendingUp className="w-4 h-4 text-blue-600" />
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                    <TrendingUp className="w-4 h-4 text-white" />
+                  </div>
                 )}
-                <h3 className={`text-xs font-medium ${conflictSummary && conflictSummary.totalConflicts > 0 ? 'text-amber-900' : 'text-blue-900'}`}>
+                <h3 className={cn(
+                  "text-sm font-semibold",
+                  conflictSummary && conflictSummary.totalConflicts > 0
+                    ? 'text-amber-900 dark:text-amber-100'
+                    : 'text-blue-900 dark:text-blue-100'
+                )}>
                   Release Health
                 </h3>
               </div>
-              <div className={`text-xs space-y-1 ${conflictSummary && conflictSummary.totalConflicts > 0 ? 'text-amber-700' : 'text-blue-700'}`}>
+              <div className={cn(
+                "text-sm space-y-2",
+                conflictSummary && conflictSummary.totalConflicts > 0
+                  ? 'text-amber-700 dark:text-amber-300'
+                  : 'text-blue-700 dark:text-blue-300'
+              )}>
                 <div className="flex justify-between">
                   <span>Total Team Members:</span>
                   <span className="font-medium">{teamCapacities.length}</span>
@@ -240,22 +266,25 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
                 : 0;
 
               return (
-                <div key={sprintId} className="border border-gray-200 rounded-lg overflow-hidden">
+                <div key={sprintId} className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden">
                   {/* Sprint Header */}
                   <button
                     onClick={() => toggleSprint(sprintId)}
-                    className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-all duration-200"
+                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-slate-50/50 to-white/50 dark:from-slate-800/50 dark:to-slate-900/50 hover:from-slate-100/50 hover:to-slate-50/50 dark:hover:from-slate-700/50 dark:hover:to-slate-800/50 transition-all duration-200"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       {isExpanded ? (
-                        <ChevronDown className="w-4 h-4 text-gray-600" />
+                        <ChevronDown className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                       ) : (
-                        <ChevronRight className="w-4 h-4 text-gray-600" />
+                        <ChevronRight className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                       )}
-                      <span className="text-sm font-medium text-gray-900">{sprintName}</span>
+                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <Calendar className="w-4 h-4 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white">{sprintName}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-600">
+                      <span className="text-xs px-2.5 py-1 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg font-medium">
                         {sprintUtilization}% utilized
                       </span>
                     </div>
@@ -263,7 +292,7 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
 
                   {/* Sprint Members */}
                   {isExpanded && (
-                    <div className="p-3 space-y-2 bg-white">
+                    <div className="p-4 space-y-3 bg-slate-50/30 dark:bg-slate-800/30">
                       {sprintData.map(({ member, sprintCapacity }) => {
                         if (!sprintCapacity) return null;
                         
@@ -272,20 +301,28 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
                         return (
                           <div
                             key={member.memberId}
-                            className="border border-gray-200 rounded-md overflow-hidden"
+                            className={cn(
+                              "border rounded-xl overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md backdrop-blur-xl",
+                              isMemberExpanded
+                                ? 'ring-2 ring-blue-500 border-blue-300 dark:border-blue-700 bg-white/95 dark:bg-slate-900/95'
+                                : 'border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 bg-white/90 dark:bg-slate-900/90'
+                            )}
                           >
                             {/* Member Summary */}
                             <button
                               onClick={() => toggleMember(`${sprintId}-${member.memberId}`)}
-                              className="w-full p-2 hover:bg-gray-50 transition-all duration-200 rounded"
+                              className="w-full p-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-all duration-200 rounded"
                             >
                               <div className="flex items-start justify-between">
                                 <div className="flex-1 text-left">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-sm font-medium text-gray-900">
+                                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-xs shadow-lg shadow-blue-500/30">
+                                      {member.memberName.charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="text-sm font-semibold text-slate-900 dark:text-white">
                                       {member.memberName}
                                     </span>
-                                    <span className={`text-xs px-1.5 py-0.5 rounded ${getRoleColor(member.role)}`}>
+                                    <span className={cn("text-xs px-2 py-0.5 rounded-lg font-medium", getRoleColor(member.role))}>
                                       {member.role}
                                     </span>
                                     {/* Velocity Insight Badge */}
@@ -310,8 +347,8 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
                                       return null;
                                     })()}
                                     {conflictSummary && conflictSummary.conflictsByDeveloper[member.memberName] > 0 && (
-                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-semibold">
-                                        <AlertTriangle className="w-2.5 h-2.5" />
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 text-amber-700 dark:text-amber-300 rounded-lg text-[10px] font-semibold">
+                                        <AlertTriangle className="w-3 h-3" />
                                         {conflictSummary.conflictsByDeveloper[member.memberName]}
                                       </span>
                                     )}
@@ -321,14 +358,14 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
                                     const teamMember = teamMembers.find(tm => tm.name === member.memberName);
                                     if (teamMember?.experienceLevel) {
                                       return (
-                                        <div className="text-[11px] text-gray-500 mt-1 mb-2">
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 mb-2">
                                           {teamMember.experienceLevel} · {teamMember.velocityMultiplier ?? 1}x
                                         </div>
                                       );
                                     }
                                     return null;
                                   })()}
-                                  <div className="text-xs text-gray-600 space-y-0.5">
+                                  <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
                                     <div className="flex justify-between">
                                       <span>Assigned:</span>
                                       <span className="font-medium">
@@ -340,7 +377,7 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
                                       <span className="font-medium">{sprintCapacity.availableCapacity.toFixed(1)}d</span>
                                     </div>
                                     {(sprintCapacity.ptoOverlapDays > 0 || sprintCapacity.holidayOverlapDays > 0) && (
-                                      <div className="flex justify-between text-amber-600">
+                                      <div className="flex justify-between text-amber-600 dark:text-amber-400">
                                         <span>Reductions:</span>
                                         <span className="font-medium">
                                           {sprintCapacity.ptoOverlapDays > 0 && `${sprintCapacity.ptoOverlapDays}d PTO`}
@@ -352,13 +389,13 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
                                   </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-1 ml-2">
-                                  <span className={`text-xs px-2 py-0.5 rounded border ${getStatusColor(sprintCapacity.status)}`}>
+                                  <span className={cn("text-xs px-2.5 py-1 rounded-lg border font-medium", getStatusColor(sprintCapacity.status))}>
                                     {getStatusIcon(sprintCapacity.status)} {sprintCapacity.utilizationPercent}%
                                   </span>
                                   {isMemberExpanded ? (
-                                    <ChevronDown className="w-3 h-3 text-gray-400" />
+                                    <ChevronDown className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                                   ) : (
-                                    <ChevronRight className="w-3 h-3 text-gray-400" />
+                                    <ChevronRight className="w-3 h-3 text-slate-400 dark:text-slate-500" />
                                   )}
                                 </div>
                               </div>
@@ -366,24 +403,30 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
 
                             {/* Member Details */}
                             {isMemberExpanded && (
-                              <div className="px-2 pb-2 bg-gray-50 border-t border-gray-200">
+                              <div className="px-3 pb-3 bg-slate-50/30 dark:bg-slate-800/30 border-t border-slate-200 dark:border-slate-700">
                                 {/* Assigned Tickets */}
                                 {sprintCapacity.tickets.length > 0 && (
-                                  <div className="mt-2">
-                                    <div className="text-xs font-medium text-gray-700 mb-1">
+                                  <div className="mt-3">
+                                    <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
                                       Assigned Tickets ({sprintCapacity.tickets.length})
                                     </div>
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                       {sprintCapacity.tickets.map(ticket => (
                                         <div
                                           key={ticket.id}
-                                          className="text-xs p-1.5 bg-white rounded border border-gray-200"
+                                          className="text-xs p-2.5 bg-white/95 dark:bg-slate-900/95 rounded-lg border border-slate-200 dark:border-slate-700 backdrop-blur-xl"
                                         >
-                                          <div className="font-medium text-gray-900 truncate">
+                                          <div className="font-semibold text-slate-900 dark:text-white truncate">
                                             {ticket.title}
                                           </div>
-                                          <div className="text-gray-500 mt-0.5">
-                                            {resolveEffortDays(ticket)}d · {ticket.status}
+                                          <div className="text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+                                            <span className="px-2 py-0.5 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg font-medium">
+                                              {resolveEffortDays(ticket)}d
+                                            </span>
+                                            <span className="px-2 py-0.5 bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-lg font-medium">
+                                              {ticket.status}
+                                            </span>
                                           </div>
                                         </div>
                                       ))}
@@ -393,23 +436,25 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
 
                                 {/* PTO Entries */}
                                 {sprintCapacity.ptoEntries.length > 0 && (
-                                  <div className="mt-2">
-                                    <div className="flex items-center gap-1 text-xs font-medium text-amber-700 mb-1">
-                                      <Calendar className="w-3 h-3" />
+                                  <div className="mt-3">
+                                    <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                                      <Calendar className="w-3.5 h-3.5" />
                                       PTO Impact
                                     </div>
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                       {sprintCapacity.ptoEntries.map(pto => (
                                         <div
                                           key={pto.id}
-                                          className="text-xs p-1.5 bg-amber-50 rounded border border-amber-200"
+                                          className="text-xs p-2.5 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/20 rounded-lg border border-amber-200 dark:border-amber-800"
                                         >
-                                          <div className="font-medium text-amber-900">{pto.name}</div>
-                                          <div className="text-amber-700 mt-0.5">
+                                          <div className="font-semibold text-amber-900 dark:text-amber-100">{pto.name}</div>
+                                          <div className="text-amber-700 dark:text-amber-300 mt-1">
                                             {pto.startDate.toLocaleDateString()} - {pto.endDate.toLocaleDateString()}
                                           </div>
-                                          <div className="text-amber-600 mt-0.5">
-                                            Impact: {pto.overlapDays} days in this sprint
+                                          <div className="text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                                            <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 rounded-lg font-medium">
+                                              Impact: {pto.overlapDays} days
+                                            </span>
                                           </div>
                                         </div>
                                       ))}
@@ -419,19 +464,19 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
 
                                 {/* Holiday Impact */}
                                 {sprintCapacity.holidays.length > 0 && (
-                                  <div className="mt-2">
-                                    <div className="flex items-center gap-1 text-xs font-medium text-blue-700 mb-1">
-                                      <Calendar className="w-3 h-3" />
+                                  <div className="mt-3">
+                                    <div className="flex items-center gap-2 text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                                      <Calendar className="w-3.5 h-3.5" />
                                       Holiday Impact
                                     </div>
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                       {sprintCapacity.holidays.map((holiday, idx) => (
                                         <div
                                           key={`${holiday.id}-${idx}`}
-                                          className="text-xs p-1.5 rounded border" style={{ backgroundColor: '#E0F2FE', borderColor: '#BAE6FD' }}
+                                          className="text-xs p-2.5 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800"
                                         >
-                                          <div className="font-medium text-blue-900">{holiday.name}</div>
-                                          <div className="text-blue-700 mt-0.5">
+                                          <div className="font-semibold text-blue-900 dark:text-blue-100">{holiday.name}</div>
+                                          <div className="text-blue-700 dark:text-blue-300 mt-1">
                                             {holiday.date.toLocaleDateString()}
                                           </div>
                                         </div>
@@ -442,9 +487,9 @@ export function TeamCapacityPanel({ teamCapacities, conflictSummary, onClose, on
 
                                 {/* Warnings */}
                                 {sprintCapacity.status === 'over' && (
-                                  <div className="mt-2 flex items-start gap-1 text-xs p-1.5 bg-red-50 rounded border border-red-200">
-                                    <AlertTriangle className="w-3 h-3 text-red-600 flex-shrink-0 mt-0.5" />
-                                    <span className="text-red-700">
+                                  <div className="mt-3 flex items-start gap-2 text-xs p-2.5 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
+                                    <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                    <span className="text-red-700 dark:text-red-300 font-medium">
                                       Over-allocated! Consider redistributing work.
                                     </span>
                                   </div>

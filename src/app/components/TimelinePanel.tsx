@@ -7,7 +7,8 @@ import { TicketConflict, hasConflict } from '../lib/conflictDetection';
 import { SprintCapacity, getCapacityStatusColor } from '../lib/capacityCalculation';
 import designTokens, { getTicketColors, getConflictColors } from '../lib/designTokens';
 import { TruncatedText } from './Tooltip';
-import { resolveEffortDays, getAdjustedDuration } from '../lib/effortResolver';
+import { resolveEffortDays } from '../lib/effortResolver';
+import { toLocalDateString } from '../lib/dateUtils';
 import { calculateWorkingDays } from '../lib/teamCapacityCalculation';
 import { loadMilestones, saveMilestones, loadPhases, savePhases } from '../lib/localStorage';
 import { AddMilestoneModal } from './AddMilestoneModal';
@@ -70,7 +71,7 @@ function getPTOOverlapInfo(ticket: Ticket, assignedMember: TeamMember | undefine
         while (current <= overlapEnd) {
           const dayOfWeek = current.getDay();
           if (dayOfWeek !== 0 && dayOfWeek !== 6) {
-            overlapDates.add(current.toISOString().split('T')[0]);
+            overlapDates.add(toLocalDateString(current));
           }
           current.setDate(current.getDate() + 1);
         }
@@ -355,7 +356,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   const contentHeight = (totalFeatures * FEATURE_HEADER_HEIGHT) + (totalTickets * ROW_HEIGHT);
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <div className="h-full flex flex-col bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
       {/* 1.2.5: CSS animations for smooth transitions + 1.2.3: Loading animations */}
       <style>{`
         .header-scroll-hidden::-webkit-scrollbar {
@@ -410,10 +411,10 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
       `}</style>
       
       {/* Sticky Header Row */}
-      <div className="sticky top-0 z-30 bg-white border-b border-gray-200 flex relative">
+      <div className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 flex relative shadow-sm">
         {/* Left Sidebar Header */}
         <div 
-          className="border-r border-gray-200 bg-gray-50"
+          className="border-r border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-800/90 backdrop-blur-sm"
           style={{ width: SIDEBAR_WIDTH, minWidth: SIDEBAR_WIDTH }}
         >
           <TimelineSidebarHeader 
@@ -505,25 +506,25 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
           </div>
 
           {/* Timeline Legend - No more spillover warning here */}
-          <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+          <div className="px-4 py-3 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/30 border-b border-slate-100 dark:border-slate-800 shadow-sm">
             {/* Timeline Legend */}
             <div className="flex items-center gap-4 text-xs">
               <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 bg-blue-200 border-2 border-blue-500 rounded" />
-                <span className="text-gray-700">Planned</span>
+                <div className="w-4 h-4 bg-blue-200 border-2 border-blue-500 rounded shadow-sm" />
+                <span className="text-slate-700 dark:text-slate-300 font-medium">Planned</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 bg-yellow-200 border-2 border-yellow-500 rounded" />
-                <span className="text-gray-700">In Progress</span>
+                <div className="w-4 h-4 bg-yellow-200 border-2 border-yellow-500 rounded shadow-sm" />
+                <span className="text-slate-700 dark:text-slate-300 font-medium">In Progress</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <div 
-                  className="w-4 h-4 bg-orange-200 border-2 border-orange-500 rounded" 
+                  className="w-4 h-4 bg-orange-200 border-2 border-orange-500 rounded shadow-sm" 
                   style={{
                     backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(249, 115, 22, 0.2) 2px, rgba(249, 115, 22, 0.2) 4px)'
                   }}
                 />
-                <span className="text-gray-700">Spillover</span>
+                <span className="text-slate-700 dark:text-slate-300 font-medium">Spillover</span>
               </div>
             </div>
           </div>
@@ -1081,23 +1082,23 @@ function TimelineHeader({
   const releaseWorkingDays = calculateWorkingDays(startDate, headerEndDate);
 
   return (
-    <div className="bg-card border-b border-border">
+    <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 shadow-sm">
       {/* Header strip: uses otherwise-empty space and improves calendar readability */}
-      <div className="flex h-10 items-center justify-between px-3 border-b border-border/50 bg-card">
+      <div className="flex h-10 items-center justify-between px-3 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-50/50 to-transparent dark:from-slate-800/50">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-semibold text-foreground tracking-tight">Calendar</span>
-          <span className="text-[11px] text-muted-foreground truncate">
+          <span className="text-xs font-semibold text-slate-900 dark:text-white tracking-tight">Calendar</span>
+          <span className="text-[11px] text-slate-600 dark:text-slate-400 truncate">
             {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – {headerEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </span>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-muted-foreground flex-shrink-0">
-          <span className="font-medium text-foreground/80">{totalDays + 1} days</span>
-          <span className="font-medium text-foreground/80">{releaseWorkingDays} working</span>
+        <div className="flex items-center gap-3 text-[11px] text-slate-600 dark:text-slate-400 flex-shrink-0">
+          <span className="font-medium text-slate-900 dark:text-white">{totalDays + 1} days</span>
+          <span className="font-medium text-slate-900 dark:text-white">{releaseWorkingDays} working</span>
         </div>
       </div>
 
       {/* Month band */}
-      <div className="flex h-7 items-center border-b border-border/50 relative bg-muted/35">
+      <div className="flex h-7 items-center border-b border-slate-200/50 dark:border-slate-700/50 relative bg-gradient-to-br from-slate-50/30 to-slate-100/30 dark:from-slate-800/30 dark:to-slate-900/30">
         {monthSpans.map((span, idx) => (
           <div
             key={idx}
@@ -1107,7 +1108,7 @@ function TimelineHeader({
               borderRight: idx < monthSpans.length - 1 ? '1px solid rgba(0,0,0,0.1)' : 'none'
             }}
           >
-            <span className="text-[10px] font-semibold text-foreground/70 uppercase tracking-wider">
+            <span className="text-[10px] font-semibold text-slate-900 dark:text-white uppercase tracking-wider">
               {span.label}
             </span>
           </div>
@@ -1115,7 +1116,7 @@ function TimelineHeader({
       </div>
 
       {/* Date labels - Show every day number */}
-      <div className="flex h-12 items-center border-b border-border relative">
+      <div className="flex h-12 items-center border-b border-slate-200 dark:border-slate-700 relative">
         {Array.from({ length: totalDays + 1 }).map((_, i) => {
           const currentDate = new Date(startDate);
           currentDate.setDate(currentDate.getDate() + i);
@@ -1413,14 +1414,14 @@ function TimelineSidebarHeader({
   return (
     <div className="h-full flex flex-col">
       {/* Control Bar - Grouped by intent */}
-      <div className="bg-card/50 border-b border-border px-3 py-2">
+      <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-b border-slate-200 dark:border-slate-700 px-3 py-2 shadow-sm">
         <div className="flex items-center justify-between w-full gap-2">
           <div className="flex items-center gap-2">
             {/* View Menu */}
             <div className="relative">
               <button
                 onClick={() => setShowViewMenu(!showViewMenu)}
-                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
               >
                 <span>View</span>
                 <ChevronDown className="w-3 h-3" />
@@ -1428,8 +1429,8 @@ function TimelineSidebarHeader({
               {showViewMenu && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowViewMenu(false)} />
-                  <div className="absolute left-0 mt-1 w-36 bg-card border border-border rounded-md shadow-lg z-50 py-1">
-                    <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors">
+                  <div className="absolute left-0 mt-1 w-36 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 py-1">
+                    <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                       <input
                         type="checkbox"
                         checked={showHolidays}
@@ -1438,7 +1439,7 @@ function TimelineSidebarHeader({
                       />
                       <span className="text-xs">Holidays</span>
                     </label>
-                    <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-muted transition-colors">
+                    <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                       <input
                         type="checkbox"
                         checked={showPTO}
@@ -1452,15 +1453,15 @@ function TimelineSidebarHeader({
               )}
             </div>
 
-            <div className="w-px h-4 bg-border" />
+            <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
 
             {/* Filter */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-medium text-muted-foreground">Filter</span>
+              <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Filter</span>
               <select
                 value={selectedDeveloperId}
                 onChange={(e) => onChangeDeveloper(e.target.value as 'all' | 'unassigned' | string)}
-                className="text-xs px-2 py-0.5 border border-border rounded bg-card hover:bg-muted transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-ring"
+                className="text-xs px-2 py-0.5 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400/50 shadow-sm"
               >
                 <option value="all">All</option>
                 <option value="unassigned">Unassigned</option>
@@ -1477,7 +1478,7 @@ function TimelineSidebarHeader({
 
       {/* Ticket Name Header */}
       <div 
-        className="px-4 h-7 flex items-center justify-between border-b border-border/50 bg-muted/35"
+        className="px-4 h-7 flex items-center justify-between border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-br from-slate-50/30 to-slate-100/30 dark:from-slate-800/30 dark:to-slate-900/30"
         style={{
           fontSize: designTokens.typography.fontSize.xs,
           fontWeight: designTokens.typography.fontWeight.semibold,
@@ -1623,9 +1624,10 @@ function TicketTimelineBar({
 
   const ticketLeft = getPositionFromDate(ticket.startDate);
   
-  // Calculate adjusted duration based on effort and velocity
-  const adjustedDuration = getAdjustedDuration(ticket, assignedMember);
-  const rawTicketWidth = adjustedDuration * dayWidth;
+  // Calculate visual width from actual stored startDate to endDate (calendar days)
+  // This ensures the timeline bar accurately reflects the stored date range
+  const calendarDays = Math.ceil((ticket.endDate.getTime() - ticket.startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+  const rawTicketWidth = calendarDays * dayWidth;
   
   // Calculate the maximum available width from ticket start to timeline end
   const timelineEndPosition = getPositionFromDate(endDate);

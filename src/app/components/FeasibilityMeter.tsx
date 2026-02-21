@@ -1,4 +1,6 @@
 import { motion } from 'motion/react';
+import { TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { cn } from './ui/utils';
 
 interface FeasibilityMeterProps {
   percentage: number;
@@ -13,9 +15,9 @@ export function FeasibilityMeter({ percentage }: FeasibilityMeterProps) {
   };
 
   const getTextColor = () => {
-    if (percentage >= 90) return 'text-green-600';
-    if (percentage >= 70) return 'text-amber-600';
-    return 'text-red-600';
+    if (percentage >= 90) return 'text-green-600 dark:text-green-400';
+    if (percentage >= 70) return 'text-amber-600 dark:text-amber-400';
+    return 'text-red-600 dark:text-red-400';
   };
 
   const getStatusText = () => {
@@ -24,30 +26,45 @@ export function FeasibilityMeter({ percentage }: FeasibilityMeterProps) {
     return 'Over Capacity';
   };
 
+  const getStatusIcon = () => {
+    if (percentage >= 90) return <CheckCircle2 className="w-5 h-5" />;
+    if (percentage >= 70) return <TrendingUp className="w-5 h-5" />;
+    return <AlertTriangle className="w-5 h-5" />;
+  };
+
   const getBgColor = () => {
-    if (percentage >= 90) return 'bg-green-50/50';
-    if (percentage >= 70) return 'bg-amber-50/50';
-    return 'bg-red-50/50';
+    if (percentage >= 90) return 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800';
+    if (percentage >= 70) return 'bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800';
+    return 'bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 border-red-200 dark:border-red-800';
+  };
+
+  const getIconBg = () => {
+    if (percentage >= 90) return 'bg-gradient-to-br from-green-500 to-emerald-600 shadow-green-500/30';
+    if (percentage >= 70) return 'bg-gradient-to-br from-amber-500 to-yellow-600 shadow-amber-500/30';
+    return 'bg-gradient-to-br from-red-500 to-orange-600 shadow-red-500/30';
   };
 
   return (
-    <div className={`p-6 rounded-xl ${getBgColor()} shadow-sm`}>
-      {/* Percentage Display */}
-      <div className="flex items-center justify-center mb-2">
-        <div className={`text-5xl font-bold ${getTextColor()}`}>
+    <div className={cn('p-6 rounded-xl border shadow-sm', getBgColor())}>
+      {/* Icon & Percentage Display */}
+      <div className="flex items-center justify-center gap-4 mb-4">
+        <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center shadow-lg text-white', getIconBg())}>
+          {getStatusIcon()}
+        </div>
+        <div className={cn('text-5xl font-bold tabular-nums', getTextColor())}>
           {percentage}%
         </div>
       </div>
 
       {/* Status Text */}
-      <div className={`text-center text-sm font-medium mb-4 ${getTextColor()}`}>
+      <div className={cn('text-center text-sm font-semibold mb-4', getTextColor())}>
         {getStatusText()}
       </div>
 
       {/* Progress Bar Container */}
-      <div className="relative w-full h-2 bg-muted/30 rounded-full overflow-hidden">
+      <div className="relative w-full h-3 bg-white/60 dark:bg-slate-900/60 rounded-full overflow-hidden shadow-inner border border-slate-200/50 dark:border-slate-700/50">
         <motion.div
-          className={`absolute inset-y-0 left-0 bg-gradient-to-r ${getGradient()} rounded-full`}
+          className={cn('absolute inset-y-0 left-0 bg-gradient-to-r rounded-full shadow-md', getGradient())}
           initial={{ width: 0 }}
           animate={{ width: `${percentage}%` }}
           transition={{

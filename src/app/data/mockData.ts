@@ -251,7 +251,7 @@ const product1: Product = {
               title: 'One-click checkout flow',
               description: 'Priority: High | Build streamlined single-page checkout with saved payment methods',
               startDate: new Date('2026-03-09'),
-              endDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-18'), // 8 working days (Mon-Fri, skipping weekend 3/14-3/15)
               status: 'in-progress',
               storyPoints: 8,
               effortDays: 8,

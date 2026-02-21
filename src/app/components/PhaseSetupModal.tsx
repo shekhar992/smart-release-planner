@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { nanoid } from 'nanoid';
+import { Sparkles, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Calendar, Clock } from 'lucide-react';
+import { cn } from './ui/utils';
 import type { Phase } from '../data/mockData';
+import { toLocalDateString } from '../lib/dateUtils';
 import { 
   PHASE_TEMPLATES, 
   calculatePhaseDates, 
@@ -97,142 +100,232 @@ export function PhaseSetupModal({
   // STEP 1: Choose Approach
   if (currentStep === 'choose-approach') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className="bg-background rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border">
-          <div className="p-6 border-b">
-            <h2 className="text-2xl font-bold">Set Up Release Phases</h2>
-            <p className="text-sm text-muted-foreground mt-2">
-              Define key phases for better release planning and tracking
-            </p>
-          </div>
-
-          <div className="p-6 space-y-4">
-            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <div className="flex items-start">
-                <span className="text-2xl mr-3">💡</span>
+      <>
+        <style>{`
+          @keyframes modalSlideIn {
+            from {
+              opacity: 0;
+              transform: scale(0.95) translateY(-10px);
+            }
+            to {
+              opacity: 1;
+              transform: scale(1) translateY(0);
+            }
+          }
+          .modal-enter {
+            animation: modalSlideIn 0.2s ease-out;
+          }
+          .glass-modal {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+          }
+          .dark .glass-modal {
+            background: rgba(15, 23, 42, 0.95);
+          }
+        `}</style>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="glass-modal rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-white/20 dark:border-slate-700/50 modal-enter">
+            {/* Header */}
+            <div className="p-8 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-br from-blue-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                    Best Practice
-                  </h3>
-                  <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                    Defining phases upfront helps with ticket scheduling, milestone tracking, 
-                    and executive reporting. Recommended for all releases.
+                  <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Set Up Release Phases</h2>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                    Define key phases for better release planning and tracking
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3 mt-6">
-              <button
-                onClick={() => setCurrentStep('select-template')}
-                className="w-full p-4 border-2 border-primary bg-primary/5 hover:bg-primary/10 rounded-lg text-left transition-colors"
-              >
-                <div className="flex items-center justify-between">
+            <div className="p-8 space-y-6">
+              {/* Best Practice Card */}
+              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200 dark:border-blue-800 rounded-xl p-5 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
+                    <CheckCircle2 className="w-5 h-5 text-white" />
+                  </div>
                   <div>
-                    <h3 className="text-base font-semibold">Use Phase Template</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Choose from Standard SDLC or Agile templates (recommended)
+                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                      Best Practice
+                    </h3>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1.5 leading-relaxed">
+                      Defining phases upfront helps with ticket scheduling, milestone tracking, 
+                      and executive reporting. Recommended for all releases.
                     </p>
                   </div>
-                  <span className="text-primary text-xl">→</span>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleTemplateSelect('custom')}
-                className="w-full p-4 border-2 border-border hover:border-foreground/50 hover:bg-muted/50 rounded-lg text-left transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-semibold">Define Custom Phases</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Create your own phase structure (advanced)
-                    </p>
-                  </div>
-                  <span className="text-muted-foreground text-xl">→</span>
-                </div>
-              </button>
-
-              <button
-                onClick={handleSkip}
-                className="w-full p-4 border-2 border-border hover:border-foreground/50 hover:bg-muted/50 rounded-lg text-left transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-base font-semibold">Skip Phase Setup</h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Release will work without phases (not recommended)
-                    </p>
-                  </div>
-                  <span className="text-muted-foreground text-xl">→</span>
-                </div>
-              </button>
-            </div>
-
-            {showSkipWarning && (
-              <div className="mt-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg">
-                <h3 className="text-sm font-semibold text-destructive">Are you sure?</h3>
-                <p className="text-xs text-destructive/80 mt-1">
-                  Without phases, managing the release timeline will be more difficult. 
-                  You won't be able to distinguish dev work from testing/deployment phases.
-                </p>
-                <div className="flex gap-2 mt-3">
-                  <button
-                    onClick={confirmSkip}
-                    className="px-3 py-1.5 bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs font-medium rounded"
-                  >
-                    Skip Anyway
-                  </button>
-                  <button
-                    onClick={() => setShowSkipWarning(false)}
-                    className="px-3 py-1.5 bg-secondary hover:bg-secondary/80 text-secondary-foreground text-xs font-medium rounded"
-                  >
-                    Go Back
-                  </button>
                 </div>
               </div>
-            )}
-          </div>
 
-          <div className="p-6 border-t flex justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium hover:bg-muted rounded"
-            >
-              Cancel
-            </button>
+              {/* Options */}
+              <div className="space-y-3">
+                <button
+                  onClick={() => setCurrentStep('select-template')}
+                  className={cn(
+                    'group w-full p-5 border-2 rounded-xl text-left transition-all duration-200',
+                    'border-blue-300 bg-gradient-to-br from-blue-50/80 to-white dark:from-blue-950/30 dark:to-slate-900',
+                    'hover:border-blue-500 hover:shadow-lg hover:shadow-blue-500/20 hover:-translate-y-0.5',
+                    'dark:border-blue-800 dark:hover:border-blue-600'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <Sparkles className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">Use Phase Template</h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                          Choose from Standard SDLC or Agile templates (recommended)
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform duration-200" />
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleTemplateSelect('custom')}
+                  className={cn(
+                    'group w-full p-5 border-2 rounded-xl text-left transition-all duration-200',
+                    'border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/70',
+                    'hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5',
+                    'dark:hover:border-slate-600'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-400 to-slate-500 flex items-center justify-center shadow-lg shadow-slate-500/20">
+                        <Calendar className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">Define Custom Phases</h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                          Create your own phase structure (advanced)
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 transition-transform duration-200" />
+                  </div>
+                </button>
+
+                <button
+                  onClick={handleSkip}
+                  className={cn(
+                    'group w-full p-5 border-2 rounded-xl text-left transition-all duration-200',
+                    'border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/70',
+                    'hover:border-slate-300 hover:shadow-md hover:-translate-y-0.5',
+                    'dark:hover:border-slate-600'
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-300 to-slate-400 flex items-center justify-center shadow-lg shadow-slate-500/10">
+                        <Clock className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">Skip Phase Setup</h3>
+                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                          Release will work without phases (not recommended)
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-slate-400 group-hover:translate-x-1 transition-transform duration-200" />
+                  </div>
+                </button>
+              </div>
+
+              {/* Skip Warning */}
+              {showSkipWarning && (
+                <div className="mt-4 p-5 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 border border-red-200 dark:border-red-800 rounded-xl shadow-sm">
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg shadow-red-500/30 flex-shrink-0">
+                      <AlertCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">Are you sure?</h3>
+                      <p className="text-xs text-red-700 dark:text-red-300 mt-1.5 leading-relaxed">
+                        Without phases, managing the release timeline will be more difficult. 
+                        You won't be able to distinguish dev work from testing/deployment phases.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={confirmSkip}
+                      className="px-4 py-2 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white text-xs font-semibold rounded-lg shadow-lg shadow-red-500/30 transition-all duration-200 hover:-translate-y-0.5"
+                    >
+                      Skip Anyway
+                    </button>
+                    <button
+                      onClick={() => setShowSkipWarning(false)}
+                      className="px-4 py-2 bg-white/80 hover:bg-white border border-slate-300 dark:bg-slate-800/80 dark:hover:bg-slate-800 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded-lg transition-all duration-200 hover:-translate-y-0.5"
+                    >
+                      Go Back
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-200/50 dark:border-slate-700/50 flex justify-end bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
+              <button
+                onClick={onClose}
+                className="px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // STEP 2: Select Template
   if (currentStep === 'select-template') {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className="bg-background rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border">
-          <div className="p-6 border-b">
-            <h2 className="text-2xl font-bold">Choose Phase Template</h2>
-            <p className="text-sm text-muted-foreground mt-2">
-              Select a template that matches your release structure
-            </p>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div className="glass-modal rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto border border-white/20 dark:border-slate-700/50 modal-enter">
+          {/* Header */}
+          <div className="p-8 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-br from-blue-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <Sparkles className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Choose Phase Template</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                  Select a template that matches your release structure
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Template Grid */}
+          <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-4">
             {PHASE_TEMPLATES.filter(t => t.id !== 'custom').map((template) => (
               <button
                 key={template.id}
                 onClick={() => handleTemplateSelect(template.id)}
-                className="p-5 border-2 border-border hover:border-primary hover:bg-primary/5 rounded-lg text-left transition-colors"
+                className={cn(
+                  'group p-6 border-2 rounded-xl text-left transition-all duration-200',
+                  'border-slate-200 bg-white/70 dark:border-slate-700 dark:bg-slate-900/70',
+                  'hover:border-blue-400 hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-1',
+                  'dark:hover:border-blue-600'
+                )}
               >
-                <h3 className="text-lg font-semibold">{template.name}</h3>
-                <p className="text-xs text-muted-foreground mt-2">{template.description}</p>
-                <div className="mt-4 space-y-2">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">{template.name}</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{template.description}</p>
+                <div className="mt-5 space-y-2.5">
                   {template.phases.map((phase, idx) => (
                     <div key={idx} className="flex items-center text-xs">
                       <span 
-                        className="w-3 h-3 rounded-full mr-2" 
+                        className="w-2.5 h-2.5 rounded-full mr-2.5 shadow-sm" 
                         style={{
                           backgroundColor: 
                             phase.type === 'DevWindow' ? '#3b82f6' :
@@ -240,8 +333,11 @@ export function PhaseSetupModal({
                             phase.type === 'Deployment' ? '#a855f7' : '#22c55e'
                         }}
                       />
-                      <span className="text-foreground">
-                        {phase.name} {phase.durationDays > 0 ? `(${phase.durationDays}d)` : '(flexible)'}
+                      <span className="text-slate-700 dark:text-slate-300 font-medium">
+                        {phase.name}
+                      </span>
+                      <span className="text-slate-500 dark:text-slate-500 ml-1">
+                        {phase.durationDays > 0 ? `(${phase.durationDays}d)` : '(flexible)'}
                       </span>
                     </div>
                   ))}
@@ -250,16 +346,18 @@ export function PhaseSetupModal({
             ))}
           </div>
 
-          <div className="p-6 border-t flex justify-between">
+          {/* Footer */}
+          <div className="p-6 border-t border-slate-200/50 dark:border-slate-700/50 flex justify-between bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
             <button
               onClick={() => setCurrentStep('choose-approach')}
-              className="px-4 py-2 text-sm font-medium hover:bg-muted rounded"
+              className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
             >
-              ← Back
+              <ArrowLeft className="w-4 h-4" />
+              Back
             </button>
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium hover:bg-muted rounded"
+              className="px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
             >
               Cancel
             </button>
@@ -271,36 +369,46 @@ export function PhaseSetupModal({
 
   // STEP 3: Review & Adjust
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-background rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border">
-        <div className="p-6 border-b">
-          <h2 className="text-2xl font-bold">Review & Adjust Phases</h2>
-          <p className="text-sm text-muted-foreground mt-2">
-            Verify dates and adjust as needed. Changes cascade to subsequent phases.
-          </p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      <div className="glass-modal rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-white/20 dark:border-slate-700/50 modal-enter">
+        {/* Header */}
+        <div className="p-8 border-b border-slate-200/50 dark:border-slate-700/50 bg-gradient-to-br from-blue-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+              <CheckCircle2 className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">Review & Adjust Phases</h2>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                Verify dates and adjust as needed. Changes cascade to subsequent phases.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="p-6">
-          <div className="bg-muted rounded-lg p-4 mb-4">
+        <div className="p-8">
+          {/* Release Info Card */}
+          <div className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 rounded-xl p-5 mb-6 border border-slate-200 dark:border-slate-700 shadow-sm">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Release Duration:</span>
-              <span className="font-semibold">
+              <span className="text-slate-600 dark:text-slate-400 font-medium">Release Duration:</span>
+              <span className="font-semibold text-slate-900 dark:text-white">
                 {releaseStartDate.toLocaleDateString()} → {releaseEndDate.toLocaleDateString()} 
-                ({getDuration(releaseStartDate, releaseEndDate)} days)
+                <span className="text-blue-600 dark:text-blue-400 ml-2">({getDuration(releaseStartDate, releaseEndDate)} days)</span>
               </span>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          {/* Phase Table */}
+          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-3 px-3 font-semibold min-w-[150px]">Phase Name</th>
-                  <th className="text-left py-3 px-2 font-semibold">Type</th>
-                  <th className="text-left py-3 px-2 font-semibold">Start Date</th>
-                  <th className="text-left py-3 px-2 font-semibold">End Date</th>
-                  <th className="text-left py-3 px-2 font-semibold">Duration (days)</th>
-                  <th className="text-center py-3 px-2 font-semibold">Work Allowed</th>
+                <tr className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700">
+                  <th className="text-left py-4 px-4 font-semibold text-slate-700 dark:text-slate-200 min-w-[150px]">Phase Name</th>
+                  <th className="text-left py-4 px-3 font-semibold text-slate-700 dark:text-slate-200">Type</th>
+                  <th className="text-left py-4 px-3 font-semibold text-slate-700 dark:text-slate-200">Start Date</th>
+                  <th className="text-left py-4 px-3 font-semibold text-slate-700 dark:text-slate-200">End Date</th>
+                  <th className="text-left py-4 px-3 font-semibold text-slate-700 dark:text-slate-200">Duration (days)</th>
+                  <th className="text-center py-4 px-3 font-semibold text-slate-700 dark:text-slate-200">Work Allowed</th>
                 </tr>
               </thead>
               <tbody>
@@ -310,10 +418,10 @@ export function PhaseSetupModal({
                   return (
                     <tr 
                       key={phase.id} 
-                      className="border-b hover:bg-muted/30 transition-colors"
+                      className="border-b border-slate-100 dark:border-slate-800 hover:bg-blue-50/50 dark:hover:bg-slate-800/50 transition-colors duration-150"
                     >
                       {/* Editable Phase Name */}
-                      <td className="py-3 px-3">
+                      <td className="py-4 px-4">
                         <input
                           type="text"
                           value={phase.name}
@@ -322,28 +430,28 @@ export function PhaseSetupModal({
                             updated[index] = { ...updated[index], name: e.target.value };
                             setPhases(updated);
                           }}
-                          className="w-full px-2 py-1.5 border rounded text-sm bg-background 
-                            focus:outline-none focus:ring-1 focus:ring-ring"
+                          className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white dark:bg-slate-800 dark:border-slate-600 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                           placeholder="Phase name"
                         />
                       </td>
                       
                       {/* Phase Type Badge */}
-                      <td className="py-3 px-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap inline-block ${
-                          phase.type === 'DevWindow' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                          phase.type === 'Testing' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                          phase.type === 'Deployment' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                          phase.type === 'Approval' ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200' :
-                          phase.type === 'Launch' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                          'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                        }`}>
+                      <td className="py-4 px-3">
+                        <span className={cn(
+                          'px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap inline-block border transition-all duration-200',
+                          phase.type === 'DevWindow' && 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/50 dark:text-blue-300 dark:border-blue-800',
+                          phase.type === 'Testing' && 'bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-800',
+                          phase.type === 'Deployment' && 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/50 dark:text-purple-300 dark:border-purple-800',
+                          phase.type === 'Approval' && 'bg-cyan-100 text-cyan-700 border-cyan-200 dark:bg-cyan-900/50 dark:text-cyan-300 dark:border-cyan-800',
+                          phase.type === 'Launch' && 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800',
+                          !['DevWindow', 'Testing', 'Deployment', 'Approval', 'Launch'].includes(phase.type) && 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900/50 dark:text-gray-300 dark:border-gray-800'
+                        )}>
                           {phase.type}
                         </span>
                       </td>
                       
                       {/* Start Date (read-only, calculated) */}
-                      <td className="py-3 px-2 text-muted-foreground text-xs">
+                      <td className="py-4 px-3 text-slate-600 dark:text-slate-400 text-xs font-medium">
                         {phase.startDate.toLocaleDateString('en-GB', { 
                           day: '2-digit', 
                           month: 'short',
@@ -352,20 +460,19 @@ export function PhaseSetupModal({
                       </td>
                       
                       {/* Editable End Date */}
-                      <td className="py-3 px-2">
+                      <td className="py-4 px-3">
                         <input
                           type="date"
-                          value={phase.endDate.toISOString().split('T')[0]}
+                          value={toLocalDateString(phase.endDate)}
                           onChange={(e) => handlePhaseEndDateChange(index, new Date(e.target.value))}
-                          min={phase.startDate.toISOString().split('T')[0]}
-                          max={releaseEndDate.toISOString().split('T')[0]}
-                          className="px-2 py-1 border rounded text-xs bg-background 
-                            focus:outline-none focus:ring-1 focus:ring-ring"
+                          min={toLocalDateString(phase.startDate)}
+                          max={toLocalDateString(releaseEndDate)}
+                          className="px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white dark:bg-slate-800 dark:border-slate-600 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                         />
                       </td>
                       
                       {/* Editable Duration */}
-                      <td className="py-3 px-2">
+                      <td className="py-4 px-3">
                         <input
                           type="number"
                           min="1"
@@ -382,21 +489,18 @@ export function PhaseSetupModal({
                             
                             handlePhaseEndDateChange(index, newEndDate);
                           }}
-                          className="w-16 px-2 py-1 border rounded text-xs bg-background 
-                            focus:outline-none focus:ring-1 focus:ring-ring text-center 
-                            [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none 
-                            [&::-webkit-inner-spin-button]:appearance-none"
+                          className="w-20 px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white dark:bg-slate-800 dark:border-slate-600 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-center transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </td>
                       
                       {/* Work Allowed */}
-                      <td className="py-3 px-2 text-center">
+                      <td className="py-4 px-3 text-center">
                         {phase.allowsWork ? (
-                          <span className="text-green-600 dark:text-green-400 text-xs font-medium">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/50 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 text-xs font-semibold">
                             ✓ Yes
                           </span>
                         ) : (
-                          <span className="text-muted-foreground text-xs">No</span>
+                          <span className="text-slate-500 dark:text-slate-500 text-xs">No</span>
                         )}
                       </td>
                     </tr>
@@ -407,11 +511,13 @@ export function PhaseSetupModal({
           </div>
 
           {/* Pro Tip Helper */}
-          <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <div className="flex items-start gap-2">
-              <span className="text-lg">💡</span>
+          <div className="mt-6 p-5 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0">
+                <CheckCircle2 className="w-5 h-5 text-white" />
+              </div>
               <div className="flex-1">
-                <p className="text-xs text-blue-700 dark:text-blue-300">
+                <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
                   <strong className="font-semibold">Pro tip:</strong> Edit the <strong>Duration</strong> field 
                   to quickly adjust phase lengths. Changes automatically cascade to subsequent phases 
                   to maintain continuity with no gaps.
@@ -422,47 +528,54 @@ export function PhaseSetupModal({
 
           {/* Validation Warnings */}
           {phases[phases.length - 1]?.endDate > releaseEndDate && (
-            <div className="mt-3 p-3 bg-destructive/10 border border-destructive/30 rounded-lg">
-              <p className="text-xs text-destructive flex items-start gap-2">
-                <span>⚠️</span>
-                <span>
+            <div className="mt-4 p-5 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30 border border-red-200 dark:border-red-800 rounded-xl shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500 to-orange-500 flex items-center justify-center shadow-lg shadow-red-500/30 flex-shrink-0">
+                  <AlertCircle className="w-5 h-5 text-white" />
+                </div>
+                <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
                   Phases extend beyond release end date. 
                   Adjust phase durations or extend the release end date.
-                </span>
-              </p>
+                </p>
+              </div>
             </div>
           )}
 
           {!phases.some(p => p.allowsWork) && (
-            <div className="mt-3 p-3 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <p className="text-xs text-yellow-700 dark:text-yellow-300 flex items-start gap-2">
-                <span>⚠️</span>
-                <span>
+            <div className="mt-4 p-5 bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30 border border-yellow-200 dark:border-yellow-800 rounded-xl shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-500/30 flex-shrink-0">
+                  <AlertCircle className="w-5 h-5 text-white" />
+                </div>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 leading-relaxed">
                   No Dev Window phase defined. Tickets may not schedule correctly during auto-scheduling.
-                </span>
-              </p>
+                </p>
+              </div>
             </div>
           )}
         </div>
 
-        <div className="p-6 border-t flex justify-between">
+        {/* Footer */}
+        <div className="p-6 border-t border-slate-200/50 dark:border-slate-700/50 flex justify-between bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
           <button
             onClick={() => setCurrentStep(selectedTemplateId === 'custom' ? 'choose-approach' : 'select-template')}
-            className="px-4 py-2 text-sm font-medium hover:bg-muted rounded"
+            className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
           >
-            ← Back
+            <ArrowLeft className="w-4 h-4" />
+            Back
           </button>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium hover:bg-muted rounded"
+              className="px-5 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
             >
               Cancel
             </button>
             <button
               onClick={handleConfirm}
-              className="px-6 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-semibold rounded-lg"
+              className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg shadow-lg shadow-blue-500/30 transition-all duration-200 hover:-translate-y-0.5"
             >
+              <CheckCircle2 className="w-4 h-4" />
               Confirm & Create Release
             </button>
           </div>

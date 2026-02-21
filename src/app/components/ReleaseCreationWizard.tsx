@@ -2,11 +2,14 @@ import { useState, useMemo } from 'react';
 import { X, ChevronRight, ChevronLeft, Sparkles, Calendar, Zap, CheckCircle2, AlertCircle, Plus, Trash2, Download, ChevronDown, ChevronUp, FileText } from 'lucide-react';
 import { nanoid } from 'nanoid';
 import type { Product, Sprint, Phase, Ticket, PhaseType } from '../data/mockData';
+import { mockHolidays } from '../data/mockData';
 import { DatePicker } from './DatePicker';
 import { PhaseTimelinePreview } from './PhaseTimelinePreview';
 import { PHASE_TEMPLATES, calculatePhaseDates, recalculateCascadingDates } from '../lib/phaseTemplates';
 import { parseCSV, validateAndTransformCSV } from '../lib/csvParser';
 import { ticketImportMapping } from '../lib/importMappings';
+import { calculateEndDateFromEffort, toLocalDateString } from '../lib/dateUtils';
+import { loadHolidays, loadTeamMembers } from '../lib/localStorage';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -283,37 +286,41 @@ export function ReleaseCreationWizard({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 animate-fade-in"
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in"
       onClick={handleClose}
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
       <div
-        className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+        className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200/50 dark:border-slate-700/50"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between bg-gradient-to-r from-slate-50/50 to-transparent dark:from-slate-800/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-lg">
               {flow === 'smart' ? (
-                <Sparkles className="w-5 h-5 text-primary" />
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/30">
+                  <Sparkles className="w-5 h-5 text-white" />
+                </div>
               ) : (
-                <Calendar className="w-5 h-5 text-primary" />
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <Calendar className="w-5 h-5 text-white" />
+                </div>
               )}
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
                 {flow === 'smart' ? 'Smart Release Creation' : 'Manual Release Creation'}
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
                 Step {wizardState.currentStepIndex + 1} of {steps.length}
               </p>
             </div>
           </div>
           <button
             onClick={handleClose}
-            className="w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-all text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"
           >
             <X className="w-4 h-4" />
           </button>
@@ -393,11 +400,11 @@ export function ReleaseCreationWizard({
         </div>
 
         {/* Navigation Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
+        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
           <button
             onClick={handleBack}
             disabled={isFirstStep}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground bg-secondary hover:bg-accent rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
           >
             <ChevronLeft className="w-4 h-4" />
             Back
@@ -406,7 +413,7 @@ export function ReleaseCreationWizard({
           {!isLastStep ? (
             <button
               onClick={handleNext}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40"
             >
               Next
               <ChevronRight className="w-4 h-4" />
@@ -414,7 +421,7 @@ export function ReleaseCreationWizard({
           ) : (
             <button
               onClick={handleComplete}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 rounded-xl transition-all shadow-lg shadow-emerald-500/30 hover:shadow-xl hover:shadow-emerald-500/40"
             >
               <CheckCircle2 className="w-4 h-4" />
               Create Release
@@ -449,20 +456,20 @@ function WizardStepper({
   };
 
   return (
-    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+    <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30">
       <div className="flex items-center justify-between">
         {steps.map((step, index) => (
           <div key={step} className="flex items-center flex-1">
             {/* Step circle */}
             <div
               className={`
-                flex items-center justify-center w-8 h-8 rounded-full border-2 text-sm font-semibold transition-all
+                flex items-center justify-center w-9 h-9 rounded-xl text-sm font-bold transition-all shadow-md
                 ${
                   index < currentStepIndex
-                    ? 'border-green-500 bg-green-500 text-white'
+                    ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-emerald-500/30'
                     : index === currentStepIndex
-                    ? 'border-primary bg-primary text-white'
-                    : 'border-gray-300 dark:border-gray-700 bg-background text-muted-foreground'
+                    ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-500/30 scale-110'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 shadow-none'
                 }
               `}
             >
@@ -476,8 +483,8 @@ function WizardStepper({
             {/* Step label */}
             <div className="ml-2 flex-1 min-w-0">
               <div
-                className={`text-xs font-medium truncate ${
-                  index <= currentStepIndex ? 'text-foreground' : 'text-muted-foreground'
+                className={`text-xs font-semibold truncate ${
+                  index <= currentStepIndex ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400'
                 }`}
               >
                 {getStepLabel(step)}
@@ -487,8 +494,8 @@ function WizardStepper({
             {/* Connector line */}
             {index < steps.length - 1 && (
               <div
-                className={`h-0.5 flex-1 mx-2 transition-colors ${
-                  index < currentStepIndex ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-700'
+                className={`h-1 rounded-full flex-1 mx-2 transition-all ${
+                  index < currentStepIndex ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 shadow-sm' : 'bg-slate-200 dark:bg-slate-700'
                 }`}
               />
             )}
@@ -523,19 +530,19 @@ function DetailsStep({
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-2">Release Details</h3>
-        <p className="text-sm text-muted-foreground">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Release Details</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           Configure the basic information for your release.
         </p>
       </div>
 
       {errors && errors.length > 0 && (
-        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg">
+        <div className="p-3 bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800 rounded-xl shadow-sm">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5" />
             <div className="flex-1">
               {errors.map((error, i) => (
-                <p key={i} className="text-xs text-red-700 dark:text-red-400">
+                <p key={i} className="text-xs text-red-700 dark:text-red-300 font-medium">
                   {error}
                 </p>
               ))}
@@ -548,22 +555,22 @@ function DetailsStep({
         {/* Product Selection or Display */}
         {defaultProductId ? (
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
               Product
             </label>
-            <div className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-foreground">
+            <div className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-slate-900 dark:text-white font-medium shadow-sm">
               {selectedProduct?.name || 'Unknown Product'}
             </div>
           </div>
         ) : products.length > 1 ? (
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
+            <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
               Product <span className="text-red-500">*</span>
             </label>
             <select
               value={productId}
               onChange={(e) => onChange({ productId: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 font-medium shadow-sm transition-all"
             >
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
@@ -576,7 +583,7 @@ function DetailsStep({
 
         {/* Release Name */}
         <div>
-          <label className="block text-sm font-medium text-foreground mb-1.5">
+          <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
             Release Name <span className="text-red-500">*</span>
           </label>
           <input
@@ -584,7 +591,7 @@ function DetailsStep({
             value={name}
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="e.g., Q1 2026 Release"
-            className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 font-medium shadow-sm transition-all"
           />
         </div>
 
@@ -656,19 +663,19 @@ function SprintsStep({
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-2">Sprint Configuration</h3>
-        <p className="text-sm text-muted-foreground">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Sprint Configuration</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           Define sprint cadence for your release (optional).
         </p>
       </div>
 
       {errors && errors.length > 0 && (
-        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg">
+        <div className="p-3 bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800 rounded-xl shadow-sm">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5" />
             <div className="flex-1">
               {errors.map((error, i) => (
-                <p key={i} className="text-xs text-red-700 dark:text-red-400">
+                <p key={i} className="text-xs text-red-700 dark:text-red-300 font-medium">
                   {error}
                 </p>
               ))}
@@ -679,18 +686,18 @@ function SprintsStep({
 
       <div className="space-y-4">
         {/* Enable/Disable Sprints */}
-        <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+        <div className="flex items-center gap-3 p-4 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/30 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
           <input
             type="checkbox"
             checked={enabled}
             onChange={(e) => onChange({ enabled: e.target.checked, sprints: e.target.checked ? generatedSprints : [] })}
-            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+            className="w-4 h-4 text-blue-600 border-slate-300 dark:border-slate-600 rounded focus:ring-2 focus:ring-blue-400/50"
           />
           <div className="flex-1">
-            <label className="text-sm font-medium text-foreground">
+            <label className="text-sm font-semibold text-slate-900 dark:text-white">
               Enable Sprint Planning
             </label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-slate-600 dark:text-slate-400">
               Automatically divide release into fixed-length sprints
             </p>
           </div>
@@ -700,7 +707,7 @@ function SprintsStep({
           <>
             {/* Sprint Duration */}
             <div>
-              <label className="block text-sm font-medium text-foreground mb-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
                 Sprint Duration
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -708,10 +715,10 @@ function SprintsStep({
                   <button
                     key={days}
                     onClick={() => onChange({ duration: days })}
-                    className={`px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                    className={`px-3 py-2 text-sm font-semibold rounded-xl border transition-all shadow-sm ${
                       duration === days
-                        ? 'bg-primary text-white border-primary'
-                        : 'bg-background text-foreground border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white border-blue-600 shadow-lg shadow-blue-500/30'
+                        : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-blue-300 dark:hover:border-blue-700'
                     }`}
                   >
                     {days / 7} week{days > 7 ? 's' : ''}
@@ -722,8 +729,8 @@ function SprintsStep({
 
             {/* Sprint Preview */}
             {generatedSprints.length > 0 && (
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-lg">
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl shadow-sm">
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-200 mb-2">
                   <Zap className="w-4 h-4 inline mr-1" />
                   Planning Engine will auto-generate sprints
                 </p>
@@ -756,6 +763,9 @@ function UploadStep({
   const [parseErrors, setParseErrors] = useState<{ row: number; field: string; message: string }[]>([]);
   const [hasValidationErrors, setHasValidationErrors] = useState(false);
   const teamSize = 5; // Default team size - in production, get from team context
+  
+  // Load holidays for date calculations
+  const holidays = useMemo(() => loadHolidays() || mockHolidays, []);
 
   // Function to generate and download sample CSV
   const downloadSampleCSV = () => {
@@ -853,6 +863,10 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
       return;
     }
     
+    // Load team members for velocity calculations
+    const allTeamMembers = loadTeamMembers() || [];
+    const productTeam = allTeamMembers.filter(tm => tm.productId === state.releaseData.productId);
+    
     // Convert parsed tickets to Ticket format - timeline canvas engine will assign id, startDate, endDate
     // Use release start date as placeholder for dates (timeline canvas will overwrite with actual schedule)
     const placeholderStartDate = new Date(state.releaseData.startDate);
@@ -860,9 +874,12 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
     const tickets: Ticket[] = result.data.map((ticket) => {
       const effortDays = ticket.effortDays ?? ticket.storyPoints ?? 1;
       
-      // Calculate placeholder end date based on effort (startDate + effortDays in milliseconds)
+      // Calculate placeholder end date with velocity adjustment (working days, not calendar days)
+      const assignedDev = productTeam.find(m => m.name === ticket.assignedTo);
+      const velocity = assignedDev?.velocityMultiplier ?? 1;
+      const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
       const ticketStartDate = ticket.startDate || placeholderStartDate;
-      const ticketEndDate = ticket.endDate || new Date(ticketStartDate.getTime() + (effortDays * 24 * 60 * 60 * 1000));
+      const ticketEndDate = ticket.endDate || calculateEndDateFromEffort(ticketStartDate, adjustedDuration, holidays);
       
       return {
         id: ticket.id || '', // Empty - timeline canvas engine will assign
@@ -916,19 +933,19 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-2">Upload Tickets</h3>
-        <p className="text-sm text-muted-foreground">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Upload Tickets</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           Upload CSV file with ticket data for AI-powered scheduling.
         </p>
       </div>
 
       {errors && errors.length > 0 && (
-        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg">
+        <div className="p-3 bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800 rounded-xl shadow-sm">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5" />
             <div className="flex-1">
               {errors.map((error, i) => (
-                <p key={i} className="text-xs text-red-700 dark:text-red-400">
+                <p key={i} className="text-xs font-medium text-red-700 dark:text-red-400">
                   {error}
                 </p>
               ))}
@@ -938,15 +955,16 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
       )}
 
       {/* Capacity Overview (PROMINENT) */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 
-        border-2 border-blue-200 dark:border-blue-800 rounded-lg p-6">
-        <h4 className="text-base font-semibold mb-4 flex items-center gap-2 text-foreground">
-          <span className="text-2xl">📊</span>
+      <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/40 dark:to-indigo-950/40 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 shadow-sm">
+        <h4 className="text-base font-semibold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500/10 to-indigo-500/10 flex items-center justify-center shadow-inner">
+            <span className="text-xl">📊</span>
+          </div>
           Available Development Capacity
         </h4>
 
         {devWindowCapacity.warning ? (
-          <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/40 rounded-lg p-4">
+          <div className="bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-900/40 rounded-xl p-4 shadow-sm">
             <p className="text-sm text-red-700 dark:text-red-400 font-medium">
               ⚠️ {devWindowCapacity.warning}
             </p>
@@ -957,36 +975,36 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
         ) : (
           <>
             <div className="grid grid-cols-3 gap-4">
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800">
+              <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   {devWindowCapacity.totalDays}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">
+                <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
                   Dev Window Days
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800">
+              <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                   {teamSize}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">
+                <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
                   Team Members
                 </div>
               </div>
 
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-800">
-                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+              <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                   {devWindowCapacity.totalCapacity}
                 </div>
-                <div className="text-xs text-muted-foreground mt-1">
+                <div className="text-xs text-slate-600 dark:text-slate-400 mt-1 font-medium">
                   Total Person-Days
                 </div>
               </div>
             </div>
 
             {/* Dev Window breakdown */}
-            <div className="mt-4 text-xs text-muted-foreground bg-white dark:bg-gray-900 rounded-lg p-3 border border-gray-200 dark:border-gray-800">
+            <div className="mt-4 text-xs text-slate-600 dark:text-slate-400 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm">
               <p className="font-medium mb-2 text-foreground">Dev Window Phases:</p>
               <ul className="space-y-1">
                 {devWindowCapacity.devPhases.map(phase => {
@@ -1011,7 +1029,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
         <button
           type="button"
           onClick={downloadSampleCSV}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary border border-primary bg-primary/5 hover:bg-primary/10 rounded-lg transition-colors"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 border-0 rounded-xl transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40"
         >
           <Download className="w-4 h-4" />
           Download Sample CSV (29 tickets)
@@ -1019,7 +1037,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
       </div>
 
       {/* CSV Upload Area */}
-      <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center hover:border-primary transition-colors">
+      <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-2xl p-8 text-center hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50/30 dark:hover:bg-blue-950/10 transition-all">
         <input
           type="file"
           accept=".csv"
@@ -1033,14 +1051,14 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           className={`${devWindowCapacity.warning ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
         >
           <div className="text-4xl mb-3">📄</div>
-          <p className="text-sm font-medium text-foreground">Click to upload CSV file</p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-sm font-medium text-slate-900 dark:text-white">Click to upload CSV file</p>
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
             or drag and drop your tickets.csv file here
           </p>
-          <p className="text-xs text-muted-foreground mt-3 px-4">
+          <p className="text-xs text-slate-600 dark:text-slate-400 mt-3 px-4">
             Required: title, assignedTo, effortDays
           </p>
-          <p className="text-xs text-muted-foreground px-4">
+          <p className="text-xs text-slate-600 dark:text-slate-400 px-4">
             Optional: epic/feature, priority, description
           </p>
         </label>
@@ -1048,7 +1066,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
 
       {/* Validation Errors */}
       {validationErrors.length > 0 && (
-        <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg p-4">
+        <div className="bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-900/40 rounded-xl p-4 shadow-sm">
           <p className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2 flex items-center gap-2">
             <AlertCircle className="w-4 h-4" />
             Upload Errors - Please Fix Your CSV
@@ -1075,17 +1093,17 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
 
       {/* Preview Section - Show after successful parsing */}
       {parsedTickets.length > 0 && !hasValidationErrors && (
-        <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+        <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
           {/* Header */}
-          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
+          <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <span className="text-sm font-medium text-foreground">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+              <span className="text-sm font-medium text-slate-900 dark:text-white">
                 {parsedTickets.length} ticket{parsedTickets.length !== 1 ? 's' : ''} parsed successfully
               </span>
             </div>
             {fileName && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <span className="text-xs text-slate-600 dark:text-slate-400 flex items-center gap-1">
                 <FileText className="w-3 h-3" />
                 {fileName}
               </span>
@@ -1094,17 +1112,17 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
 
           {/* Feature Groupings */}
           {state.uploadData?.featureGroups && Object.keys(state.uploadData.featureGroups).length > 0 && (
-            <div className="px-4 py-3 bg-blue-50 dark:bg-blue-950/20 border-b border-gray-200 dark:border-gray-800">
-              <p className="text-xs font-medium text-foreground mb-2">Features to be created:</p>
+            <div className="px-4 py-3 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border-b border-slate-200 dark:border-slate-800">
+              <p className="text-xs font-medium text-slate-900 dark:text-white mb-2">Features to be created:</p>
               <div className="flex flex-wrap gap-2">
                 {Object.entries(state.uploadData.featureGroups).map(([name, count]) => (
                   <span
                     key={name}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-900/40"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/40 shadow-sm"
                   >
-                    <span className="text-green-500 text-[9px]">NEW</span>
+                    <span className="text-emerald-600 dark:text-emerald-500 text-[9px] font-bold">NEW</span>
                     {name}
-                    <span className="text-gray-400 font-normal">({count})</span>
+                    <span className="text-slate-500 dark:text-slate-400 font-normal">({count})</span>
                   </span>
                 ))}
               </div>
@@ -1114,37 +1132,37 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           {/* Preview Table */}
           <div className="max-h-[280px] overflow-y-auto">
             <table className="w-full text-xs">
-              <thead className="bg-gray-50 dark:bg-gray-800/50 sticky top-0">
+              <thead className="bg-slate-50 dark:bg-slate-800/50 sticky top-0">
                 <tr>
-                  <th className="text-left px-3 py-2 text-muted-foreground font-medium">Feature</th>
-                  <th className="text-left px-3 py-2 text-muted-foreground font-medium">Title</th>
-                  <th className="text-left px-3 py-2 text-muted-foreground font-medium">Effort</th>
-                  <th className="text-left px-3 py-2 text-muted-foreground font-medium">Assignee</th>
-                  <th className="text-left px-3 py-2 text-muted-foreground font-medium">Status</th>
+                  <th className="text-left px-3 py-2 text-slate-600 dark:text-slate-400 font-semibold">Feature</th>
+                  <th className="text-left px-3 py-2 text-slate-600 dark:text-slate-400 font-semibold">Title</th>
+                  <th className="text-left px-3 py-2 text-slate-600 dark:text-slate-400 font-semibold">Effort</th>
+                  <th className="text-left px-3 py-2 text-slate-600 dark:text-slate-400 font-semibold">Assignee</th>
+                  <th className="text-left px-3 py-2 text-slate-600 dark:text-slate-400 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {parsedTickets.map((ticket, i) => (
-                  <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
-                    <td className="px-3 py-2 text-muted-foreground max-w-[110px] truncate">
+                  <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                    <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[110px] truncate">
                       {ticket.feature || 'Imported Tickets'}
                     </td>
-                    <td className="px-3 py-2 text-foreground font-medium max-w-[200px] truncate">
+                    <td className="px-3 py-2 text-slate-900 dark:text-white font-medium max-w-[200px] truncate">
                       {ticket.title}
                     </td>
-                    <td className="px-3 py-2 text-foreground">
+                    <td className="px-3 py-2 text-slate-900 dark:text-white">
                       <span className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400 inline-flex items-center justify-center text-[10px] font-medium">
                         {ticket.effortDays ?? ticket.storyPoints ?? 1}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground max-w-[100px] truncate">
+                    <td className="px-3 py-2 text-slate-600 dark:text-slate-400 max-w-[100px] truncate">
                       {ticket.assignedTo || 'Unassigned'}
                     </td>
                     <td className="px-3 py-2">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                        ticket.status === 'completed' ? 'bg-green-100 dark:bg-green-950 text-green-700 dark:text-green-400' :
+                        ticket.status === 'completed' ? 'bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400' :
                         ticket.status === 'in-progress' ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400' :
-                        'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                        'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                       }`}>
                         {ticket.status}
                       </span>
@@ -1157,7 +1175,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
 
           {/* Warnings if any */}
           {parseErrors.length > 0 && (
-            <div className="px-4 py-2 bg-amber-50 dark:bg-amber-950/20 border-t border-amber-200 dark:border-amber-900/40">
+            <div className="px-4 py-2 bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 border-t border-amber-200 dark:border-amber-900/40">
               <details className="group">
                 <summary className="text-[11px] text-amber-700 dark:text-amber-400 cursor-pointer hover:text-amber-900 dark:hover:text-amber-300">
                   {parseErrors.length} warning{parseErrors.length !== 1 ? 's' : ''} (non-critical)
@@ -1177,10 +1195,10 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
 
       {/* Upload Summary (shown after successful upload without validation errors) */}
       {uploadedTickets.length > 0 && !hasValidationErrors && devWindowCapacity.totalCapacity > 0 && (
-        <div className={`border-2 rounded-lg p-5 ${
+        <div className={`border-2 rounded-xl p-5 shadow-sm ${
           isOverCapacity 
-            ? 'bg-red-50 dark:bg-red-950/20 border-red-300 dark:border-red-900/40' 
-            : 'bg-green-50 dark:bg-green-950/20 border-green-300 dark:border-green-800'
+            ? 'bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border-red-300 dark:border-red-900/40' 
+            : 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border-emerald-300 dark:border-emerald-800'
         }`}>
           <h4 className="text-sm font-semibold mb-4 flex items-center gap-2">
             {isOverCapacity ? (
@@ -1197,22 +1215,22 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           </h4>
 
           <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-            <div className="bg-white dark:bg-gray-900 rounded p-3 border border-gray-200 dark:border-gray-800">
-              <span className="text-muted-foreground">Tickets Uploaded:</span>
-              <span className="font-semibold ml-2 text-foreground">{uploadedTickets.length}</span>
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-slate-600 dark:text-slate-400">Tickets Uploaded:</span>
+              <span className="font-semibold ml-2 text-slate-900 dark:text-white">{uploadedTickets.length}</span>
             </div>
-            <div className="bg-white dark:bg-gray-900 rounded p-3 border border-gray-200 dark:border-gray-800">
-              <span className="text-muted-foreground">Total Effort:</span>
-              <span className="font-semibold ml-2 text-foreground">{totalTicketEffort} days</span>
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-slate-600 dark:text-slate-400">Total Effort:</span>
+              <span className="font-semibold ml-2 text-slate-900 dark:text-white">{totalTicketEffort} days</span>
             </div>
-            <div className="bg-white dark:bg-gray-900 rounded p-3 border border-gray-200 dark:border-gray-800">
-              <span className="text-muted-foreground">Available Capacity:</span>
-              <span className="font-semibold ml-2 text-foreground">{devWindowCapacity.totalCapacity} days</span>
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-slate-600 dark:text-slate-400">Available Capacity:</span>
+              <span className="font-semibold ml-2 text-slate-900 dark:text-white">{devWindowCapacity.totalCapacity} days</span>
             </div>
-            <div className="bg-white dark:bg-gray-900 rounded p-3 border border-gray-200 dark:border-gray-800">
-              <span className="text-muted-foreground">Utilization:</span>
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="text-slate-600 dark:text-slate-400">Utilization:</span>
               <span className={`font-semibold ml-2 ${
-                isOverCapacity ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                isOverCapacity ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'
               }`}>
                 {capacityUtilization.toFixed(0)}%
               </span>
@@ -1220,7 +1238,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           </div>
 
           {/* Uploaded Tickets Table */}
-          <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 mb-4">
+          <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 mb-4 shadow-sm">
             <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between">
               <h5 className="text-sm font-semibold text-foreground">Uploaded Tickets</h5>
               {uploadedTickets.length > 10 && (
@@ -1301,8 +1319,8 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           </div>
 
           {isOverCapacity && (
-            <div className="bg-red-100 dark:bg-red-950/30 border border-red-300 dark:border-red-900/40 rounded-lg p-3">
-              <p className="text-xs text-red-800 dark:text-red-300">
+            <div className="bg-red-100 dark:bg-red-950/30 border border-red-300 dark:border-red-900/40 rounded-xl p-3 shadow-sm">
+              <p className="text-xs text-red-800 dark:text-red-300 font-medium">
                 <strong>⚠️ Warning:</strong> Ticket effort exceeds Dev Window capacity by{' '}
                 <strong>{(totalTicketEffort - devWindowCapacity.totalCapacity).toFixed(1)} days</strong>. 
                 Some tickets may be scheduled outside the Dev Window or remain unscheduled. 
@@ -1312,7 +1330,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           )}
 
           {!isOverCapacity && capacityUtilization > 80 && (
-            <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 dark:border-yellow-900/40 rounded-lg p-3">
+            <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-300 dark:border-yellow-900/40 rounded-xl p-3 shadow-sm">
               <p className="text-xs text-yellow-800 dark:text-yellow-300">
                 <strong>ℹ️ Note:</strong> Capacity utilization is at {capacityUtilization.toFixed(0)}%. 
                 This is a healthy level, but leaves limited buffer for unknowns or scope changes.
@@ -1581,15 +1599,15 @@ function PhasesStep({
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-2">Phase Setup</h3>
-        <p className="text-sm text-muted-foreground">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Phase Setup</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           Configure release phases for better timeline management.
         </p>
       </div>
 
       {/* Smart Release Helper Text */}
       {state.flow === 'smart' && (
-        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 shadow-sm">
           <p className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
             <span className="text-sm">💡</span>
             <span>
@@ -1603,12 +1621,12 @@ function PhasesStep({
       )}
 
       {errors && errors.length > 0 && (
-        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg">
+        <div className="p-3 bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800 rounded-xl shadow-sm">
           <div className="flex items-start gap-2">
             <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5" />
             <div className="flex-1">
               {errors.map((error, i) => (
-                <p key={i} className="text-xs text-red-700 dark:text-red-400">
+                <p key={i} className="text-xs font-medium text-red-700 dark:text-red-400">
                   {error}
                 </p>
               ))}
@@ -1622,38 +1640,38 @@ function PhasesStep({
         <div className="grid grid-cols-3 gap-3">
           <button
             onClick={() => onChange({ approach: 'template' })}
-            className={`p-4 rounded-lg border-2 transition-colors ${
+            className={`p-4 rounded-xl border-2 transition-all shadow-sm hover:shadow-md ${
               approach === 'template'
-                ? 'border-primary bg-primary/5'
-                : 'border-gray-200 dark:border-gray-800 hover:border-primary/50'
+                ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20'
+                : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 bg-white/50 dark:bg-slate-900/50'
             }`}
           >
-            <div className="text-sm font-medium text-foreground mb-1">Use Template</div>
-            <div className="text-xs text-muted-foreground">Choose from predefined phase structures</div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Use Template</div>
+            <div className="text-xs text-slate-600 dark:text-slate-400">Choose from predefined phase structures</div>
           </button>
 
           <button
             onClick={() => onChange({ approach: 'custom', phases: [] })}
-            className={`p-4 rounded-lg border-2 transition-colors ${
+            className={`p-4 rounded-xl border-2 transition-all shadow-sm hover:shadow-md ${
               approach === 'custom'
-                ? 'border-primary bg-primary/5'
-                : 'border-gray-200 dark:border-gray-800 hover:border-primary/50'
+                ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20'
+                : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 bg-white/50 dark:bg-slate-900/50'
             }`}
           >
-            <div className="text-sm font-medium text-foreground mb-1">Custom</div>
-            <div className="text-xs text-muted-foreground">Build your own phase structure</div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Custom</div>
+            <div className="text-xs text-slate-600 dark:text-slate-400">Build your own phase structure</div>
           </button>
 
           <button
             onClick={() => onChange({ approach: 'skip', phases: [] })}
-            className={`p-4 rounded-lg border-2 transition-colors ${
+            className={`p-4 rounded-xl border-2 transition-all shadow-sm hover:shadow-md ${
               approach === 'skip'
-                ? 'border-primary bg-primary/5'
-                : 'border-gray-200 dark:border-gray-800 hover:border-primary/50'
+                ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20'
+                : 'border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 bg-white/50 dark:bg-slate-900/50'
             }`}
           >
-            <div className="text-sm font-medium text-foreground mb-1">Skip</div>
-            <div className="text-xs text-muted-foreground">Continue without phases</div>
+            <div className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Skip</div>
+            <div className="text-xs text-slate-600 dark:text-slate-400">Continue without phases</div>
           </button>
         </div>
       )}
@@ -1661,16 +1679,16 @@ function PhasesStep({
       {/* Template Selection */}
       {approach === 'template' && !templateId && phases.length === 0 && (
         <div className="space-y-3">
-          <label className="text-sm font-medium text-foreground">Select Template</label>
+          <label className="text-sm font-medium text-slate-900 dark:text-white">Select Template</label>
           <div className="grid grid-cols-2 gap-3">
             {PHASE_TEMPLATES.map((template) => (
               <button
                 key={template.id}
                 onClick={() => handleTemplateSelect(template.id)}
-                className="text-left p-4 rounded-lg border border-gray-200 dark:border-gray-800 hover:border-primary transition-colors"
+                className="text-left p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-600 transition-all bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm hover:shadow-md shadow-sm"
               >
-                <div className="text-sm font-medium text-foreground mb-1">{template.name}</div>
-                <div className="text-xs text-muted-foreground">{template.description}</div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-white mb-1">{template.name}</div>
+                <div className="text-xs text-slate-600 dark:text-slate-400">{template.description}</div>
               </button>
             ))}
           </div>
@@ -1681,32 +1699,32 @@ function PhasesStep({
       {phases.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-medium text-foreground">
+            <label className="text-sm font-medium text-slate-900 dark:text-white">
               Review Phases ({phases.length})
             </label>
             {templateId && (
               <button
                 onClick={() => onChange({ templateId: null, approach: 'template', phases: [] })}
-                className="text-xs text-primary hover:text-primary/80"
+                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
               >
                 Change Template
               </button>
             )}
           </div>
 
-          <div className="overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-lg">
+          <div className="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+              <thead className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
                 <tr>
-                  <th className="text-left py-3 px-3 font-semibold">Phase Name</th>
-                  <th className="text-left py-3 px-2 font-semibold">Type</th>
-                  <th className="text-left py-3 px-2 font-semibold">Start Date</th>
-                  <th className="text-left py-3 px-2 font-semibold">End Date</th>
-                  <th className="text-left py-3 px-2 font-semibold">Duration</th>
-                  <th className="text-left py-3 px-2 font-semibold">Actions</th>
+                  <th className="text-left py-3 px-3 font-semibold text-slate-900 dark:text-white">Phase Name</th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-900 dark:text-white">Type</th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-900 dark:text-white">Start Date</th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-900 dark:text-white">End Date</th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-900 dark:text-white">Duration</th>
+                  <th className="text-left py-3 px-2 font-semibold text-slate-900 dark:text-white">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {phases.map((phase, index) => (
                   <tr key={phase.id}>
                     <td className="py-3 px-3 font-medium">{phase.name}</td>
@@ -1729,7 +1747,7 @@ function PhasesStep({
                     <td className="py-3 px-2">
                       <input
                         type="date"
-                        value={phase.endDate.toISOString().split('T')[0]}
+                        value={toLocalDateString(phase.endDate)}
                         onChange={(e) => handlePhaseEndDateChange(index, new Date(e.target.value))}
                         className="px-2 py-1 border border-gray-200 dark:border-gray-800 rounded text-xs bg-transparent"
                       />
@@ -1765,34 +1783,34 @@ function PhasesStep({
 
       {/* Add Custom Phase Section */}
       {(approach === 'custom' || approach === 'template') && (
-        <div className="border-t border-gray-200 dark:border-gray-800 pt-4">
+        <div className="border-t border-slate-200 dark:border-slate-800 pt-4">
           {!showAddPhase ? (
             <button
               onClick={() => setShowAddPhase(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors text-sm font-medium text-muted-foreground hover:text-primary"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl hover:border-blue-400 dark:hover:border-blue-600 hover:bg-blue-50/30 dark:hover:bg-blue-950/10 transition-all text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 shadow-sm"
             >
               <Plus className="w-4 h-4" />
               Add Custom Phase
             </button>
           ) : (
-            <div className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 bg-gray-50 dark:bg-gray-900 space-y-4">
+            <div className="border border-slate-200 dark:border-slate-800 rounded-xl p-4 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-sm space-y-4 shadow-sm">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-foreground">Add New Phase</h4>
+                <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Add New Phase</h4>
                 <button
                   onClick={() => {
                     setShowAddPhase(false);
                     setValidationErrors([]);
                     setNewPhase({ name: '', type: 'Custom', allowsWork: false, duration: undefined });
                   }}
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded transition-colors"
+                  className="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition-colors"
                 >
-                  <X className="w-4 h-4 text-muted-foreground" />
+                  <X className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                 </button>
               </div>
 
               {/* Phase Name */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">
                   Phase Name *
                 </label>
                 <input
@@ -1800,13 +1818,13 @@ function PhasesStep({
                   value={newPhase.name}
                   onChange={(e) => setNewPhase(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="e.g., Code Freeze, QA Testing"
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-sm bg-white dark:bg-gray-950 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 shadow-sm"
                 />
               </div>
 
               {/* Phase Type */}
               <div>
-                <label className="text-xs font-medium text-muted-foreground block mb-1">
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400 block mb-1">
                   Phase Type *
                 </label>
                 <select
@@ -1819,7 +1837,7 @@ function PhasesStep({
                       allowsWork: value === 'DevWindow', // Auto-set for dev phases
                     }));
                   }}
-                  className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-sm bg-white dark:bg-gray-950 text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-400/50 shadow-sm"
                 >
                   <option value="DevWindow">Dev Window</option>
                   <option value="Testing">Testing</option>
@@ -1894,7 +1912,7 @@ function PhasesStep({
 
               {/* Validation Errors */}
               {validationErrors.length > 0 && (
-                <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg p-3">
+                <div className="bg-gradient-to-br from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-900/40 rounded-xl p-3 shadow-sm">
                   <p className="text-xs font-semibold text-red-700 dark:text-red-400 mb-2 flex items-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
                     Cannot add phase:
@@ -1909,7 +1927,7 @@ function PhasesStep({
 
               {/* Preview Impact */}
               {newPhase.name && newPhase.duration && validationErrors.length === 0 && (
-                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/40 rounded-lg p-3">
+                <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border border-blue-200 dark:border-blue-900/40 rounded-xl p-3 shadow-sm">
                   <p className="text-xs text-blue-700 dark:text-blue-300">
                     <strong>Impact:</strong> Adding "{newPhase.name}" ({newPhase.duration} days) will{' '}
                     {calculateShiftImpact(phases, insertPosition, newPhase.duration)}
@@ -1974,28 +1992,28 @@ function ReviewStep({
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h3 className="text-lg font-semibold text-foreground mb-2">Review & Create</h3>
-        <p className="text-sm text-muted-foreground">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Review & Create</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
           Review your release configuration before creating.
         </p>
       </div>
 
       <div className="space-y-4">
         {/* Release Details */}
-        <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-          <h4 className="text-sm font-semibold text-foreground mb-3">Release Details</h4>
+        <div className="p-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Release Details</h4>
           <dl className="space-y-2">
             <div className="flex justify-between text-sm">
-              <dt className="text-muted-foreground">Product:</dt>
-              <dd className="font-medium text-foreground">{product?.name}</dd>
+              <dt className="text-slate-600 dark:text-slate-400">Product:</dt>
+              <dd className="font-medium text-slate-900 dark:text-white">{product?.name}</dd>
             </div>
             <div className="flex justify-between text-sm">
-              <dt className="text-muted-foreground">Release Name:</dt>
-              <dd className="font-medium text-foreground">{name}</dd>
+              <dt className="text-slate-600 dark:text-slate-400">Release Name:</dt>
+              <dd className="font-medium text-slate-900 dark:text-white">{name}</dd>
             </div>
             <div className="flex justify-between text-sm">
-              <dt className="text-muted-foreground">Date Range:</dt>
-              <dd className="font-medium text-foreground">
+              <dt className="text-slate-600 dark:text-slate-400">Date Range:</dt>
+              <dd className="font-medium text-slate-900 dark:text-white">
                 {new Date(startDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} - {new Date(endDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
               </dd>
             </div>
@@ -2004,39 +2022,39 @@ function ReviewStep({
 
         {/* Sprints */}
         {sprintsEnabled && sprints.length > 0 && (
-          <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-            <h4 className="text-sm font-semibold text-foreground mb-3">
+          <div className="p-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
               Sprints ({sprints.length})
             </h4>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-xs text-slate-600 dark:text-slate-400">
               {sprints.length} sprint{sprints.length !== 1 ? 's' : ''} configured
             </div>
           </div>
         )}
 
         {/* Phases */}
-        <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
-          <h4 className="text-sm font-semibold text-foreground mb-3">
+        <div className="p-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
             Phases ({phases.length})
           </h4>
           {phases.length > 0 ? (
             <div className="space-y-2">
               {phases.map((phase) => (
                 <div key={phase.id} className="flex justify-between text-xs">
-                  <span className="text-foreground font-medium">{phase.name}</span>
-                  <span className="text-muted-foreground">
+                  <span className="text-slate-900 dark:text-white font-medium">{phase.name}</span>
+                  <span className="text-slate-600 dark:text-slate-400">
                     {phase.startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} - {phase.endDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-xs text-muted-foreground">No phases configured</div>
+            <div className="text-xs text-slate-600 dark:text-slate-400">No phases configured</div>
           )}
         </div>
 
         {/* Success Message */}
-        <div className="p-4 bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/40 rounded-lg">
+        <div className="p-4 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border border-emerald-200 dark:border-emerald-900/40 rounded-xl shadow-sm">
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5" />
             <div>

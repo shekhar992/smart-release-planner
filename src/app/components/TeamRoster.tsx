@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Plus, User, ArrowLeft, Calendar } from 'lucide-react';
+import { Plus, User, ArrowLeft, Calendar, X, Users } from 'lucide-react';
+import { cn } from './ui/utils';
 import { useNavigate, useParams } from 'react-router';
 import { mockTeamMembers, TeamMember, mockProducts } from '../data/mockData';
 import { loadTeamMembers, loadProducts, saveTeamMembers } from '../lib/localStorage';
@@ -60,34 +61,39 @@ export function TeamRoster() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 px-6 py-5 shadow-sm">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
               onClick={() => navigate(releaseId ? `/release/${releaseId}` : '/')}
-              className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+              className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors duration-200"
               title="Back"
             >
-              <ArrowLeft className="w-4 h-4 text-gray-600" />
+              <ArrowLeft className="w-4 h-4 text-slate-600 dark:text-slate-400" />
             </button>
-            <div>
-              <h1 className="text-lg font-medium text-gray-900">Team Roster</h1>
-              <p className="text-sm text-gray-500">
-                {productName ? (
-                  <>{productName} &middot; {teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''}</>
-                ) : (
-                  <>{teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''}</>
-                )}
-              </p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h1 className="text-base font-semibold text-slate-900 dark:text-white">Team Roster</h1>
+                <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
+                  {productName ? (
+                    <>{productName} &middot; {teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''}</>
+                  ) : (
+                    <>{teamMembers.length} team member{teamMembers.length !== 1 ? 's' : ''}</>
+                  )}
+                </p>
+              </div>
             </div>
           </div>
           {resolvedProductId && (
             <div className="flex items-center gap-2">
               <button
                 onClick={() => navigate(`/product/${resolvedProductId}/team/pto`)}
-                className="flex items-center gap-2 px-4 py-2 bg-white text-gray-700 text-sm font-medium border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-200"
                 title="Manage PTO Calendar"
               >
                 <Calendar className="w-4 h-4" />
@@ -95,7 +101,7 @@ export function TeamRoster() {
               </button>
               <button
                 onClick={() => setShowAddForm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors shadow-sm hover:shadow-md"
+                className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/30"
               >
                 <Plus className="w-4 h-4" />
                 Add Team Member
@@ -119,28 +125,31 @@ export function TeamRoster() {
                     : `/team/${member.id}`;
                   navigate(basePath);
                 }}
-                className="bg-white border border-gray-200 rounded-lg p-5 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
+                className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl p-5 hover:border-blue-300 dark:hover:border-blue-600 hover:shadow-xl transition-all duration-200 cursor-pointer"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                    <User className="w-5 h-5 text-gray-600" />
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <User className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-gray-900">{member.name}</h3>
-                    <p className="text-sm text-gray-500 mt-0.5">{member.role}</p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{member.name}</h3>
+                    <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">{member.role}</p>
+                    <div className="flex items-center gap-2 mt-2.5 flex-wrap">
                       {member.experienceLevel && (
-                        <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${getExperienceLevelColor(member.experienceLevel)}`}>
+                        <span className={cn(
+                          "inline-block px-2.5 py-1 text-xs font-semibold rounded-lg",
+                          getExperienceLevelColor(member.experienceLevel)
+                        )}>
                           {member.experienceLevel}
                         </span>
                       )}
                       {member.velocityMultiplier !== undefined && (
-                        <span className="text-xs text-gray-600">
+                        <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                           • {member.velocityMultiplier.toFixed(1)}x velocity
                         </span>
                       )}
                       {member.pto.length > 0 && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-slate-500 dark:text-slate-400">
                           • {member.pto.length} PTO {member.pto.length === 1 ? 'entry' : 'entries'}
                         </span>
                       )}
@@ -153,10 +162,12 @@ export function TeamRoster() {
 
           {/* Empty State */}
           {teamMembers.length === 0 && (
-            <div className="text-center py-12">
-              <User className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-sm font-medium text-gray-900 mb-1">No team members yet</h3>
-              <p className="text-sm text-gray-500 mb-4">
+            <div className="text-center py-16">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center shadow-lg mb-4">
+                <User className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+              </div>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-2">No team members yet</h3>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-5">
                 {resolvedProductId 
                   ? 'Add your first team member to get started.'
                   : 'Select a product to manage its team roster.'}
@@ -164,7 +175,7 @@ export function TeamRoster() {
               {resolvedProductId && (
                 <button
                   onClick={() => setShowAddForm(true)}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/30"
                 >
                   <Plus className="w-4 h-4" />
                   Add Team Member
@@ -225,24 +236,51 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
 
   return (
     <>
+      <style>{`
+        .modal-appear {
+          animation: modalAppear 0.2s ease-out;
+        }
+        @keyframes modalAppear {
+          from {
+            opacity: 0;
+            transform: translate(-50%, -48%) scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+          }
+        }
+      `}</style>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/20 z-40"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] bg-white rounded-lg shadow-2xl z-50 border border-gray-200">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl z-50 border border-slate-200 dark:border-slate-700 modal-appear">
         <form onSubmit={handleSubmit}>
           {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-200">
-            <h3 className="text-sm font-medium text-gray-900">Add Team Member</h3>
+          <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-br from-blue-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50 flex items-center justify-between rounded-t-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                <Plus className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">Add Team Member</h3>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors duration-200"
+            >
+              <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            </button>
           </div>
 
           {/* Content */}
-          <div className="px-5 py-4 space-y-4">
+          <div className="px-6 py-5 space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
                 Name
               </label>
               <input
@@ -251,18 +289,18 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Sarah Chen"
                 autoFocus
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
                 Role
               </label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as 'Developer' | 'Designer' | 'QA')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
               >
                 <option value="Developer">Developer</option>
                 <option value="Designer">Designer</option>
@@ -271,20 +309,20 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
                 Experience Level
               </label>
               <select
                 value={experienceLevel}
                 onChange={(e) => setExperienceLevel(e.target.value as 'Junior' | 'Mid' | 'Senior')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
               >
                 <option value="Junior">Junior</option>
                 <option value="Mid">Mid</option>
                 <option value="Senior">Senior</option>
               </select>
-              <p className="mt-1.5 text-xs text-gray-500">
-                Velocity: <span className="font-medium text-gray-700">{velocityMultiplier.toFixed(1)}x</span>
+              <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
+                Velocity: <span className="font-semibold text-slate-900 dark:text-white">{velocityMultiplier.toFixed(1)}x</span>
                 {experienceLevel === 'Junior' && ' (slower pace)'}
                 {experienceLevel === 'Mid' && ' (standard pace)'}
                 {experienceLevel === 'Senior' && ' (faster pace)'}
@@ -293,18 +331,18 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-5 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50 border-t border-slate-200 dark:border-slate-700 rounded-b-2xl">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!name.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+              className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
               Add Team Member
             </button>

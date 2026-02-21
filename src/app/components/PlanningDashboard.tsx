@@ -10,6 +10,8 @@ import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTea
 import { ModeSwitch } from './ModeSwitch';
 import { buildReleasePlan } from '../../domain/planningEngine';
 import type { TicketInput, ReleaseConfig } from '../../domain/types';
+import { calculateEndDateFromEffort } from '../lib/dateUtils';
+import { cn } from './ui/utils';
 
 interface PlanningDashboardProps {
   openCreateProduct?: () => void;
@@ -38,7 +40,6 @@ export function PlanningDashboard({
   
   // Initialize and load products from localStorage
   useEffect(() => {
-    // Initialize storage with mock data if empty
     initializeStorage(mockProducts, mockHolidays, mockTeamMembers);
     
     // Load products from localStorage
@@ -146,10 +147,15 @@ export function PlanningDashboard({
               );
               
               if (originalTicket) {
-                // Calculate end date from sprint's startDate + effort
+                // Calculate end date with velocity adjustment
                 const effortDays = originalTicket.effortDays || 1;
-                const ticketEndDate = new Date(
-                  domainSprint.startDate.getTime() + (effortDays * 24 * 60 * 60 * 1000)
+                const assignedDev = productTeam.find(m => m.name === originalTicket.assignedTo);
+                const velocity = assignedDev?.velocityMultiplier ?? 1;
+                const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
+                const ticketEndDate = calculateEndDateFromEffort(
+                  domainSprint.startDate,
+                  adjustedDuration,
+                  holidays
                 );
                 
                 updatedTickets.push({
@@ -170,8 +176,13 @@ export function PlanningDashboard({
             
             if (originalTicket) {
               const effortDays = originalTicket.effortDays || 1;
-              const ticketEndDate = new Date(
-                data.endDate.getTime() + (effortDays * 24 * 60 * 60 * 1000)
+              const assignedDev = productTeam.find(m => m.name === originalTicket.assignedTo);
+              const velocity = assignedDev?.velocityMultiplier ?? 1;
+              const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
+              const ticketEndDate = calculateEndDateFromEffort(
+                data.endDate,
+                adjustedDuration,
+                holidays
               );
               
               updatedTickets.push({
@@ -190,14 +201,18 @@ export function PlanningDashboard({
           let currentDate = new Date(data.startDate);
           ticketsWithSequentialDates = data.tickets.map(ticket => {
             const effortDays = ticket.effortDays || 1;
-            const endDate = new Date(currentDate.getTime() + (effortDays * 24 * 60 * 60 * 1000));
+            const assignedDev = productTeam.find(m => m.name === ticket.assignedTo);
+            const velocity = assignedDev?.velocityMultiplier ?? 1;
+            const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
+            const endDate = calculateEndDateFromEffort(currentDate, adjustedDuration, holidays);
             const updatedTicket = {
               ...ticket,
               id: ticket.id || nanoid(),
               startDate: new Date(currentDate),
               endDate: endDate,
             };
-            currentDate = endDate;
+            // Next ticket starts after this one ends (add 1 day)
+            currentDate = new Date(endDate.getTime() + (24 * 60 * 60 * 1000));
             return updatedTicket;
           });
         }
@@ -206,14 +221,18 @@ export function PlanningDashboard({
         let currentDate = new Date(data.startDate);
         ticketsWithSequentialDates = data.tickets.map(ticket => {
           const effortDays = ticket.effortDays || 1;
-          const endDate = new Date(currentDate.getTime() + (effortDays * 24 * 60 * 60 * 1000));
+          const assignedDev = productTeam.find(m => m.name === ticket.assignedTo);
+          const velocity = assignedDev?.velocityMultiplier ?? 1;
+          const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
+          const endDate = calculateEndDateFromEffort(currentDate, adjustedDuration, holidays);
           const updatedTicket = {
             ...ticket,
             id: ticket.id || nanoid(),
             startDate: new Date(currentDate),
             endDate: endDate,
           };
-          currentDate = endDate;
+          // Next ticket starts after this one ends (add 1 day)
+          currentDate = new Date(endDate.getTime() + (24 * 60 * 60 * 1000));
           return updatedTicket;
         });
       }
@@ -328,35 +347,35 @@ export function PlanningDashboard({
     <PageShell>
       {/* ── Greeting ── */}
       <div className="mb-8 animate-fade-in">
-        <h1 className="text-2xl font-semibold text-foreground tracking-tight">
+        <h1 className="text-2xl font-semibold text-slate-900 dark:text-white tracking-tight">
           Release Planning
         </h1>
         {hasProducts ? (
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             {products.length} product{products.length !== 1 ? 's' : ''}
-            <span className="mx-1.5 text-border">·</span>
+            <span className="mx-1.5 text-slate-300 dark:text-slate-700">·</span>
             {allReleases.length} release{allReleases.length !== 1 ? 's' : ''}
-            <span className="mx-1.5 text-border">·</span>
+            <span className="mx-1.5 text-slate-300 dark:text-slate-700">·</span>
             {totalTickets} ticket{totalTickets !== 1 ? 's' : ''}
           </p>
         ) : (
-          <p className="text-sm text-muted-foreground mt-1">Create your first product to get started</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Create your first product to get started</p>
         )}
       </div>
 
       {/* ── Empty state ── */}
       {!hasProducts && (
         <div className="flex flex-col items-center justify-center py-32 animate-fade-in">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 flex items-center justify-center border border-primary/10 mb-6">
-            <Layers className="w-10 h-10 text-primary" />
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500/10 to-blue-600/5 flex items-center justify-center border border-blue-500/10 mb-6 shadow-lg shadow-blue-500/5">
+            <Layers className="w-10 h-10 text-blue-600 dark:text-blue-500" />
           </div>
-          <h2 className="text-xl font-semibold text-foreground mb-2 tracking-tight">No products yet</h2>
-          <p className="text-sm text-muted-foreground mb-8 max-w-sm text-center leading-relaxed">
+          <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2 tracking-tight">No products yet</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 max-w-sm text-center leading-relaxed">
             Products group your releases and teams together. Create one to start planning your roadmap.
           </p>
           <button
             onClick={effectiveOpenCreateProduct}
-            className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:bg-primary-hover transition-all shadow-sm hover:shadow-md"
+            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-xl"
           >
             <FolderPlus className="w-4 h-4" />
             Create Your First Product
@@ -391,25 +410,25 @@ export function PlanningDashboard({
             {/* Ghost card */}
             <button
               onClick={effectiveOpenCreateProduct}
-              className="group flex flex-col items-center justify-center gap-3 min-h-[260px] rounded-xl border-2 border-dashed border-border hover:border-primary/40 bg-card/50 hover:bg-primary/[0.02] transition-all duration-200 cursor-pointer"
+              className="group flex flex-col items-center justify-center gap-3 min-h-[260px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-200 cursor-pointer"
             >
-              <div className="w-11 h-11 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-                <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+              <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-blue-100 dark:group-hover:from-blue-950/30 dark:group-hover:to-blue-900/20 flex items-center justify-center transition-all duration-200 shadow-sm">
+                <Plus className="w-5 h-5 text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-500 transition-colors" />
               </div>
-              <span className="text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors">
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-500 transition-colors">
                 New Product
               </span>
             </button>
           </div>
 
           {/* ── Quick actions bar ── */}
-          <div className="flex items-center gap-3 pt-6 border-t border-border">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-2">Quick&nbsp;Actions</span>
+          <div className="flex items-center gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
+            <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mr-2">Quick&nbsp;Actions</span>
             <Link
               to="/holidays"
-              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-foreground bg-card border border-border rounded-lg hover:bg-accent hover:border-primary/20 transition-all"
+              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-slate-900 dark:text-white bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200"
             >
-              <Calendar className="w-3.5 h-3.5 text-muted-foreground" />
+              <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
               Holidays
             </Link>
           </div>
@@ -501,11 +520,11 @@ function ProductCard({
   };
 
   return (
-    <div className="group flex flex-col bg-card rounded-xl border border-border hover:border-primary/25 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
+    <div className="group flex flex-col bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden">
       {/* Card header */}
       <div className="flex items-center gap-3 px-5 pt-5 pb-3">
-        <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 flex items-center justify-center shrink-0">
-          <Package className="w-4 h-4 text-primary" />
+        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
+          <Package className="w-4 h-4 text-white" />
         </div>
         <div className="min-w-0 flex-1">
           {renaming ? (
@@ -518,20 +537,20 @@ function ProductCard({
                 if (e.key === 'Enter') commitRename();
                 if (e.key === 'Escape') { setDraftName(product.name); setRenaming(false); }
               }}
-              className="text-sm font-semibold text-foreground bg-transparent border-b border-primary outline-none w-full"
+              className="text-sm font-semibold text-slate-900 dark:text-white bg-transparent border-b border-blue-500 outline-none w-full"
             />
           ) : (
-            <h3 className="text-sm font-semibold text-foreground truncate">{product.name}</h3>
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white truncate">{product.name}</h3>
           )}
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             {product.releases.length} release{product.releases.length !== 1 ? 's' : ''}
-            <span className="mx-1 text-border">·</span>
+            <span className="mx-1 text-slate-300 dark:text-slate-700">·</span>
             <span className="inline-flex items-center gap-0.5">
               <Users className="w-3 h-3" /> {teamCount}
             </span>
             {ticketCount > 0 && (
               <>
-                <span className="mx-1 text-border">·</span>
+                <span className="mx-1 text-slate-300 dark:text-slate-700">·</span>
                 {ticketCount} ticket{ticketCount !== 1 ? 's' : ''}
               </>
             )}
@@ -542,7 +561,7 @@ function ProductCard({
         <div className="relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+            className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all duration-200 opacity-0 group-hover:opacity-100 focus:opacity-100"
           >
             <MoreVertical className="w-4 h-4" />
           </button>
@@ -550,17 +569,17 @@ function ProductCard({
             <>
               {/* Click-away backdrop */}
               <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-full mt-1 w-36 bg-popover border border-border rounded-lg shadow-lg z-50 py-1 animate-fade-in">
+              <div className="absolute right-0 top-full mt-1 w-36 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 py-1 animate-fade-in">
                 <button
                   onClick={() => { setRenaming(true); setMenuOpen(false); }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-foreground hover:bg-accent transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
-                  <Pencil className="w-3.5 h-3.5 text-muted-foreground" />
+                  <Pencil className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                   Rename
                 </button>
                 <button
                   onClick={() => { setConfirmDelete(true); setMenuOpen(false); }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete
@@ -573,20 +592,20 @@ function ProductCard({
 
       {/* Delete confirmation */}
       {confirmDelete && (
-        <div className="mx-3 mb-2 p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 rounded-lg animate-fade-in">
+        <div className="mx-3 mb-2 p-3 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800 rounded-xl animate-fade-in shadow-sm">
           <p className="text-xs text-red-700 dark:text-red-400 mb-2">
             Delete <strong>{product.name}</strong>? This removes all releases, tickets, and team members for this product.
           </p>
           <div className="flex gap-2">
             <button
               onClick={() => { onDelete(); setConfirmDelete(false); }}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors"
+              className="px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-lg transition-all duration-200 shadow-lg shadow-red-500/30"
             >
               Delete
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="px-3 py-1.5 text-xs font-medium text-foreground bg-secondary hover:bg-accent rounded-md transition-colors"
+              className="px-3 py-1.5 text-xs font-medium text-slate-900 dark:text-white bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
             >
               Cancel
             </button>
@@ -598,10 +617,10 @@ function ProductCard({
       <div className="flex-1 px-3 pb-2">
         {product.releases.length === 0 ? (
           <div className="px-2 py-6 text-center">
-            <p className="text-xs text-muted-foreground mb-3">No releases yet</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">No releases yet</p>
             <button
               onClick={onAutoGenerate}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-md transition-colors shadow-sm mb-2"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/30 mb-2"
             >
               <Sparkles className="w-3 h-3" />
               Create Smart Release
@@ -609,7 +628,7 @@ function ProductCard({
             <div>
               <button
                 onClick={onNewRelease}
-                className="text-xs font-medium text-muted-foreground hover:text-primary transition-colors"
+                className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-500 transition-colors"
               >
                 or create manually
               </button>
@@ -636,7 +655,7 @@ function ProductCard({
       <div className="flex items-center gap-1.5 px-3 pb-3 pt-1 mt-auto">
         <button
           onClick={onAutoGenerate}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/30"
           title="AI-powered release creation"
         >
           <Sparkles className="w-3.5 h-3.5" />
@@ -644,7 +663,7 @@ function ProductCard({
         </button>
         <button
           onClick={onNewRelease}
-          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-secondary hover:bg-accent rounded-lg transition-colors"
+          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
           title="Manual release creation"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -652,7 +671,7 @@ function ProductCard({
         </button>
         <Link
           to={`/product/${product.id}/team`}
-          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-foreground bg-secondary hover:bg-accent rounded-lg transition-colors"
+          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
         >
           <Users className="w-3.5 h-3.5" />
           Team
@@ -674,45 +693,46 @@ function ReleaseRow({ release }: { release: Release }) {
     <li>
       <Link
         to={`/release/${release.id}`}
-        className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-accent/60 transition-colors group/row"
+        className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 group/row"
       >
         {/* Status dot */}
         <span
-          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+          className={cn(
+            "w-1.5 h-1.5 rounded-full shrink-0",
             isActive
-              ? 'bg-green-500'
+              ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50'
               : isUpcoming
-                ? 'bg-amber-400'
-                : 'bg-muted-foreground/30'
-          }`}
+                ? 'bg-amber-400 shadow-sm shadow-amber-400/50'
+                : 'bg-slate-300 dark:bg-slate-600'
+          )}
         />
 
         {/* Name + date */}
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-foreground truncate group-hover/row:text-primary transition-colors">
+          <p className="text-xs font-medium text-slate-900 dark:text-white truncate group-hover/row:text-blue-600 dark:group-hover/row:text-blue-500 transition-colors">
             {release.name}
           </p>
-          <p className="text-[10px] text-muted-foreground">{fmtRange(release.startDate, release.endDate)}</p>
+          <p className="text-[10px] text-slate-500 dark:text-slate-400">{fmtRange(release.startDate, release.endDate)}</p>
         </div>
 
         {/* Inline progress */}
         {tickets > 0 && (
           <div className="flex items-center gap-2 shrink-0">
-            <div className="w-16 h-1 bg-muted rounded-full overflow-hidden">
+            <div className="w-16 h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full bg-primary/60 transition-all"
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all shadow-sm"
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <span className="text-[10px] tabular-nums text-muted-foreground w-6 text-right">{pct}%</span>
+            <span className="text-[10px] tabular-nums text-slate-500 dark:text-slate-400 w-6 text-right">{pct}%</span>
           </div>
         )}
 
         {tickets === 0 && (
-          <span className="text-[10px] text-muted-foreground italic">empty</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">empty</span>
         )}
 
-        <ChevronRight className="w-3 h-3 text-muted-foreground/40 group-hover/row:text-primary transition-colors shrink-0" />
+        <ChevronRight className="w-3 h-3 text-slate-400 dark:text-slate-500 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-500 transition-colors shrink-0" />
       </Link>
     </li>
   );

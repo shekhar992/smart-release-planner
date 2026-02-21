@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Calendar, Trash2, Edit2, X } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, Trash2, Edit2, X, User } from 'lucide-react';
+import { cn } from './ui/utils';
 import { useParams, useNavigate } from 'react-router';
 import { mockTeamMembers, TeamMember, PTOEntry } from '../data/mockData';
 import { loadTeamMembers, saveTeamMembers } from '../lib/localStorage';
@@ -56,19 +57,19 @@ export function TeamMemberDetail() {
   }
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'Developer': return 'bg-blue-100 text-blue-700';
-      case 'Designer': return 'bg-purple-100 text-purple-700';
-      case 'QA': return 'bg-green-100 text-green-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'Developer': return 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 text-blue-700 dark:text-blue-300';
+      case 'Designer': return 'bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/50 dark:to-purple-900/30 text-purple-700 dark:text-purple-300';
+      case 'QA': return 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/30 text-emerald-700 dark:text-emerald-300';
+      default: return 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-600 text-slate-700 dark:text-slate-300';
     }
   };
 
   const getExperienceLevelColor = (level?: string) => {
     switch (level) {
-      case 'Senior': return 'bg-purple-100 text-purple-700';
-      case 'Mid': return 'bg-blue-100 text-blue-700';
-      case 'Junior': return 'bg-gray-100 text-gray-700';
-      default: return 'bg-gray-100 text-gray-600';
+      case 'Senior': return 'bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/50 dark:to-purple-900/30 text-purple-700 dark:text-purple-300';
+      case 'Mid': return 'bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 text-blue-700 dark:text-blue-300';
+      case 'Junior': return 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-600 text-slate-700 dark:text-slate-300';
+      default: return 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-700 dark:to-slate-600 text-slate-600 dark:text-slate-400';
     }
   };
 
@@ -97,20 +98,23 @@ export function TeamMemberDetail() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col bg-slate-50/30 dark:bg-slate-800/30">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 shadow-sm">
+      <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 px-6 py-4 shadow-lg">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate(backPath)}
-            className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+            className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
             title="Back to Team Roster"
           >
-            <ArrowLeft className="w-4 h-4 text-gray-600" />
+            <ArrowLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" />
           </button>
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-blue-500/30">
+            {member.name.charAt(0).toUpperCase()}
+          </div>
           <div className="flex-1">
-            <h1 className="text-lg font-medium text-gray-900">{member.name}</h1>
-            <p className="text-sm text-gray-500">Team Member Details</p>
+            <h1 className="text-lg font-semibold text-slate-900 dark:text-white">{member.name}</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Team Member Details</p>
           </div>
         </div>
       </div>
@@ -119,17 +123,22 @@ export function TeamMemberDetail() {
       <div className="flex-1 overflow-auto p-6">
         <div className="max-w-3xl mx-auto space-y-6">
           {/* Member Info Card */}
-          <div className="bg-white border border-gray-200 rounded-lg p-5">
-            <div className="flex items-start justify-between mb-4">
-              <h2 className="text-sm font-medium text-gray-900">Information</h2>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-lg">
+            <div className="flex items-start justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
+                  <User className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Information</h2>
+              </div>
               <button
                 onClick={() => setIsEditingInfo(!isEditingInfo)}
-                className="p-1.5 hover:bg-gray-100 rounded transition-colors"
+                className="w-9 h-9 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
               >
                 {isEditingInfo ? (
-                  <X className="w-4 h-4 text-gray-600" />
+                  <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                 ) : (
-                  <Edit2 className="w-4 h-4 text-gray-600" />
+                  <Edit2 className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                 )}
               </button>
             </div>
@@ -144,26 +153,26 @@ export function TeamMemberDetail() {
                 onCancel={() => setIsEditingInfo(false)}
               />
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
-                  <p className="text-sm text-gray-900">{member.name}</p>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">Name</label>
+                  <p className="text-sm text-slate-900 dark:text-white font-medium">{member.name}</p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Role</label>
-                  <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${getRoleColor(member.role)}`}>
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">Role</label>
+                  <span className={cn("inline-block px-3 py-1.5 text-xs font-semibold rounded-xl", getRoleColor(member.role))}>
                     {member.role}
                   </span>
                 </div>
                 {member.experienceLevel && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Experience Level</label>
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${getExperienceLevelColor(member.experienceLevel)}`}>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">Experience Level</label>
+                    <div className="flex items-center gap-3">
+                      <span className={cn("inline-block px-3 py-1.5 text-xs font-semibold rounded-xl", getExperienceLevelColor(member.experienceLevel))}>
                         {member.experienceLevel}
                       </span>
                       {member.velocityMultiplier !== undefined && (
-                        <span className="text-xs text-gray-600">
+                        <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
                           • {member.velocityMultiplier.toFixed(1)}x velocity
                         </span>
                       )}
@@ -172,8 +181,8 @@ export function TeamMemberDetail() {
                 )}
                 {member.notes && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
-                    <p className="text-sm text-gray-900">{member.notes}</p>
+                    <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">Notes</label>
+                    <p className="text-sm text-slate-900 dark:text-white">{member.notes}</p>
                   </div>
                 )}
               </div>
@@ -181,48 +190,57 @@ export function TeamMemberDetail() {
           </div>
 
           {/* PTO Section */}
-          <div className="bg-white border border-gray-200 rounded-lg p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-medium text-gray-900">Time Off (PTO)</h2>
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-lg">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                  <Calendar className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Time Off (PTO)</h2>
+              </div>
               <button
                 onClick={() => setShowAddPTO(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors shadow-sm"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-blue-500 to-blue-600 text-white text-sm font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" />
                 Add PTO
               </button>
             </div>
 
             {member.pto.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {member.pto.map(pto => (
                   <div
                     key={pto.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-md transition-all duration-200"
                   >
                     <div className="flex items-center gap-3">
-                      <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30 flex-shrink-0">
+                        <Calendar className="w-5 h-5 text-white" />
+                      </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{pto.name}</p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{pto.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                           {pto.startDate.toLocaleDateString()} - {pto.endDate.toLocaleDateString()}
                         </p>
                       </div>
                     </div>
                     <button
                       onClick={() => deletePTO(pto.id)}
-                      className="p-1.5 hover:bg-red-50 rounded transition-colors"
+                      className="w-9 h-9 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all duration-200"
                       title="Delete PTO"
                     >
-                      <Trash2 className="w-4 h-4 text-red-600" />
+                      <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
                     </button>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8">
-                <Calendar className="w-10 h-10 text-gray-400 mx-auto mb-3" />
-                <p className="text-sm text-gray-500">No PTO entries yet</p>
+              <div className="text-center py-12">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                  <Calendar className="w-8 h-8 text-slate-400 dark:text-slate-500" />
+                </div>
+                <p className="text-sm text-slate-500 dark:text-slate-400">No PTO entries yet</p>
               </div>
             )}
           </div>
@@ -270,22 +288,22 @@ function EditMemberInfoForm({ member, onSave, onCancel }: EditMemberInfoFormProp
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1.5">Name</label>
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Name</label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1.5">Role</label>
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Role</label>
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as 'Developer' | 'Designer' | 'QA')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
         >
           <option value="Developer">Developer</option>
           <option value="Designer">Designer</option>
@@ -293,43 +311,43 @@ function EditMemberInfoForm({ member, onSave, onCancel }: EditMemberInfoFormProp
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1.5">Experience Level</label>
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Experience Level</label>
         <select
           value={experienceLevel}
           onChange={(e) => setExperienceLevel(e.target.value as 'Junior' | 'Mid' | 'Senior')}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
         >
           <option value="Junior">Junior</option>
           <option value="Mid">Mid</option>
           <option value="Senior">Senior</option>
         </select>
-        <p className="mt-1.5 text-xs text-gray-500">
-          Velocity: <span className="font-medium text-gray-700">{velocityMultiplier.toFixed(1)}x</span>
+        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+          Velocity: <span className="font-semibold text-slate-700 dark:text-slate-300">{velocityMultiplier.toFixed(1)}x</span>
           {experienceLevel === 'Junior' && ' (slower pace)'}
           {experienceLevel === 'Mid' && ' (standard pace)'}
           {experienceLevel === 'Senior' && ' (faster pace)'}
         </p>
       </div>
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1.5">Notes</label>
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Notes</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-none"
+          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm resize-none transition-all duration-200"
           rows={3}
         />
       </div>
-      <div className="flex items-center gap-2 pt-2">
+      <div className="flex items-center gap-3 pt-2">
         <button
           type="submit"
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors"
+          className="px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-lg shadow-blue-500/30"
         >
           Save
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200 border border-slate-200 dark:border-slate-700"
         >
           Cancel
         </button>
@@ -366,22 +384,27 @@ function AddPTOModal({ onClose, onAdd }: AddPTOModalProps) {
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/20 z-40"
+        className="fixed inset-0 bg-slate-900/20 dark:bg-black/40 backdrop-blur-sm z-40 transition-opacity duration-200"
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] bg-white rounded-lg shadow-2xl z-50 border border-gray-200">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[460px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl z-50 border border-slate-200 dark:border-slate-700">
         <form onSubmit={handleSubmit}>
           {/* Header */}
-          <div className="px-5 py-4 border-b border-gray-200">
-            <h3 className="text-sm font-medium text-gray-900">Add Time Off</h3>
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-br from-amber-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50 rounded-t-2xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">Add Time Off</h3>
+            </div>
           </div>
 
           {/* Content */}
-          <div className="px-5 py-4 space-y-4">
+          <div className="px-6 py-5 space-y-5 bg-slate-50/30 dark:bg-slate-800/30">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
                 Name
               </label>
               <input
@@ -390,49 +413,49 @@ function AddPTOModal({ onClose, onAdd }: AddPTOModalProps) {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Vacation, Sick Leave, Conference"
                 autoFocus
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 backdrop-blur-sm transition-all duration-200"
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
                   Start Date
                 </label>
                 <input
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
                   End Date
                 </label>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
                 />
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-end gap-2 px-5 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-slate-50/50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-700 rounded-b-2xl backdrop-blur-sm">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded transition-colors"
+              className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-all duration-200 border border-slate-200 dark:border-slate-700"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!name.trim()}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
+              className="px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl hover:from-blue-600 hover:to-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40"
             >
               Add PTO
             </button>

@@ -11,7 +11,7 @@ import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, g
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
 import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
-import { calculateEffortFromDates } from '../lib/dateUtils';
+import { calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
 import { calculateDurationDays } from '../lib/durationCalculator';
 import { addDays } from 'date-fns';
 import { exportReleaseTimelinePptx } from '../lib/exporters/exportReleaseTimelinePptx';
@@ -60,47 +60,41 @@ function HeaderAlertsPanel({
     <div className="relative">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex items-center gap-2 px-2.5 py-1.5 rounded-md transition-all text-sm font-medium hover:shadow-sm"
-        style={{
-          backgroundColor: 'rgba(251, 192, 45, 0.15)',
-          border: '1px solid rgba(251, 192, 45, 0.3)',
-          color: '#b45309',
-        }}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all text-sm font-semibold hover:shadow-md shadow-sm bg-gradient-to-r from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 hover:from-amber-100 hover:to-amber-200/50"
       >
         <AlertTriangle className="w-3.5 h-3.5" />
         <span>Alerts</span>
-        <div className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold" style={{
-          backgroundColor: '#b45309',
-          color: 'white',
-        }}>
+        <div className="ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-600 dark:bg-amber-700 text-white shadow-sm">
           {totalAlerts}
         </div>
       </button>
       
       {isExpanded && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsExpanded(false)} />
-          <div className="absolute right-0 top-full mt-2 w-80 bg-white border-2 border-orange-200 rounded-lg shadow-xl z-50 overflow-hidden animate-fade-in">
+          <div className="fixed inset-0 z-[55]" onClick={() => setIsExpanded(false)} />
+          <div className="absolute right-0 top-full mt-2 w-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-amber-200 dark:border-amber-800 rounded-xl shadow-2xl z-[60] overflow-hidden animate-fade-in">
             {/* Dev Window Issues */}
             {spilloverCount > 0 && (
-              <div className="border-b border-orange-100 p-3">
+              <div className="border-b border-amber-100 dark:border-amber-900/50 p-3 bg-gradient-to-br from-amber-50/50 to-transparent dark:from-amber-950/20">
                 <div className="flex items-start gap-2">
-                  <span className="text-lg mt-0.5">⚠️</span>
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 flex items-center justify-center mt-0.5">
+                    <span className="text-base">⚠️</span>
+                  </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-orange-900">
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
                       Dev Window Issues ({spilloverCount})
                     </p>
-                    <p className="text-xs text-orange-700 mt-1">
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
                       Tickets scheduled during Testing, Deployment, or other non-dev phases.
                     </p>
-                    <div className="mt-2 text-xs text-orange-800 space-y-1">
+                    <div className="mt-2 text-xs text-amber-800 dark:text-amber-300 space-y-1">
                       {spilloverTickets.slice(0, 3).map((ticket) => (
                         <div key={ticket.id} className="truncate">
                           • {ticket.title} ({ticket.assignedTo || 'Unassigned'})
                         </div>
                       ))}
                       {spilloverCount > 3 && (
-                        <div className="text-orange-600 font-medium">
+                        <div className="text-amber-600 dark:text-amber-400 font-semibold">
                           +{spilloverCount - 3} more
                         </div>
                       )}
@@ -114,21 +108,23 @@ function HeaderAlertsPanel({
             {conflictCount > 0 && (
               <div className="p-3">
                 <div className="flex items-start gap-2">
-                  <span className="text-lg mt-0.5">⚡</span>
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 flex items-center justify-center mt-0.5">
+                    <span className="text-base">⚡</span>
+                  </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-amber-900">
+                    <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
                       Resource Conflicts ({conflictCount})
                     </p>
-                    <p className="text-xs text-amber-700 mt-1">
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
                       Multiple tickets assigned to same developer with overlapping dates.
                     </p>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setIsExpanded(false);
                         onViewConflicts();
+                        setIsExpanded(false);
                       }}
-                      className="mt-3 w-full px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-medium rounded-md transition-colors flex items-center justify-center gap-2"
+                      className="mt-3 w-full px-3 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-amber-600/30 hover:shadow-xl flex items-center justify-center gap-2"
                     >
                       <AlertTriangle className="w-3 h-3" />
                       Resolve Conflicts
@@ -234,8 +230,8 @@ export function ReleasePlanningCanvas() {
   const openEditRelease = () => {
     if (!release) return;
     setDraftReleaseName(release.name);
-    setDraftStartDate(release.startDate.toISOString().split('T')[0]);
-    setDraftEndDate(release.endDate.toISOString().split('T')[0]);
+    setDraftStartDate(toLocalDateString(release.startDate));
+    setDraftEndDate(toLocalDateString(release.endDate));
     setEditingRelease(true);
   };
 
@@ -576,8 +572,8 @@ export function ReleasePlanningCanvas() {
             ...f,
             tickets: f.tickets.map(t => {
               if (t.id === ticketId) {
-                // Recalculate effortDays from new duration (timeline bar resize)
-                const newEffort = calculateEffortFromDates(t.startDate, newEndDate);
+                // Recalculate effortDays from new duration (working days, not calendar days)
+                const newEffort = calculateEffortFromDates(t.startDate, newEndDate, holidays);
                 return {
                   ...t,
                   endDate: newEndDate,
@@ -698,30 +694,30 @@ export function ReleasePlanningCanvas() {
   return (
     <div className="h-screen flex flex-col bg-[#F7F8FA]">
       {/* Top Navigation Bar */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200 shadow-sm">
+      <div className="relative z-50 flex items-center justify-between px-6 py-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-all"
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all shadow-sm"
             title="Back to Dashboard"
           >
-            <ArrowLeft className="w-4 h-4 text-gray-600" />
+            <ArrowLeft className="w-4 h-4 text-slate-600 dark:text-slate-400" />
           </button>
           <div>
-            <h1 className="text-base font-medium text-gray-900">{releaseData.name}</h1>
-            <p className="text-xs text-gray-500 mt-1">{release.name}</p>
+            <h1 className="text-base font-semibold text-slate-900 dark:text-white">{releaseData.name}</h1>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-medium">{release.name}</p>
           </div>
           <div className="flex items-center gap-1 ml-1">
             <button
               onClick={openEditRelease}
-              className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
               title="Edit release"
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setConfirmDeleteRelease(true)}
-              className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-600 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-all"
               title="Delete release"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -730,7 +726,7 @@ export function ReleasePlanningCanvas() {
         </div>
         <div className="flex items-center gap-3">
           {/* Storage indicator - subtle */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-muted border border-border rounded text-[11px] text-muted-foreground">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] text-slate-600 dark:text-slate-400 shadow-sm">
             <Database className="w-3 h-3" />
             {lastSaved && (
               <span>
@@ -742,7 +738,7 @@ export function ReleasePlanningCanvas() {
           {/* Primary CTA */}
           <button
             onClick={() => setShowTicketCreation({})}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-primary-foreground bg-primary hover:bg-primary-hover rounded-md transition-colors shadow-sm"
+            className="flex items-center gap-2 px-3 py-1.5 text-sm text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 font-semibold"
           >
             <Plus className="w-4 h-4" />
             <span>New Ticket</span>
@@ -760,7 +756,7 @@ export function ReleasePlanningCanvas() {
           <div className="relative">
             <button
               onClick={() => setShowActionsMenu(!showActionsMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-foreground hover:bg-muted rounded-md transition-colors border border-border"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all border border-slate-300 dark:border-slate-600 font-medium shadow-sm"
             >
               <span>Actions</span>
               <ChevronDown className="w-3.5 h-3.5" />
@@ -769,16 +765,16 @@ export function ReleasePlanningCanvas() {
             {showActionsMenu && (
               <>
                 <div 
-                  className="fixed inset-0 z-40"
+                  className="fixed inset-0 z-[55]"
                   onClick={() => setShowActionsMenu(false)}
                 />
-                <div className="absolute right-0 mt-1 w-56 bg-card border border-border rounded-lg shadow-xl z-50 py-1">
+                <div className="absolute right-0 mt-1 w-56 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-[60] py-1 overflow-hidden">
                   <button
                     onClick={() => {
                       setShowSprintCreation(true);
                       setShowActionsMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left font-medium"
                   >
                     <Plus className="w-4 h-4" />
                     <span>Add Sprint</span>
@@ -788,18 +784,18 @@ export function ReleasePlanningCanvas() {
                       setShowAddMilestoneModal(true);
                       setShowActionsMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left font-medium"
                   >
                     <Calendar className="w-4 h-4" />
                     <span>Add Milestone</span>
                   </button>
-                  <div className="my-1 border-t border-border" />
+                  <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
                   <button
                     onClick={() => {
                       setShowBulkImport({});
                       setShowActionsMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left font-medium"
                   >
                     <Upload className="w-4 h-4" />
                     <span>Import Tickets</span>
@@ -809,18 +805,18 @@ export function ReleasePlanningCanvas() {
                       handleExportPPTX();
                       setShowActionsMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left font-medium"
                   >
                     <FileDown className="w-4 h-4" />
                     <span>Export PPTX</span>
                   </button>
-                  <div className="my-1 border-t border-border" />
+                  <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
                   <button
                     onClick={() => {
                       navigate(`/product/${releaseData.id}/team`);
                       setShowActionsMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left font-medium"
                   >
                     <Users className="w-4 h-4" />
                     <span>Team Roster</span>
@@ -830,14 +826,14 @@ export function ReleasePlanningCanvas() {
                       navigate(`/release/${releaseId}/team/holidays`);
                       setShowActionsMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left font-medium"
                   >
                     <Calendar className="w-4 h-4" />
                     <span>Holidays</span>
                   </button>
                   {SCENARIO_ENABLED && (
                     <>
-                      <div className="my-1 border-t border-border" />
+                      <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
                       <button
                         onClick={() => {
                           setScenarioMode(!scenarioMode);
@@ -851,7 +847,7 @@ export function ReleasePlanningCanvas() {
                           }
                           setShowActionsMenu(false);
                         }}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors text-left"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-all text-left font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
                         style={{
                           backgroundColor: scenarioMode ? 'rgba(251, 192, 45, 0.1)' : 'transparent',
                           color: scenarioMode ? '#b45309' : 'inherit'
@@ -873,13 +869,13 @@ export function ReleasePlanningCanvas() {
                       </button>
                     </>
                   )}
-                  <div className="my-1 border-t border-border" />
+                  <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
                   <button
                     onClick={() => {
                       handleResetStorage();
                       setShowActionsMenu(false);
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left font-medium"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Reset to Demo Data</span>
@@ -1099,7 +1095,7 @@ export function ReleasePlanningCanvas() {
 
       {/* Conflict Resolution Panel */}
       {showConflictResolution && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/20">
+        <div className="fixed inset-0 z-[70] flex justify-end bg-black/20">
           <ConflictResolutionPanel
             conflicts={enhancedConflicts}
             tickets={allTickets}
@@ -1114,54 +1110,54 @@ export function ReleasePlanningCanvas() {
 
       {/* Edit Release Dialog */}
       {editingRelease && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-[380px] animate-fade-in">
-            <h3 className="text-sm font-semibold text-gray-900 mb-4">Edit Release</h3>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-[380px] border border-slate-200 dark:border-slate-700">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Edit Release</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-medium text-gray-600 mb-1 block">Name</label>
+                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block">Name</label>
                 <input
                   autoFocus
                   value={draftReleaseName}
                   onChange={e => setDraftReleaseName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  className="w-full px-3 py-2 text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 outline-none shadow-sm transition-all"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">Start Date</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block">Start Date</label>
                   <input
                     type="date"
                     value={draftStartDate}
                     onChange={e => setDraftStartDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 outline-none shadow-sm transition-all"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-600 mb-1 block">End Date</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block">End Date</label>
                   <input
                     type="date"
                     value={draftEndDate}
                     onChange={e => setDraftEndDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 text-sm text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 outline-none shadow-sm transition-all"
                   />
                 </div>
               </div>
               {draftEndDate && draftStartDate && draftEndDate < draftStartDate && (
-                <p className="text-xs text-red-500">End date must be after start date</p>
+                <p className="text-xs text-red-600 dark:text-red-400 font-medium">End date must be after start date</p>
               )}
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button
                 onClick={() => setEditingRelease(false)}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={commitEditRelease}
                 disabled={!draftReleaseName.trim() || (draftEndDate < draftStartDate)}
-                className="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+                className="px-4 py-1.5 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all shadow-lg shadow-blue-500/30 disabled:shadow-none"
               >
                 Save
               </button>
@@ -1172,22 +1168,22 @@ export function ReleasePlanningCanvas() {
 
       {/* Delete Release Confirmation */}
       {confirmDeleteRelease && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-[380px] animate-fade-in">
-            <h3 className="text-sm font-semibold text-red-700 mb-2">Delete Release</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Are you sure you want to delete <strong>{release.name}</strong>? All features, tickets, and sprints within this release will be permanently removed.
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-[380px] border border-red-200 dark:border-red-800">
+            <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2">Delete Release</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
+              Are you sure you want to delete <strong className="text-slate-900 dark:text-white">{release.name}</strong>? All features, tickets, and sprints within this release will be permanently removed.
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDeleteRelease(false)}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all font-medium"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteRelease}
-                className="px-4 py-1.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                className="px-4 py-1.5 text-sm font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40"
               >
                 Delete
               </button>
