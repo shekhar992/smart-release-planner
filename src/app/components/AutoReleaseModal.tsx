@@ -9,6 +9,7 @@ import type { Product, Phase } from '../data/mockData';
 import { loadProducts, saveProducts, loadTeamMembersByProduct } from '../lib/localStorage';
 import { savePhases } from '../lib/localStorage';
 import { DatePicker } from './DatePicker';
+import { toLocalDateString, parseLocalDate } from '../lib/dateUtils';
 import { FeasibilityMeter } from './FeasibilityMeter';
 import { ReviewStatsGrid } from './ReviewStatsGrid';
 import { DataInsightsPanel } from './DataInsightsPanel';
@@ -559,16 +560,16 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                 <div>
                   <DatePicker
                     label="Start Date"
-                    value={releaseStart.toISOString().split('T')[0]}
-                    onChange={(dateStr) => setReleaseStart(new Date(dateStr))}
+                    value={toLocalDateString(releaseStart)}
+                    onChange={(dateStr) => setReleaseStart(parseLocalDate(dateStr))}
                   />
                 </div>
                 
                 <div>
                   <DatePicker
                     label="End Date"
-                    value={releaseEnd.toISOString().split('T')[0]}
-                    onChange={(dateStr) => setReleaseEnd(new Date(dateStr))}
+                    value={toLocalDateString(releaseEnd)}
+                    onChange={(dateStr) => setReleaseEnd(parseLocalDate(dateStr))}
                   />
                 </div>
                 

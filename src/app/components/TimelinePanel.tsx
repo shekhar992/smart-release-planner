@@ -664,10 +664,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
               />
             </div>
             
-            {/* Spacer to push content below sticky strips */}
-            <div style={{ height: phases.length > 0 ? 110 : 50 }} />
-            
-            {/* Absolute layers container - positioned after spacer */}
+            {/* Absolute layers container - positioned below sticky strips to align with sidebar tickets */}
             <div className="absolute" style={{ 
               top: phases.length > 0 ? 110 : 50,
               left: 0, 
@@ -704,6 +701,9 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             </div>
 
             {/* LAYER 4: TICKET BARS - Rendered in natural flow matching sidebar */}
+            {/* Spacer to match the legend height in left sidebar */}
+            <div style={{ height: 48 }} />
+            
             {visibleFeatures.map((feature) => {
               const isCollapsed = collapsedFeatures.has(feature.id);
               

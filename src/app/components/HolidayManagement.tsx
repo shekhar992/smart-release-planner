@@ -6,12 +6,14 @@ import { PageShell } from './PageShell';
 import { mockHolidays, Holiday } from '../data/mockData';
 import { loadHolidays, saveHolidays } from '../lib/localStorage';
 import { DatePicker } from './DatePicker';
+import { toLocalDateString, parseLocalDate } from '../lib/dateUtils';
 
 export function HolidayManagement() {
   const { releaseId } = useParams();
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showAddForm, setShowAddForm] = useState(false);
+  const [clickedDate, setClickedDate] = useState<Date | null>(null);
   
   // Load holidays from localStorage on mount
   useEffect(() => {
@@ -84,6 +86,7 @@ export function HolidayManagement() {
   };
 
   const handleQuickAddHoliday = (date: Date) => {
+    setClickedDate(date);
     setShowAddForm(true);
   };
 
@@ -292,11 +295,16 @@ export function HolidayManagement() {
       {/* Add Holiday Modal */}
       {showAddForm && (
         <AddHolidayModal
-          onClose={() => setShowAddForm(false)}
+          onClose={() => {
+            setShowAddForm(false);
+            setClickedDate(null);
+          }}
           onAdd={(holiday) => {
             addHoliday(holiday);
             setShowAddForm(false);
+            setClickedDate(null);
           }}
+          initialDate={clickedDate || undefined}
         />
       )}
     </PageShell>
@@ -306,12 +314,13 @@ export function HolidayManagement() {
 interface AddHolidayModalProps {
   onClose: () => void;
   onAdd: (holiday: Holiday) => void;
+  initialDate?: Date;
 }
 
-function AddHolidayModal({ onClose, onAdd }: AddHolidayModalProps) {
+function AddHolidayModal({ onClose, onAdd, initialDate }: AddHolidayModalProps) {
   const [name, setName] = useState('');
-  const [startDate, setStartDate] = useState<Date>(new Date());
-  const [endDate, setEndDate] = useState<Date>(new Date());
+  const [startDate, setStartDate] = useState<Date>(initialDate || new Date());
+  const [endDate, setEndDate] = useState<Date>(initialDate || new Date());
 
   const datesInvalid = startDate && endDate && endDate < startDate;
 
@@ -388,8 +397,8 @@ function AddHolidayModal({ onClose, onAdd }: AddHolidayModalProps) {
                   Start Date
                 </label>
                 <DatePicker
-                  value={startDate.toISOString().split('T')[0]}
-                  onChange={(dateStr) => setStartDate(new Date(dateStr))}
+                  value={toLocalDateString(startDate)}
+                  onChange={(dateStr) => setStartDate(parseLocalDate(dateStr))}
                 />
               </div>
 
@@ -398,8 +407,8 @@ function AddHolidayModal({ onClose, onAdd }: AddHolidayModalProps) {
                   End Date
                 </label>
                 <DatePicker
-                  value={endDate.toISOString().split('T')[0]}
-                  onChange={(dateStr) => setEndDate(new Date(dateStr))}
+                  value={toLocalDateString(endDate)}
+                  onChange={(dateStr) => setEndDate(parseLocalDate(dateStr))}
                 />
               </div>
 

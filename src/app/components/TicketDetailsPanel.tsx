@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check, AlertTriangle } from 'lucide-react';
 import { Ticket, Release, TeamMember, Milestone, Holiday, mockHolidays } from '../data/mockData';
 import { resolveEffortDays } from '../lib/effortResolver';
-import { calculateEndDate, calculateEndDateFromEffort, calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
+import { calculateEndDateFromEffort, calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
 import { loadHolidays } from '../lib/localStorage';
 import { cn } from './ui/utils';
 
@@ -173,7 +173,7 @@ export function TicketDetailsPanel({
       
       const effort = ticket.effortDays || resolveEffortDays(ticket);
       const adjustedDuration = Math.max(1, Math.round(effort / newVelocity));
-      const newEndDate = calculateEndDate(ticket.startDate, adjustedDuration - 1, holidays);
+      const newEndDate = calculateEndDateFromEffort(ticket.startDate, adjustedDuration, holidays);
       
       onUpdate(featureId, ticket.id, {
         assignedTo: value,
@@ -359,7 +359,7 @@ export function TicketDetailsPanel({
                 const adjustedDuration = Math.max(1, Math.round(value / velocity));
                 
                 // Calculate end date using working days (skips weekends and holidays)
-                const newEndDate = calculateEndDate(ticket.startDate, adjustedDuration - 1, holidays);
+                const newEndDate = calculateEndDateFromEffort(ticket.startDate, adjustedDuration, holidays);
                 
                 onUpdate(featureId, ticket.id, {
                   effortDays: value,

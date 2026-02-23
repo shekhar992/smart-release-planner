@@ -3,7 +3,7 @@ import { X, Flag, AlertTriangle } from 'lucide-react';
 import { cn } from './ui/utils';
 import { Milestone, MilestoneType } from '../data/mockData';
 import { DatePicker } from './DatePicker';
-import { toLocalDateString } from '../lib/dateUtils';
+import { toLocalDateString, parseLocalDate } from '../lib/dateUtils';
 
 interface AddMilestoneModalProps {
   isOpen: boolean;
@@ -187,7 +187,7 @@ export function AddMilestoneModal({
                   </label>
                   <DatePicker
                     value={toLocalDateString(startDate)}
-                    onChange={(dateStr) => setStartDate(new Date(dateStr))}
+                    onChange={(dateStr) => setStartDate(parseLocalDate(dateStr))}
                   />
                 </div>
               ) : (
@@ -198,7 +198,7 @@ export function AddMilestoneModal({
                     </label>
                     <DatePicker
                       value={toLocalDateString(startDate)}
-                      onChange={(dateStr) => setStartDate(new Date(dateStr))}
+                      onChange={(dateStr) => setStartDate(parseLocalDate(dateStr))}
                     />
                   </div>
                   <div>
@@ -207,7 +207,7 @@ export function AddMilestoneModal({
                     </label>
                     <DatePicker
                       value={toLocalDateString(endDate)}
-                      onChange={(dateStr) => setEndDate(new Date(dateStr))}
+                      onChange={(dateStr) => setEndDate(parseLocalDate(dateStr))}
                     />
                   </div>
                   {datesInvalid && (

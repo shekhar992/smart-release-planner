@@ -8,7 +8,7 @@ import { PhaseTimelinePreview } from './PhaseTimelinePreview';
 import { PHASE_TEMPLATES, calculatePhaseDates, recalculateCascadingDates } from '../lib/phaseTemplates';
 import { parseCSV, validateAndTransformCSV } from '../lib/csvParser';
 import { ticketImportMapping } from '../lib/importMappings';
-import { calculateEndDateFromEffort, toLocalDateString } from '../lib/dateUtils';
+import { calculateEndDateFromEffort, toLocalDateString, parseLocalDate } from '../lib/dateUtils';
 import { loadHolidays, loadTeamMembers } from '../lib/localStorage';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1748,7 +1748,7 @@ function PhasesStep({
                       <input
                         type="date"
                         value={toLocalDateString(phase.endDate)}
-                        onChange={(e) => handlePhaseEndDateChange(index, new Date(e.target.value))}
+                        onChange={(e) => handlePhaseEndDateChange(index, parseLocalDate(e.target.value))}
                         className="px-2 py-1 border border-gray-200 dark:border-gray-800 rounded text-xs bg-transparent"
                       />
                     </td>

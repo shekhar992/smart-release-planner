@@ -11,7 +11,7 @@ import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, g
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
 import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
-import { calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
+import { calculateEffortFromDates, toLocalDateString, calculateEndDateFromEffort } from '../lib/dateUtils';
 import { calculateDurationDays } from '../lib/durationCalculator';
 import { addDays } from 'date-fns';
 import { exportReleaseTimelinePptx } from '../lib/exporters/exportReleaseTimelinePptx';
@@ -147,6 +147,7 @@ export function ReleasePlanningCanvas() {
   // Initialize localStorage with mock data if empty (only once)
   const [initialized, setInitialized] = useState(false);
   const [teamMembersRefreshKey, setTeamMembersRefreshKey] = useState(0);
+  const [holidaysRefreshKey, setHolidaysRefreshKey] = useState(0);
   
   useEffect(() => {
     if (!initialized) {
@@ -165,9 +166,20 @@ export function ReleasePlanningCanvas() {
     return () => window.removeEventListener('teamMembersUpdated', handleTeamMembersUpdate);
   }, []);
   
+  // Listen for holidays updates (from Holiday Management, etc.)
+  useEffect(() => {
+    const handleHolidaysUpdate = () => {
+      console.log('[Event] Holidays updated, triggering refresh...');
+      setHolidaysRefreshKey(prev => prev + 1);
+    };
+
+    window.addEventListener('holidaysUpdated', handleHolidaysUpdate);
+    return () => window.removeEventListener('holidaysUpdated', handleHolidaysUpdate);
+  }, []);
+  
   // Load products, holidays, and team members from localStorage or use mock data
   const products = useMemo(() => loadProducts() || mockProducts, [initialized]);
-  const holidays = useMemo(() => loadHolidays() || mockHolidays, [initialized]);
+  const holidays = useMemo(() => loadHolidays() || mockHolidays, [initialized, holidaysRefreshKey]);
   const milestones = useMemo(() => {
     if (!releaseId) return [];
     return loadMilestones(releaseId);
@@ -226,6 +238,43 @@ export function ReleasePlanningCanvas() {
     velocityOverrides: {} as Record<string, number>,
     scopeDeltaDays: 0
   });
+
+  // AUTO-RECALCULATE TICKET END DATES WHEN HOLIDAYS CHANGE
+  // This ensures tickets automatically expand/contract based on holidays and weekends
+  useEffect(() => {
+    console.log('[Auto-Recalculate] Holidays changed, recalculating all ticket end dates...');
+    
+    setRelease(prevRelease => {
+      if (!prevRelease) return prevRelease;
+      
+      const updatedRelease = {
+        ...prevRelease,
+        features: prevRelease.features.map(feature => ({
+          ...feature,
+          tickets: feature.tickets.map(ticket => {
+            const effortDays = ticket.effortDays || ticket.storyPoints;
+            
+            // Apply velocity multiplier for realistic duration
+            const assignedMember = teamMembers.find(m => m.name === ticket.assignedTo);
+            const velocity = assignedMember?.velocityMultiplier ?? 1;
+            const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
+            
+            const recalculatedEndDate = calculateEndDateFromEffort(ticket.startDate, adjustedDuration, holidays);
+            
+            // Only update if end date actually changed
+            if (recalculatedEndDate.getTime() !== ticket.endDate.getTime()) {
+              console.log(`  ✓ ${ticket.title}: ${effortDays} effort → ${adjustedDuration} working days (${velocity}x velocity) → ${recalculatedEndDate.toDateString()}`);
+              return { ...ticket, endDate: recalculatedEndDate };
+            }
+            
+            return ticket;
+          })
+        }))
+      };
+      
+      return updatedRelease;
+    });
+  }, [holidays, teamMembers]); // Trigger when holidays or teamMembers change
 
   const openEditRelease = () => {
     if (!release) return;
@@ -547,8 +596,16 @@ export function ReleasePlanningCanvas() {
             ...f,
             tickets: f.tickets.map(t => {
               if (t.id === ticketId) {
-                const duration = t.endDate.getTime() - t.startDate.getTime();
-                const newEndDate = new Date(newStartDate.getTime() + duration);
+                // Recalculate end date based on effort days + velocity + holidays/weekends
+                const effortDays = t.effortDays || t.storyPoints;
+                
+                // Apply velocity multiplier for realistic duration
+                const assignedMember = teamMembers.find(m => m.name === t.assignedTo);
+                const velocity = assignedMember?.velocityMultiplier ?? 1;
+                const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
+                
+                const newEndDate = calculateEndDateFromEffort(newStartDate, adjustedDuration, holidays);
+                console.log(`[Move Ticket] ${t.title}: ${effortDays} effort → ${adjustedDuration} working days (${velocity}x velocity) → ${newEndDate.toDateString()}`);
                 return { ...t, startDate: newStartDate, endDate: newEndDate };
               }
               return t;

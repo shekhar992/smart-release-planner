@@ -4,9 +4,10 @@
  */
 
 import { Product, Release, Ticket, Holiday, TeamMember, Milestone, Phase } from '../data/mockData';
+import { toLocalDateString, parseLocalDate } from './dateUtils';
 
 // Data version - increment this to force refresh of all localStorage data
-const DATA_VERSION = '4.0.0'; // Updated for new FinTech + Life Sciences mock data
+const DATA_VERSION = '5.0.0'; // TIMEZONE FIX: Changed date storage from ISO to local YYYY-MM-DD format
 
 const STORAGE_KEYS = {
   PRODUCTS: 'timeline_view_products',
@@ -17,15 +18,51 @@ const STORAGE_KEYS = {
 } as const;
 
 /**
+ * Recursively converts Date objects to local date strings (YYYY-MM-DD)
+ * for timezone-safe storage
+ */
+function serializeDates(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  
+  if (obj instanceof Date) {
+    return toLocalDateString(obj);
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => serializeDates(item));
+  }
+  
+  if (typeof obj === 'object') {
+    const result: any = {};
+    for (const key in obj) {
+      if (key === 'startDate' || key === 'endDate') {
+        result[key] = obj[key] instanceof Date ? toLocalDateString(obj[key]) : obj[key];
+      } else {
+        result[key] = serializeDates(obj[key]);
+      }
+    }
+    return result;
+  }
+  
+  return obj;
+}
+
+/**
  * Recursively converts date strings back to Date objects
+ * using local timezone (not UTC)
  */
 function reviveDates(obj: any): any {
   if (obj === null || obj === undefined) return obj;
   
   if (typeof obj === 'string') {
-    // Check if string matches ISO date format
-    const dateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-    if (dateRegex.test(obj)) {
+    // Check if string matches YYYY-MM-DD format (local date)
+    const localDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (localDateRegex.test(obj)) {
+      return parseLocalDate(obj);
+    }
+    // Check if string matches ISO date format (for backward compatibility)
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+    if (isoDateRegex.test(obj)) {
       return new Date(obj);
     }
     return obj;
@@ -39,7 +76,13 @@ function reviveDates(obj: any): any {
     const result: any = {};
     for (const key in obj) {
       if (key === 'startDate' || key === 'endDate') {
-        result[key] = new Date(obj[key]);
+        if (typeof obj[key] === 'string') {
+          // Parse local date string
+          const localDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+          result[key] = localDateRegex.test(obj[key]) ? parseLocalDate(obj[key]) : new Date(obj[key]);
+        } else {
+          result[key] = new Date(obj[key]);
+        }
       } else {
         result[key] = reviveDates(obj[key]);
       }
@@ -51,11 +94,12 @@ function reviveDates(obj: any): any {
 }
 
 /**
- * Save products to localStorage
+ * Save products to localStorage with local date strings (not ISO timestamps)
  */
 export function saveProducts(products: Product[]): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+    const serialized = serializeDates(products);
+    localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(serialized));
     localStorage.setItem(STORAGE_KEYS.LAST_UPDATED, new Date().toISOString());
   } catch (error) {
     console.error('Failed to save products to localStorage:', error);
@@ -79,12 +123,16 @@ export function loadProducts(): Product[] | null {
 }
 
 /**
- * Save holidays to localStorage
+ * Save holidays to localStorage with local date strings (not ISO timestamps)
  */
 export function saveHolidays(holidays: Holiday[]): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(holidays));
+    const serialized = serializeDates(holidays);
+    localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(serialized));
     localStorage.setItem(STORAGE_KEYS.LAST_UPDATED, new Date().toISOString());
+    
+    // Dispatch event for auto-refresh in planning views
+    window.dispatchEvent(new Event('holidaysUpdated'));
   } catch (error) {
     console.error('Failed to save holidays to localStorage:', error);
   }
@@ -114,8 +162,8 @@ export function saveMilestones(releaseId: string, milestones: Milestone[]): void
     const key = `milestones_${releaseId}`;
     const serialized = milestones.map(m => ({
       ...m,
-      startDate: m.startDate.toISOString(),
-      endDate: m.endDate?.toISOString(),
+      startDate: toLocalDateString(m.startDate),
+      endDate: m.endDate ? toLocalDateString(m.endDate) : undefined,
     }));
     localStorage.setItem(key, JSON.stringify(serialized));
   } catch (error) {
@@ -134,8 +182,14 @@ export function loadMilestones(releaseId: string): Milestone[] {
     const parsed = JSON.parse(stored);
     return parsed.map((m: any) => ({
       ...m,
-      startDate: new Date(m.startDate),
-      endDate: m.endDate ? new Date(m.endDate) : undefined,
+      startDate: typeof m.startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(m.startDate) 
+        ? parseLocalDate(m.startDate) 
+        : new Date(m.startDate),
+      endDate: m.endDate 
+        ? (typeof m.endDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(m.endDate)
+            ? parseLocalDate(m.endDate)
+            : new Date(m.endDate))
+        : undefined,
     }));
   } catch (error) {
     console.error('Failed to load milestones from localStorage:', error);
@@ -149,7 +203,8 @@ export function loadMilestones(releaseId: string): Milestone[] {
  */
 export function saveTeamMembers(teamMembers: TeamMember[]): void {
   try {
-    localStorage.setItem(STORAGE_KEYS.TEAM_MEMBERS, JSON.stringify(teamMembers));
+    const serialized = serializeDates(teamMembers);
+    localStorage.setItem(STORAGE_KEYS.TEAM_MEMBERS, JSON.stringify(serialized));
     localStorage.setItem(STORAGE_KEYS.LAST_UPDATED, new Date().toISOString());
     
     // Dispatch event for auto-refresh in planning views
@@ -244,11 +299,22 @@ export function deleteRelease(productId: string, releaseId: string): void {
  */
 export function clearStorage(): void {
   try {
+    // Clear all timeline_view_* keys
     localStorage.removeItem(STORAGE_KEYS.PRODUCTS);
     localStorage.removeItem(STORAGE_KEYS.HOLIDAYS);
     localStorage.removeItem(STORAGE_KEYS.TEAM_MEMBERS);
     localStorage.removeItem(STORAGE_KEYS.LAST_UPDATED);
     localStorage.removeItem(STORAGE_KEYS.DATA_VERSION);
+    
+    // Clear all milestone and phase keys (format: milestones_*, phases_*)
+    const allKeys = Object.keys(localStorage);
+    allKeys.forEach(key => {
+      if (key.startsWith('milestones_') || key.startsWith('phases_')) {
+        localStorage.removeItem(key);
+      }
+    });
+    
+    console.log('✅ localStorage cleared successfully');
   } catch (error) {
     console.error('Failed to clear storage:', error);
   }
@@ -290,6 +356,12 @@ export function initializeStorage(
   mockTeamMembers?: TeamMember[]
 ): void {
   if (!hasStoredData()) {
+    const storedVersion = localStorage.getItem(STORAGE_KEYS.DATA_VERSION);
+    if (storedVersion && storedVersion !== DATA_VERSION) {
+      console.log(`🔄 Data version changed: ${storedVersion} → ${DATA_VERSION}`);
+      console.log('📦 Clearing old localStorage data and reinitializing...');
+    }
+    
     // Clear any old data first
     clearStorage();
     // Save new data
@@ -308,6 +380,8 @@ export function initializeStorage(
     
     // Mark current version
     localStorage.setItem(STORAGE_KEYS.DATA_VERSION, DATA_VERSION);
+    console.log('✅ localStorage initialized with version', DATA_VERSION);
+    console.log('🎉 All dates now stored in local timezone format (YYYY-MM-DD)');
   }
 }
 
@@ -391,8 +465,8 @@ export function savePhases(releaseId: string, phases: Phase[]): void {
   const key = `phases_${releaseId}`;
   const serialized = phases.map(p => ({
     ...p,
-    startDate: p.startDate.toISOString(),
-    endDate: p.endDate.toISOString(),
+    startDate: toLocalDateString(p.startDate),
+    endDate: toLocalDateString(p.endDate),
   }));
   localStorage.setItem(key, JSON.stringify(serialized));
 }
@@ -409,8 +483,12 @@ export function loadPhases(releaseId: string): Phase[] {
     const parsed = JSON.parse(stored);
     return parsed.map((p: any) => ({
       ...p,
-      startDate: new Date(p.startDate),
-      endDate: new Date(p.endDate),
+      startDate: typeof p.startDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.startDate)
+        ? parseLocalDate(p.startDate)
+        : new Date(p.startDate),
+      endDate: typeof p.endDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(p.endDate)
+        ? parseLocalDate(p.endDate)
+        : new Date(p.endDate),
     }));
   } catch (error) {
     console.warn(`Failed to load phases for release ${releaseId}:`, error);

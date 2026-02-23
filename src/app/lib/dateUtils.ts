@@ -16,6 +16,25 @@ export function toLocalDateString(date: Date): string {
 }
 
 /**
+ * Parse a YYYY-MM-DD string as a LOCAL date (not UTC).
+ * 
+ * WARNING: new Date("2026-03-16") creates a UTC date, which in IST becomes March 16 5:30 AM.
+ * This function creates midnight in the LOCAL timezone.
+ * 
+ * @param dateString - Date string in YYYY-MM-DD format
+ * @returns Date object at midnight local time
+ * 
+ * @example
+ * // In IST (UTC+5:30):
+ * new Date("2026-03-16")           // => 2026-03-16T00:00:00.000Z (March 16 5:30 AM IST) ❌
+ * parseLocalDate("2026-03-16")     // => 2026-03-15T18:30:00.000Z (March 16 00:00 IST) ✅
+ */
+export function parseLocalDate(dateString: string): Date {
+  const [year, month, day] = dateString.split('-').map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+/**
  * Convert Holiday objects to array of Date objects
  * Extracts all dates in each holiday range
  */
@@ -30,18 +49,40 @@ function extractHolidayDates(holidays: Holiday[]): Date[] {
       currentDate = addDays(currentDate, 1);
     }
   }
+  
+  // Debug logging
+  if (dates.length > 0) {
+    console.log('[dateUtils] Extracted holiday dates:', dates.map(d => format(d, 'yyyy-MM-dd')));
+  }
+  
   return dates;
 }
 
 /**
  * Check if a date is a holiday
+ * Uses year/month/day comparison to avoid timezone precision issues
  */
 function isHoliday(date: Date, holidays: Date[]): boolean {
   const checkDate = startOfDay(date);
-  return holidays.some(holiday => {
+  const targetYear = checkDate.getFullYear();
+  const targetMonth = checkDate.getMonth();
+  const targetDay = checkDate.getDate();
+  
+  const match = holidays.some(holiday => {
     const holidayDate = startOfDay(holiday);
-    return holidayDate.getTime() === checkDate.getTime();
+    return (
+      holidayDate.getFullYear() === targetYear &&
+      holidayDate.getMonth() === targetMonth &&
+      holidayDate.getDate() === targetDay
+    );
   });
+  
+  // Debug logging for holiday matches
+  if (match) {
+    console.log(`[dateUtils] ✓ Holiday match found for ${format(checkDate, 'yyyy-MM-dd')}`);
+  }
+  
+  return match;
 }
 
 /**
@@ -109,6 +150,9 @@ export function storyPointsToDuration(storyPoints: number, conversionRate: numbe
 export function calculateEndDateFromEffort(startDate: Date, effortDays: number, holidays: Holiday[] = []): Date {
   if (effortDays <= 0) return startOfDay(startDate);
   
+  // Debug logging
+  console.log(`[dateUtils] calculateEndDateFromEffort: start=${format(startDate, 'yyyy-MM-dd')}, effortDays=${effortDays}, holidays=${holidays.length}`);
+  
   const holidayDates = extractHolidayDates(holidays);
   
   // For single day tasks, return start date
@@ -143,6 +187,7 @@ export function calculateEndDateFromEffort(startDate: Date, effortDays: number, 
     }
   }
 
+  console.log(`[dateUtils] calculateEndDateFromEffort result: ${format(currentDate, 'yyyy-MM-dd')} (${workingDaysAdded} working days)`);
   return currentDate;
 }
 

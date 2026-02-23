@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import { Sparkles, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Calendar, Clock } from 'lucide-react';
 import { cn } from './ui/utils';
 import type { Phase } from '../data/mockData';
-import { toLocalDateString } from '../lib/dateUtils';
+import { toLocalDateString, parseLocalDate } from '../lib/dateUtils';
 import { 
   PHASE_TEMPLATES, 
   calculatePhaseDates, 
@@ -464,7 +464,7 @@ export function PhaseSetupModal({
                         <input
                           type="date"
                           value={toLocalDateString(phase.endDate)}
-                          onChange={(e) => handlePhaseEndDateChange(index, new Date(e.target.value))}
+                          onChange={(e) => handlePhaseEndDateChange(index, parseLocalDate(e.target.value))}
                           min={toLocalDateString(phase.startDate)}
                           max={toLocalDateString(releaseEndDate)}
                           className="px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white dark:bg-slate-800 dark:border-slate-600 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
