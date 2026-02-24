@@ -4,10 +4,11 @@ import { TeamMember } from '../data/mockData';
 import { parseCSV } from '../lib/csvParser';
 import { deriveVelocityMultiplier } from '../lib/importMappings';
 import { cn } from './ui/utils';
+import { type TeamRole, getRoleColor, loadRoleColors } from '../lib/roleColors';
 
 interface TeamMemberDraft {
   name: string;
-  role: 'Developer' | 'Designer' | 'QA';
+  role: TeamRole;
   experienceLevel: 'Junior' | 'Mid' | 'Senior';
   notes: string;
 }
@@ -25,8 +26,9 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
   const [step, setStep] = useState<Step>('product-info');
   const [productName, setProductName] = useState('');
   const [members, setMembers] = useState<TeamMemberDraft[]>([
-    { name: '', role: 'Developer', experienceLevel: 'Mid', notes: '' }
+    { name: '', role: 'Backend', experienceLevel: 'Mid', notes: '' }
   ]);
+  const roleColors = loadRoleColors();
   const [inputMode, setInputMode] = useState<TeamInputMode>('csv');
   const [csvError, setCsvError] = useState<string | null>(null);
   const [csvSuccess, setCsvSuccess] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addMember = () => {
-    setMembers(prev => [...prev, { name: '', role: 'Developer', experienceLevel: 'Mid', notes: '' }]);
+    setMembers(prev => [...prev, { name: '', role: 'Backend', experienceLevel: 'Mid', notes: '' }]);
   };
 
   const removeMember = (index: number) => {
@@ -63,21 +65,34 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
     onClose();
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'Developer': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'Designer': return 'bg-purple-50 text-purple-700 border-purple-200';
-      case 'QA': return 'bg-green-50 text-green-700 border-green-200';
-      default: return 'bg-gray-50 text-gray-700 border-gray-200';
-    }
+  const getRoleBadgeColor = (role: TeamRole) => {
+    const color = getRoleColor(role, roleColors);
+    // Convert hex to CSS classes (simplified - using inline styles would be better but keeping structure)
+    const roleColorMap: Record<string, string> = {
+      'Frontend': 'bg-blue-50 text-blue-700 border-blue-200',
+      'Backend': 'bg-purple-50 text-purple-700 border-purple-200',
+      'Fullstack': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      'QA': 'bg-orange-50 text-orange-700 border-orange-200',
+      'Designer': 'bg-pink-50 text-pink-700 border-pink-200',
+      'DataEngineer': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      'iOS': 'bg-gray-50 text-gray-700 border-gray-200',
+      'Android': 'bg-lime-50 text-lime-700 border-lime-200',
+      'Developer': 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    };
+    return roleColorMap[role] || 'bg-gray-50 text-gray-700 border-gray-200';
   };
 
-  const normalizeRole = (role: string): 'Developer' | 'Designer' | 'QA' => {
+  const normalizeRole = (role: string): TeamRole => {
     const lower = role.toLowerCase().trim();
-    if (['developer', 'dev', 'engineer', 'frontend', 'backend', 'fullstack', 'full-stack'].includes(lower)) return 'Developer';
-    if (['designer', 'design', 'ux', 'ui', 'ux/ui', 'ui/ux', 'product designer'].includes(lower)) return 'Designer';
+    if (['frontend', 'front-end', 'fe', 'ui'].includes(lower)) return 'Frontend';
+    if (['backend', 'back-end', 'be', 'api', 'server'].includes(lower)) return 'Backend';
+    if (['fullstack', 'full-stack', 'full stack', 'fs', 'developer', 'dev', 'engineer'].includes(lower)) return 'Fullstack';
     if (['qa', 'quality', 'tester', 'test', 'quality assurance', 'sdet'].includes(lower)) return 'QA';
-    return 'Developer'; // default
+    if (['designer', 'design', 'ux', 'ui/ux', 'ux/ui', 'product designer'].includes(lower)) return 'Designer';
+    if (['dataengineer', 'data engineer', 'data', 'de', 'data eng'].includes(lower)) return 'DataEngineer';
+    if (['ios', 'swift', 'apple', 'iphone'].includes(lower)) return 'iOS';
+    if (['android', 'kotlin', 'droid'].includes(lower)) return 'Android';
+    return 'Backend'; // default
   };
 
   const processCSVContent = useCallback((content: string) => {
@@ -121,7 +136,7 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
           errors.push(`Row ${i + 2}: Empty name, skipped`);
           return;
         }
-        const role = roleIdx >= 0 ? normalizeRole(row[roleIdx] || '') : 'Developer';
+        const role = roleIdx >= 0 ? normalizeRole(row[roleIdx] || '') : 'Backend';
         const experienceLevel = experienceIdx >= 0 ? normalizeExperienceLevel(row[experienceIdx] || 'Mid') : 'Mid';
         const notes = notesIdx >= 0 ? (row[notesIdx]?.trim() || '') : '';
         parsed.push({ name, role, experienceLevel, notes });
@@ -171,16 +186,16 @@ export function CreateProductModal({ onClose, onCreate }: CreateProductModalProp
   }, [processCSVContent]);
 
   const downloadTeamTemplate = () => {
-    const csv = `name,role,notes,experienceLevel
-AI Tech Lead 1,Developer,Full-stack engineer,Senior
-AI Tech Backend 1,Developer,Full-stack engineer,Senior
-AI Tech Backend 2,Developer,Full-stack engineer,Mid
-AI Tech Backend 3,Developer,Full-stack engineer,Mid
-AI Tech Backend 4,Developer,Full-stack engineer,Junior
-AI Tech Frontend 1,Developer,Full-stack engineer,Junior
-AI Tech Frontend 2,Developer,Full-stack engineer,Senior
-AI Tech Frontend 3,Developer,Full-stack engineer,Mid
-AI Tech Frontend 4,Developer,Full-stack engineer,Junior`;
+    const csv = `name,role,experienceLevel,velocityMultiplier,notes
+Alice Chen,Backend,Senior,1.3,API design specialist
+Bob Smith,Backend,Mid,1.0,Database expert
+Carol White,Frontend,Mid,1.0,React & UI/UX
+David Lee,Fullstack,Senior,1.3,Full-stack architect
+Emma Wilson,QA,Mid,1.0,Test automation
+Frank Zhang,Designer,Senior,1.3,Product design lead
+Grace Kim,DataEngineer,Mid,1.0,Data pipelines
+Henry Park,iOS,Senior,1.3,Swift specialist
+Ivy Rodriguez,Android,Mid,1.0,Kotlin expert`;
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -378,9 +393,14 @@ AI Tech Frontend 4,Developer,Full-stack engineer,Junior`;
                             getRoleBadgeColor(member.role)
                           )}
                         >
-                          <option value="Developer">Developer</option>
-                          <option value="Designer">Designer</option>
+                          <option value="Backend">Backend</option>
+                          <option value="Frontend">Frontend</option>
+                          <option value="Fullstack">Fullstack</option>
                           <option value="QA">QA</option>
+                          <option value="Designer">Designer</option>
+                          <option value="DataEngineer">Data Engineer</option>
+                          <option value="iOS">iOS</option>
+                          <option value="Android">Android</option>
                         </select>
                       </div>
                       <div>
@@ -512,12 +532,13 @@ AI Tech Frontend 4,Developer,Full-stack engineer,Junior`;
                   <div className="p-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl">
                     <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Expected CSV format</p>
                     <div className="text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg border border-slate-200 dark:border-slate-700 overflow-x-auto">
-                      <div className="text-slate-900 dark:text-white font-semibold">name,role,experienceLevel</div>
-                      <div>Jane Doe,Developer,Senior</div>
-                      <div>John Smith,Designer,Mid</div>
+                      <div className="text-slate-900 dark:text-white font-semibold">name,role,experienceLevel,velocityMultiplier,notes</div>
+                      <div>Alice Chen,Backend,Senior,1.3,API specialist</div>
+                      <div>Bob Smith,Frontend,Mid,1.0,React expert</div>
+                      <div>Carol White,QA,Mid,1.0,Test automation</div>
                     </div>
                     <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-                      Only <span className="font-semibold">name</span> is required. Role defaults to Developer, experience level defaults to Mid.
+                      Only <span className="font-semibold">name</span> is required. Supported roles: Backend, Frontend, Fullstack, QA, Designer, DataEngineer, iOS, Android. Experience defaults to Mid. Velocity auto-calculated if not provided.
                     </p>
                   </div>
                 </div>

@@ -772,35 +772,35 @@ function UploadStep({
   const downloadSampleCSV = () => {
     // Use the exact same template as BulkTicketImportModal for consistency
     const template = `title,epic,effortDays,priority,assignedTo
-Configure AWS hosting services,Infra Setup,15,High,AI Tech Lead
-Configure AWS GenAI services,Infra Setup,10,High,AI Tech Lead
-Configure AWS storage services,Infra Setup,5,High,AI Tech Lead
-Configure Environments and Deployments,Infra Setup,10,High,AI Tech Lead
-Agents codebase setup,Code Setup,10,High,AI Tech Lead
-Backend setup (BFF layer),Code Setup,10,High,AI Tech Lead
-Develop framework to build and orchestrate multiple agents,Agentic AI Foundation,5,High,AI Tech Backend 1
-Develop data source connectors,Agentic AI Foundation,10,High,AI Tech Backend 1
-Develop tools (or MCP server) for external operations,Agentic AI Foundation,15,High,AI Tech Backend 1
-Setup memory layer,Agentic AI Foundation,10,High,AI Tech Backend 1
-Setup knowledge bases,Agentic AI Foundation,10,High,AI Tech Backend 1
-SSO Login,Authentication,5,High,AI Tech Backend 1
-SSO token verification,Authentication,5,High,AI Tech Backend 1
-Role Based access control and User groups,Account Management,15,High,AI Tech Backend 1
-Brand Library Creation,Brand Library,10,High,AI Tech Backend 2
-Document management,Brand Library,10,High,AI Tech Backend 2
-Knowledge Base - Ingestion Workflow,Brand Library,25,High,AI Tech Backend 2
-Ability to create and manage content collection in brand library,Content Collection,5,High,AI Tech Backend 2
-Agents to identify relevant documents from brand library,Content Collection,5,High,AI Tech Backend 2
-Agents to generate text content based on context and template,Content Creation,10,High,AI Tech Backend 2
-Agentic workflow to draft content with given inputs,Content Creation,10,High,AI Tech Backend 2
-Workflows to modify content draft,Content Creation,10,High,AI Tech Backend 2
-Fine-tune creation agents for specific channel templates,Content Creation,15,High,AI Tech Backend 3
-Dynamic Templates with X dynamic components,Templates,5,High,AI Tech Backend 3
-Agentic workflows to localize the content draft (translation + rules),Content Localization,15,High,AI Tech Backend 3
-Workflows to modify localized content,Content Localization,5,High,AI Tech Backend 3
-Fine-tune localization agents for specific geographies,Content Localization,10,High,AI Tech Backend 3
-UI Based Form to collect key pieces of information that will be captured and stored in our DD. This will be used for the master prompt,Master Story,15,High,AI Tech Backend 3
-Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Backend 3`;
+Configure AWS hosting services,Infra Setup,8,High,David Lee
+Configure AWS GenAI services,Infra Setup,5,High,David Lee
+Configure AWS storage services,Infra Setup,3,High,Alice Chen
+Configure Environments and Deployments,Infra Setup,5,High,Bob Smith
+Agents codebase setup,Code Setup,5,High,David Lee
+Backend setup (BFF layer),Code Setup,6,High,Alice Chen
+Develop framework to build and orchestrate multiple agents,Agentic AI Foundation,8,High,Bob Smith
+Develop data source connectors,Agentic AI Foundation,5,High,Alice Chen
+Develop tools (or MCP server) for external operations,Agentic AI Foundation,8,High,Bob Smith
+Setup memory layer,Agentic AI Foundation,5,High,Alice Chen
+Setup knowledge bases,Agentic AI Foundation,6,High,Bob Smith
+SSO Login,Authentication,3,High,Alice Chen
+SSO token verification,Authentication,3,High,Bob Smith
+Role Based access control and User groups,Account Management,8,High,Alice Chen
+Brand Library Creation,Brand Library,5,High,Bob Smith
+Document management,Brand Library,5,High,Grace Kim
+Knowledge Base - Ingestion Workflow,Brand Library,10,High,Grace Kim
+Ability to create and manage content collection in brand library,Content Collection,3,High,Grace Kim
+Agents to identify relevant documents from brand library,Content Collection,5,High,Bob Smith
+Agents to generate text content based on context and template,Content Creation,6,High,Alice Chen
+Agentic workflow to draft content with given inputs,Content Creation,6,High,Bob Smith
+Workflows to modify content draft,Content Creation,5,High,Alice Chen
+Fine-tune creation agents for specific channel templates,Content Creation,8,High,Bob Smith
+Dynamic Templates with X dynamic components,Templates,4,High,Carol White
+Agentic workflows to localize the content draft (translation + rules),Content Localization,8,High,Alice Chen
+Workflows to modify localized content,Content Localization,4,High,Bob Smith
+Fine-tune localization agents for specific geographies,Content Localization,6,High,Alice Chen
+UI Based Form to collect key pieces of information that will be captured and stored in our DD. This will be used for the master prompt,Master Story,8,High,Carol White
+Country roll-out for Global + Germany Italy,Country Roll out,10,High,David Lee`;
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

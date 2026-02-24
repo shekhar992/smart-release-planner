@@ -332,11 +332,11 @@ function TemplatesStep() {
       name: 'Tickets Template',
       description: 'Your planned work items including features and tasks with dates and assignments',
       required: true,
-      columns: ['id', 'title', 'startDate', 'endDate', 'status', 'effortDays', 'assignedTo'],
+      columns: ['id', 'title', 'startDate', 'endDate', 'status', 'effortDays', 'storyPoints', 'assignedTo', 'priority', 'description', 'feature', 'requiredRole', 'blockedBy'],
       exampleData: [
-        ['t1', 'User Authentication', '2026-03-01', '2026-03-05', 'planned', '5', 'Alice Chen'],
-        ['t2', 'Database Schema', '2026-03-04', '2026-03-08', 'planned', '8', 'Bob Smith'],
-        ['t3', 'Dashboard UI', '2026-03-06', '2026-03-10', 'planned', '3', 'Carol White']
+        ['t1', 'User Authentication', '2026-03-01', '2026-03-05', 'planned', '5', '', 'Alice Chen', 'High', 'Implement JWT-based auth', 'Auth', 'Backend', ''],
+        ['t2', 'Database Schema', '2026-03-04', '2026-03-08', 'planned', '8', '', 'Bob Smith', 'High', 'Design user tables', 'Database', 'Backend', ''],
+        ['t3', 'Dashboard UI', '2026-03-06', '2026-03-10', 'planned', '3', '', 'Carol White', 'Medium', 'Create dashboard', 'UI', 'Frontend', 't1,t2']
       ]
     },
     {
@@ -344,11 +344,11 @@ function TemplatesStep() {
       name: 'Team Roster Template',
       description: 'List of team members who will be working on this release',
       required: true,
-      columns: ['name', 'role', 'experienceLevel'],
+      columns: ['name', 'role', 'experienceLevel', 'velocityMultiplier', 'notes'],
       exampleData: [
-        ['Alice Chen', 'Developer', 'Senior'],
-        ['Bob Smith', 'Developer', 'Mid'],
-        ['Carol White', 'Designer', 'Mid']
+        ['Alice Chen', 'Backend', 'Senior', '1.3', 'API specialist'],
+        ['Bob Smith', 'Backend', 'Mid', '1.0', 'Database expert'],
+        ['Carol White', 'Frontend', 'Mid', '1.0', 'React & UI/UX']
       ]
     },
     {

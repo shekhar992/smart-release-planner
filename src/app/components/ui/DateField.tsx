@@ -42,7 +42,7 @@ interface DateFieldProps {
  * Handles conversion between Date objects and string representations
  * using timezone-safe utilities.
  */
-export const DateField = forwardRef<HTMLInputElement, DateFieldProps>(
+export const DateField = forwardRef<HTMLButtonElement, DateFieldProps>(
   (
     {
       label,

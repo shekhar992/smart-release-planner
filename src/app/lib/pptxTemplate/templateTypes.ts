@@ -43,6 +43,22 @@ export type PptxGoLive = {
   date: PptxDateLike;
 };
 
+export type PptxPhase = {
+  id: string;
+  name: string;
+  type: string;
+  range: PptxTimeRange;
+  allowsWork: boolean;
+};
+
+export type PptxMilestone = {
+  id: string;
+  name: string;
+  type: string;
+  date: PptxDateLike;
+  isBlocking?: boolean;
+};
+
 export type PptxRoadmapTemplateData = {
   templateVersion: 'release-planner-roadmap-v1';
   title: string;
@@ -53,6 +69,8 @@ export type PptxRoadmapTemplateData = {
     /** Month labels are derived if not provided */
     months?: { label: string; start: PptxDateLike; end: PptxDateLike }[];
     sprints?: PptxSprintSegment[];
+    phases?: PptxPhase[];
+    milestones?: PptxMilestone[];
     lanes: PptxLane[];
     goLive?: PptxGoLive;
   };

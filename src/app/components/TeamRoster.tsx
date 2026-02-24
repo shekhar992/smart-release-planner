@@ -154,6 +154,11 @@ export function TeamRoster() {
                         </span>
                       )}
                     </div>
+                    {member.notes && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 line-clamp-2">
+                        {member.notes}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -213,13 +218,19 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
   const [name, setName] = useState('');
   const [role, setRole] = useState<TeamRole>('Frontend');
   const [experienceLevel, setExperienceLevel] = useState<'Junior' | 'Mid' | 'Senior' | 'Lead'>('Mid');
+  const [velocityMultiplier, setVelocityMultiplier] = useState(1.0);
+  const [notes, setNotes] = useState('');
 
-  // Automatically calculate velocity multiplier based on experience level
-  const velocityMultiplier = 
-    experienceLevel === 'Junior' ? 0.7 : 
-    experienceLevel === 'Senior' ? 1.3 : 
-    experienceLevel === 'Lead' ? 1.5 : 
-    1.0;
+  // Update velocity multiplier when experience level changes
+  const handleExperienceLevelChange = (level: 'Junior' | 'Mid' | 'Senior' | 'Lead') => {
+    setExperienceLevel(level);
+    const defaultVelocity = 
+      level === 'Junior' ? 0.7 : 
+      level === 'Senior' ? 1.3 : 
+      level === 'Lead' ? 1.5 : 
+      1.0;
+    setVelocityMultiplier(defaultVelocity);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,6 +242,7 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
       role,
       experienceLevel,
       velocityMultiplier,
+      notes: notes.trim() || undefined,
       pto: [],
       productId
     };
@@ -330,7 +342,7 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
               </label>
               <select
                 value={experienceLevel}
-                onChange={(e) => setExperienceLevel(e.target.value as 'Junior' | 'Mid' | 'Senior' | 'Lead')}
+                onChange={(e) => handleExperienceLevelChange(e.target.value as 'Junior' | 'Mid' | 'Senior' | 'Lead')}
                 className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
               >
                 <option value="Junior">Junior</option>
@@ -338,13 +350,40 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
                 <option value="Senior">Senior</option>
                 <option value="Lead">Lead</option>
               </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
+                Velocity Multiplier
+              </label>
+              <input
+                type="number"
+                value={velocityMultiplier}
+                onChange={(e) => setVelocityMultiplier(parseFloat(e.target.value) || 1.0)}
+                min="0.1"
+                max="3.0"
+                step="0.1"
+                className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
+              />
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
-                Velocity: <span className="font-semibold text-slate-900 dark:text-white">{velocityMultiplier.toFixed(1)}x</span>
-                {experienceLevel === 'Junior' && ' (slower pace)'}
-                {experienceLevel === 'Mid' && ' (standard pace)'}
-                {experienceLevel === 'Senior' && ' (faster pace)'}
-                {experienceLevel === 'Lead' && ' (expert pace)'}
+                {velocityMultiplier < 0.8 && 'Slower pace - suitable for juniors or complex work'}
+                {velocityMultiplier >= 0.8 && velocityMultiplier < 1.2 && 'Standard pace - typical developer velocity'}
+                {velocityMultiplier >= 1.2 && velocityMultiplier < 1.5 && 'Faster pace - senior developer velocity'}
+                {velocityMultiplier >= 1.5 && 'Expert pace - lead developer velocity'}
               </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-900 dark:text-white mb-2">
+                Notes <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g., Specializes in React, Available part-time, etc."
+                rows={3}
+                className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all resize-none"
+              />
             </div>
           </div>
 

@@ -5,25 +5,22 @@
  * - Day view (40px per day) - Default
  * - Week view (compressed) - For sprint overview
  * - Month view (very compressed) - For release overview
- * - "Today" button - Scroll to today's date
  * - "Fit Release" button - Fit entire release in viewport
  */
 
-import { ZoomIn, ZoomOut, Calendar } from 'lucide-react';
+import { ZoomIn, ZoomOut } from 'lucide-react';
 
 export type ZoomLevel = 'day' | 'week' | 'month';
 
 interface ZoomControlsProps {
   currentZoom: ZoomLevel;
   onZoomChange: (zoom: ZoomLevel) => void;
-  onTodayClick: () => void;
   onFitReleaseClick: () => void;
 }
 
 export function ZoomControls({
   currentZoom,
   onZoomChange,
-  onTodayClick,
   onFitReleaseClick
 }: ZoomControlsProps) {
   return (
@@ -99,16 +96,7 @@ export function ZoomControls({
       {/* Divider */}
       <div className="w-px h-6 bg-gray-300" />
 
-      {/* Navigation Buttons */}
-      <button
-        onClick={onTodayClick}
-        className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors flex items-center gap-1.5"
-        title="Scroll to today"
-      >
-        <Calendar className="w-3.5 h-3.5" />
-        <span>Today</span>
-      </button>
-
+      {/* Fit Release Button */}
       <button
         onClick={onFitReleaseClick}
         className="px-3 py-1.5 text-xs font-medium bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"

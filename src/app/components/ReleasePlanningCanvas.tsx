@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, AlertTriangle, Wand2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
+import { ZoomControls, ZoomLevel } from './ZoomControls';
+import { ViewModeSelector, ViewMode } from './ViewModeSelector';
 import { WorkloadModal } from './WorkloadModal';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
 import { TicketCreationModal } from './TicketCreationModal';
@@ -248,6 +250,8 @@ export function ReleasePlanningCanvas() {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showSprintCreation, setShowSprintCreation] = useState(false);
   const [showAddMilestoneModal, setShowAddMilestoneModal] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
+  const [viewMode, setViewMode] = useState<ViewMode>('detailed');
 
   // Phase 3: Smart Assistant Panel state
   const [assistantPanelOpen, setAssistantPanelOpen] = useState(() => {
@@ -376,6 +380,26 @@ export function ReleasePlanningCanvas() {
     console.log('Ignoring conflict for ticket:', ticketId);
     // For now, just close the panel
     setShowConflictResolution(false);
+  };
+
+  // Zoom control handlers
+  const handleZoomChange = (zoom: ZoomLevel) => {
+    setZoomLevel(zoom);
+  };
+
+  const handleFitReleaseClick = () => {
+    // Set zoom level that fits entire release duration
+    // For now, default to month view for best fit
+    setZoomLevel('month');
+  };
+
+  // View mode handler
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    // When switching to executive mode, lock to week view
+    if (mode === 'executive') {
+      setZoomLevel('week');
+    }
   };
 
   // Sync release state when currentRelease changes (e.g., after data loads)
@@ -1049,7 +1073,11 @@ export function ReleasePlanningCanvas() {
   const handleExportPPTX = async () => {
     if (!release) return;
     try {
-      await exportReleaseTimelinePptx(release);
+      await exportReleaseTimelinePptx(release, {
+        viewMode,
+        milestones,
+        phases,
+      });
     } catch (error) {
       console.error('PPTX export failed:', error);
       alert('Export failed. Please check the console for details.');
@@ -1117,6 +1145,21 @@ export function ReleasePlanningCanvas() {
             onViewConflicts={() => setShowConflictResolution(true)}
           />
 
+          {/* View Mode Selector */}
+          <ViewModeSelector
+            currentMode={viewMode}
+            onModeChange={handleViewModeChange}
+          />
+
+          {/* Zoom Controls (only shown in Detailed mode) */}
+          {viewMode === 'detailed' && (
+            <ZoomControls
+              currentZoom={zoomLevel}
+              onZoomChange={handleZoomChange}
+              onFitReleaseClick={handleFitReleaseClick}
+            />
+          )}
+
           {/* Actions Menu (overflow) */}
           <div className="relative">
             <button
@@ -1166,16 +1209,6 @@ export function ReleasePlanningCanvas() {
                     <span>Import Tickets</span>
                   </button>
                   <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
-                  <button
-                    onClick={() => {
-                      handleAutoAllocate();
-                      setShowActionsMenu(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-all text-left font-medium bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 text-purple-700 dark:text-purple-400 hover:from-purple-100 hover:to-blue-100 dark:hover:from-purple-900/30 dark:hover:to-blue-900/30"
-                  >
-                    <Wand2 className="w-4 h-4" />
-                    <span>Auto-Allocate Tickets</span>
-                  </button>
                   <button
                     onClick={() => {
                       handleExportPPTX();
@@ -1433,6 +1466,8 @@ export function ReleasePlanningCanvas() {
           onShowSprintCreationChange={setShowSprintCreation}
           showAddMilestoneModal={showAddMilestoneModal}
           onShowAddMilestoneModalChange={setShowAddMilestoneModal}
+          zoomLevel={zoomLevel}
+          viewMode={viewMode}
           />
         </div>
       </div>

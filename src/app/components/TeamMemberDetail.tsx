@@ -270,11 +270,20 @@ interface EditMemberInfoFormProps {
 function EditMemberInfoForm({ member, onSave, onCancel }: EditMemberInfoFormProps) {
   const [name, setName] = useState(member.name);
   const [role, setRole] = useState(member.role);
-  const [experienceLevel, setExperienceLevel] = useState<'Junior' | 'Mid' | 'Senior'>(member.experienceLevel || 'Mid');
+  const [experienceLevel, setExperienceLevel] = useState<'Junior' | 'Mid' | 'Senior' | 'Lead'>(member.experienceLevel || 'Mid');
+  const [velocityMultiplier, setVelocityMultiplier] = useState(member.velocityMultiplier || 1.0);
   const [notes, setNotes] = useState(member.notes || '');
 
-  // Automatically calculate velocity multiplier based on experience level
-  const velocityMultiplier = experienceLevel === 'Junior' ? 0.7 : experienceLevel === 'Senior' ? 1.3 : 1.0;
+  // Update velocity multiplier when experience level changes
+  const handleExperienceLevelChange = (level: 'Junior' | 'Mid' | 'Senior' | 'Lead') => {
+    setExperienceLevel(level);
+    const defaultVelocity = 
+      level === 'Junior' ? 0.7 : 
+      level === 'Senior' ? 1.3 : 
+      level === 'Lead' ? 1.5 : 
+      1.0;
+    setVelocityMultiplier(defaultVelocity);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -302,37 +311,63 @@ function EditMemberInfoForm({ member, onSave, onCancel }: EditMemberInfoFormProp
         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Role</label>
         <select
           value={role}
-          onChange={(e) => setRole(e.target.value as 'Developer' | 'Designer' | 'QA')}
+          onChange={(e) => setRole(e.target.value as TeamMember['role'])}
           className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
         >
-          <option value="Developer">Developer</option>
-          <option value="Designer">Designer</option>
-          <option value="QA">QA</option>
+          <optgroup label="Web Development">
+            <option value="Frontend">Frontend</option>
+            <option value="Backend">Backend</option>
+            <option value="Fullstack">Fullstack</option>
+            <option value="DataEngineer">Data Engineer</option>
+          </optgroup>
+          <optgroup label="Mobile Development">
+            <option value="iOS">iOS</option>
+            <option value="Android">Android</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="Designer">Designer</option>
+            <option value="QA">QA</option>
+            <option value="Developer">Developer (Legacy)</option>
+          </optgroup>
         </select>
       </div>
       <div>
         <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Experience Level</label>
         <select
           value={experienceLevel}
-          onChange={(e) => setExperienceLevel(e.target.value as 'Junior' | 'Mid' | 'Senior')}
+          onChange={(e) => handleExperienceLevelChange(e.target.value as 'Junior' | 'Mid' | 'Senior' | 'Lead')}
           className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
         >
           <option value="Junior">Junior</option>
           <option value="Mid">Mid</option>
           <option value="Senior">Senior</option>
+          <option value="Lead">Lead</option>
         </select>
+      </div>
+      <div>
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Velocity Multiplier</label>
+        <input
+          type="number"
+          value={velocityMultiplier}
+          onChange={(e) => setVelocityMultiplier(parseFloat(e.target.value) || 1.0)}
+          min="0.1"
+          max="3.0"
+          step="0.1"
+          className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
+        />
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          Velocity: <span className="font-semibold text-slate-700 dark:text-slate-300">{velocityMultiplier.toFixed(1)}x</span>
-          {experienceLevel === 'Junior' && ' (slower pace)'}
-          {experienceLevel === 'Mid' && ' (standard pace)'}
-          {experienceLevel === 'Senior' && ' (faster pace)'}
+          {velocityMultiplier < 0.8 && 'Slower pace - suitable for juniors or complex work'}
+          {velocityMultiplier >= 0.8 && velocityMultiplier < 1.2 && 'Standard pace - typical developer velocity'}
+          {velocityMultiplier >= 1.2 && velocityMultiplier < 1.5 && 'Faster pace - senior developer velocity'}
+          {velocityMultiplier >= 1.5 && 'Expert pace - lead developer velocity'}
         </p>
       </div>
       <div>
-        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Notes</label>
+        <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Notes <span className="text-slate-400 font-normal">(optional)</span></label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+          placeholder="e.g., Specializes in React, Available part-time, etc."
           className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm resize-none transition-all duration-200"
           rows={3}
         />

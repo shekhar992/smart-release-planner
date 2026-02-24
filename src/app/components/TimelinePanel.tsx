@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, GripVertical, ChevronDown, Calendar, Plus, Trash2, X, Link2 } from 'lucide-react';
-import { Release, Ticket, Holiday, TeamMember, Milestone, MilestoneType, Phase, PhaseType, getMockPhasesForRelease } from '../data/mockData';
+import { Release, Ticket, Holiday, TeamMember, Milestone, MilestoneType, Phase, PhaseType, Feature, getMockPhasesForRelease } from '../data/mockData';
 import { SprintCreationPopover } from './SprintCreationPopover';
 import { TicketConflict, hasConflict } from '../lib/conflictDetection';
 import { SprintCapacity, getCapacityStatusColor } from '../lib/capacityCalculation';
@@ -13,7 +13,7 @@ import { calculateWorkingDays } from '../lib/teamCapacityCalculation';
 import { loadMilestones, saveMilestones, loadPhases, savePhases } from '../lib/localStorage';
 import { AddMilestoneModal } from './AddMilestoneModal';
 import { getTicketDependencyStatus, countBlockedTickets, getStatusDotColor, getStatusLabel } from '../lib/ticketDependencies';
-import { getRoleColor, type TeamRole } from '../lib/roleColors';
+import { getRoleColor, loadRoleColors, type TeamRole } from '../lib/roleColors';
 
 // Helper: Count working days (Mon-Fri) between two dates
 function countWorkingDays(start: Date, end: Date): number {
@@ -189,6 +189,56 @@ function getTicketColorScheme(
   };
 }
 
+// Feature Executive Bar Component for Executive View Mode
+function FeatureExecutiveBar({
+  feature,
+  aggregates,
+  dayWidth,
+  getPositionFromDate,
+  getDaysDifference,
+  verticalOffset
+}: {
+  feature: Feature;
+  aggregates: { ticketCount: number; totalDays: number; startDate: Date; endDate: Date };
+  dayWidth: number;
+  getPositionFromDate: (date: Date) => number;
+  getDaysDifference: (date1: Date, date2: Date) => number;
+  verticalOffset: number;
+}) {
+  const left = getPositionFromDate(aggregates.startDate);
+  const width = getDaysDifference(aggregates.startDate, aggregates.endDate) * dayWidth;
+  
+  return (
+    <div
+      className="absolute px-3 py-2 rounded-lg border-2 shadow-sm cursor-pointer hover:shadow-md transition-all duration-200"
+      style={{
+        left,
+        width: Math.max(width, 100), // Minimum width for readability
+        top: verticalOffset + 4, // 4px offset for centering within the row
+        height: 32,
+        backgroundColor: '#dbeafe',
+        borderColor: '#2563eb',
+        zIndex: 10
+      }}
+      title={`${feature.name}\n${aggregates.ticketCount} tickets\n${Math.round(aggregates.totalDays)} days`}
+    >
+      <div className="flex items-center justify-between h-full text-xs">
+        <span className="font-semibold text-blue-900 truncate flex-1">
+          {feature.name}
+        </span>
+        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+          <span className="px-1.5 py-0.5 bg-blue-600 text-white rounded text-[10px] font-bold">
+            {aggregates.ticketCount} tickets
+          </span>
+          <span className="px-1.5 py-0.5 bg-blue-700 text-white rounded text-[10px] font-bold">
+            {Math.round(aggregates.totalDays)}d
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface TimelinePanelProps {
   release: Release;
   holidays: Holiday[];
@@ -206,6 +256,8 @@ interface TimelinePanelProps {
   onShowSprintCreationChange?: (show: boolean) => void;
   showAddMilestoneModal?: boolean;
   onShowAddMilestoneModalChange?: (show: boolean) => void;
+  zoomLevel?: 'day' | 'week' | 'month';
+  viewMode?: 'detailed' | 'executive';
 }
 
 // ============================================
@@ -239,12 +291,16 @@ const GANTT_CONSTANTS = {
 } as const;
 
 // Backwards compatibility aliases
-const DAY_WIDTH = GANTT_CONSTANTS.DAY_WIDTH;
 const ROW_HEIGHT = GANTT_CONSTANTS.ROW_HEIGHT;
 const FEATURE_HEADER_HEIGHT = GANTT_CONSTANTS.FEATURE_HEADER_HEIGHT;
 const SIDEBAR_WIDTH = GANTT_CONSTANTS.SIDEBAR_WIDTH;
 
-export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, sprintCapacities, showSprintCreation: externalShowSprintCreation, onShowSprintCreationChange, showAddMilestoneModal: externalShowAddMilestoneModal, onShowAddMilestoneModalChange }: TimelinePanelProps) {
+export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, sprintCapacities, showSprintCreation: externalShowSprintCreation, onShowSprintCreationChange, showAddMilestoneModal: externalShowAddMilestoneModal, onShowAddMilestoneModalChange, zoomLevel = 'day', viewMode = 'detailed' }: TimelinePanelProps) {
+  // Calculate dynamic day width based on zoom level
+  const DAY_WIDTH = zoomLevel === 'month' ? GANTT_CONSTANTS.DAY_WIDTH_MONTH : 
+                    zoomLevel === 'week' ? GANTT_CONSTANTS.DAY_WIDTH_WEEK : 
+                    GANTT_CONSTANTS.DAY_WIDTH;
+  const roleColors = useMemo(() => loadRoleColors(), []);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [internalShowSprintCreation, setInternalShowSprintCreation] = useState(false);
   const [internalShowAddMilestoneModal, setInternalShowAddMilestoneModal] = useState(false);
@@ -433,7 +489,11 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   const totalFeatures = visibleFeatures.length;
   
   // Calculate content height including all spacers
-  let contentHeight = (totalFeatures * FEATURE_HEADER_HEIGHT) + (totalTickets * ROW_HEIGHT);
+  // In Executive mode, we only count feature headers (no individual ticket rows)
+  let contentHeight = (totalFeatures * FEATURE_HEADER_HEIGHT);
+  if (viewMode === 'detailed') {
+    contentHeight += (totalTickets * ROW_HEIGHT);
+  }
   // Add legend spacer
   contentHeight += GANTT_CONSTANTS.ROW_HEIGHT;
   // Add phase spacer if visible
@@ -444,6 +504,33 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   if (showMilestones) {
     contentHeight += GANTT_CONSTANTS.MILESTONE_STRIP_HEIGHT;
   }
+
+  // Helper function to calculate feature aggregates for Executive mode
+  const getFeatureAggregates = (feature: Feature) => {
+    if (feature.tickets.length === 0) {
+      return {
+        ticketCount: 0,
+        totalDays: 0,
+        startDate: feature.tickets[0]?.startDate || startDate,
+        endDate: feature.tickets[0]?.endDate || endDate
+      };
+    }
+
+    const ticketCount = feature.tickets.length;
+    const totalDays = feature.tickets.reduce((sum: number, ticket: Ticket) => {
+      return sum + (ticket.effortDays || ticket.storyPoints || 0);
+    }, 0);
+    
+    const featureStartDate = new Date(Math.min(...feature.tickets.map((t: Ticket) => t.startDate.getTime())));
+    const featureEndDate = new Date(Math.max(...feature.tickets.map((t: Ticket) => t.endDate.getTime())));
+    
+    return {
+      ticketCount,
+      totalDays,
+      startDate: featureStartDate,
+      endDate: featureEndDate
+    };
+  };
 
   return (
     <div className="h-full flex flex-col bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
@@ -504,7 +591,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
       <div className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b-2 border-slate-200 dark:border-slate-700 flex relative shadow-md">
         {/* Left Sidebar Header */}
         <div 
-          className="border-r-2 border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-800/90 backdrop-blur-sm"
+          className="border-r-2 border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-800/90 backdrop-blur-sm flex flex-col"
           style={{ width: SIDEBAR_WIDTH, minWidth: SIDEBAR_WIDTH }}
         >
           <TimelineSidebarHeader 
@@ -519,6 +606,30 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             teamMembers={teamMembers}
             selectedDeveloperId={selectedDeveloperId}
             onChangeDeveloper={setSelectedDeveloperId}
+          />
+          {/* Role Legend - Between TICKETS and Sprint Summary */}
+          <div className="px-4 py-2 bg-white dark:bg-slate-900 border-b border-slate-200/50 dark:border-slate-700/50">
+            <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">Roles</div>
+            <div className="grid grid-cols-4 gap-x-2 gap-y-1.5">
+              {(['Frontend', 'Backend', 'Fullstack', 'QA', 'Designer', 'DataEngineer', 'iOS', 'Android'] as const).map((role) => {
+                const color = getRoleColor(role, roleColors);
+                return (
+                  <div key={role} className="flex items-center gap-1">
+                    <div 
+                      className="w-2 h-2 rounded-full shadow-sm flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="text-[9px] text-slate-600 dark:text-slate-400 truncate">
+                      {role === 'DataEngineer' ? 'Data' : role}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <SprintSummaryPanel
+            sprints={release.sprints || []}
+            sprintCapacities={sprintCapacities}
           />
         </div>
 
@@ -542,6 +653,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
               getPositionFromDate={getPositionFromDate}
               getDaysDifference={getDaysDifference}
               sprintCapacities={sprintCapacities}
+              zoomLevel={zoomLevel}
             />
           </div>
         </div>
@@ -707,6 +819,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
           {visibleFeatures.map((feature, featureIndex) => {
             const isCollapsed = collapsedFeatures.has(feature.id);
             const ticketCount = feature.tickets.length;
+            const featureAggregates = viewMode === 'executive' ? getFeatureAggregates(feature) : null;
             
             return (
               <div 
@@ -721,6 +834,9 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                   className="flex items-center px-5 cursor-pointer hover:bg-gray-50 transition-all duration-200"
                   style={{ height: FEATURE_HEADER_HEIGHT }}
                   onClick={() => {
+                    // In Executive mode, don't allow expand/collapse
+                    if (viewMode === 'executive') return;
+                    
                     const newCollapsed = new Set(collapsedFeatures);
                     if (isCollapsed) {
                       newCollapsed.delete(feature.id);
@@ -731,22 +847,24 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                   }}
                 >
                   <div className="flex items-center gap-2.5 flex-1">
-                    {/* 1.2.5: Smooth arrow rotation */}
-                    <span 
-                      className="text-sm transition-transform duration-200 ease-out"
-                      style={{
-                        transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
-                        transformOrigin: 'center',
-                        color: designTokens.colors.neutral[600]  // 1.3.2: Better contrast
-                      }}
-                    >
-                      ▶
-                    </span>
+                    {/* Arrow only shown in Detailed mode */}
+                    {viewMode === 'detailed' && (
+                      <span 
+                        className="text-sm transition-transform duration-200 ease-out"
+                        style={{
+                          transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)',
+                          transformOrigin: 'center',
+                          color: designTokens.colors.neutral[600]
+                        }}
+                      >
+                        ▶
+                      </span>
+                    )}
                     <span 
                       className="font-bold tracking-tight"
                       style={{
                         fontSize: designTokens.typography.fontSize.sm,
-                        color: designTokens.colors.neutral[800]  // 1.3.2: Better contrast
+                        color: designTokens.colors.neutral[800]
                       }}
                     >
                       {feature.name}
@@ -762,11 +880,23 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                     >
                       {ticketCount}
                     </span>
+                    {/* Show total days in Executive mode */}
+                    {viewMode === 'executive' && featureAggregates && (
+                      <span 
+                        className="px-2.5 py-1 rounded-full shadow-sm text-xs font-semibold"
+                        style={{
+                          color: '#2563eb',
+                          backgroundColor: '#dbeafe'
+                        }}
+                      >
+                        {Math.round(featureAggregates.totalDays)}d
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                {/* Feature Tickets - Names (1.2.5: Staggered fade-in) */}
-                {!isCollapsed && feature.tickets.map((ticket, ticketIndex) => (
+                {/* Feature Tickets - Names (1.2.5: Staggered fade-in) - Only in Detailed mode */}
+                {viewMode === 'detailed' && !isCollapsed && feature.tickets.map((ticket, ticketIndex) => (
                   <div
                     key={ticket.id}
                     style={{
@@ -890,16 +1020,46 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             {/* Spacer to match the legend height in left sidebar */}
             <div style={{ height: GANTT_CONSTANTS.ROW_HEIGHT }} />
             
-            {visibleFeatures.map((feature) => {
-              const isCollapsed = collapsedFeatures.has(feature.id);
-              
-              return (
-                <div key={feature.id}>
-                  {/* Feature Header Spacer */}
-                  <div style={{ height: FEATURE_HEADER_HEIGHT }} />
+            {(() => {
+              // Calculate initial offset from spacers
+              let cumulativeOffset = GANTT_CONSTANTS.ROW_HEIGHT; // Legend spacer
+              if (showPhases && phases.length > 0) {
+                cumulativeOffset += GANTT_CONSTANTS.PHASE_STRIP_HEIGHT;
+              }
+              if (showMilestones) {
+                cumulativeOffset += GANTT_CONSTANTS.MILESTONE_STRIP_HEIGHT;
+              }
 
-                  {/* Feature Ticket Bars (1.2.5: Staggered animation) */}
-                  {!isCollapsed && feature.tickets.map((ticket, ticketIndex) => (
+              return visibleFeatures.map((feature) => {
+                const isCollapsed = collapsedFeatures.has(feature.id);
+                const featureAggregates = viewMode === 'executive' ? getFeatureAggregates(feature) : null;
+                const currentOffset = cumulativeOffset;
+                
+                // Update cumulative offset for next feature
+                cumulativeOffset += FEATURE_HEADER_HEIGHT;
+                if (viewMode === 'detailed' && !isCollapsed) {
+                  cumulativeOffset += feature.tickets.length * ROW_HEIGHT;
+                }
+                
+                return (
+                  <div key={feature.id}>
+                    {/* Feature Header Spacer */}
+                    <div style={{ height: FEATURE_HEADER_HEIGHT }} />
+
+                    {/* Executive Mode: Feature-level bar */}
+                    {viewMode === 'executive' && featureAggregates && featureAggregates.ticketCount > 0 && (
+                      <FeatureExecutiveBar
+                        feature={feature}
+                        aggregates={featureAggregates}
+                        dayWidth={DAY_WIDTH}
+                        getPositionFromDate={getPositionFromDate}
+                        getDaysDifference={getDaysDifference}
+                        verticalOffset={currentOffset}
+                      />
+                    )}
+
+                    {/* Detailed Mode: Individual Ticket Bars (1.2.5: Staggered animation) */}
+                    {viewMode === 'detailed' && !isCollapsed && feature.tickets.map((ticket, ticketIndex) => (
                     <div
                       key={ticket.id}
                       className="ticket-bar"
@@ -940,7 +1100,8 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                   ))}
                 </div>
               );
-            })}
+            });
+          })()}
           </div>
         </div>
       </div>
@@ -1221,7 +1382,8 @@ function TimelineHeader({
   sprints,
   getPositionFromDate,
   getDaysDifference,
-  sprintCapacities
+  sprintCapacities,
+  zoomLevel = 'day'
 }: {
   startDate: Date;
   totalDays: number;
@@ -1230,6 +1392,7 @@ function TimelineHeader({
   getPositionFromDate: (date: Date) => number;
   getDaysDifference: (date1: Date, date2: Date) => number;
   sprintCapacities: Map<string, SprintCapacity>;
+  zoomLevel?: 'day' | 'week' | 'month';
 }) {
   // Calculate month spans for the header band
   const monthSpans: Array<{ label: string; startIndex: number; days: number }> = [];
@@ -1305,79 +1468,210 @@ function TimelineHeader({
         ))}
       </div>
 
-      {/* Date labels - Show every day number */}
+      {/* Date labels - Adaptive based on zoom level */}
       <div className="flex h-12 items-center border-b border-slate-200 dark:border-slate-700 relative">
-        {Array.from({ length: totalDays + 1 }).map((_, i) => {
-          const currentDate = new Date(startDate);
-          currentDate.setDate(currentDate.getDate() + i);
-          const dayOfMonth = currentDate.getDate();
-          const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
-          const isMonthStart = dayOfMonth === 1;
-          
-          // Check if today
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          const cellDate = new Date(currentDate);
-          cellDate.setHours(0, 0, 0, 0);
-          const isToday = cellDate.getTime() === today.getTime();
-          
-          return (
-            <div
-              key={i}
-              className="flex-shrink-0 px-0.5 py-1.5 relative flex flex-col items-center justify-center"
-              style={{ 
-                width: dayWidth,
-                backgroundColor: isToday 
-                  ? 'rgba(239, 68, 68, 0.08)' 
-                  : 'transparent',
-                borderLeft: isMonthStart ? '1.5px solid rgba(0,0,0,0.12)' : 'none'
-              }}
-            >
-              {/* Day of month number - always shown */}
-              <div 
-                className="text-[11px] font-semibold leading-none mb-0.5" 
+        {zoomLevel === 'day' && (
+          // DAY VIEW: Show every individual day
+          Array.from({ length: totalDays + 1 }).map((_, i) => {
+            const currentDate = new Date(startDate);
+            currentDate.setDate(currentDate.getDate() + i);
+            const dayOfMonth = currentDate.getDate();
+            const isWeekend = currentDate.getDay() === 0 || currentDate.getDay() === 6;
+            const isMonthStart = dayOfMonth === 1;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const cellDate = new Date(currentDate);
+            cellDate.setHours(0, 0, 0, 0);
+            const isToday = cellDate.getTime() === today.getTime();
+            
+            return (
+              <div
+                key={i}
+                className="flex-shrink-0 px-0.5 py-1.5 relative flex flex-col items-center justify-center"
                 style={{ 
-                  color: isToday 
-                    ? designTokens.colors.today.line 
-                    : isWeekend 
-                      ? 'rgba(0, 0, 0, 0.4)' 
-                      : 'rgba(0, 0, 0, 0.82)',
-                  fontWeight: isToday ? 'bold' : isMonthStart ? 700 : 600,
+                  width: dayWidth,
+                  backgroundColor: isToday ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
+                  borderLeft: isMonthStart ? '1.5px solid rgba(0,0,0,0.12)' : 'none'
                 }}
               >
-                {dayOfMonth}
-              </div>
-              
-              {/* Day letter */}
-              <div 
-                className="text-[9px] font-medium leading-none" 
-                style={{ 
-                  color: isToday 
-                    ? designTokens.colors.today.line 
-                    : isWeekend 
-                      ? 'rgba(0, 0, 0, 0.28)' 
-                      : 'rgba(0, 0, 0, 0.55)',
-                  fontWeight: isToday ? 'bold' : 500,
-                }}
-              >
-                {currentDate.toLocaleDateString('en-US', { weekday: 'narrow' })}
-              </div>
-              
-              {/* Today indicator dot */}
-              {isToday && (
-                <div
-                  className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2"
-                  style={{
-                    width: '3px',
-                    height: '3px',
-                    borderRadius: '50%',
-                    backgroundColor: designTokens.colors.today.line,
+                <div 
+                  className="text-[11px] font-semibold leading-none mb-0.5" 
+                  style={{ 
+                    color: isToday ? designTokens.colors.today.line : isWeekend ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.82)',
+                    fontWeight: isToday ? 'bold' : isMonthStart ? 700 : 600,
                   }}
-                />
-              )}
-            </div>
-          );
-        })}
+                >
+                  {dayOfMonth}
+                </div>
+                <div 
+                  className="text-[9px] font-medium leading-none" 
+                  style={{ 
+                    color: isToday ? designTokens.colors.today.line : isWeekend ? 'rgba(0, 0, 0, 0.28)' : 'rgba(0, 0, 0, 0.55)',
+                    fontWeight: isToday ? 'bold' : 500,
+                  }}
+                >
+                  {currentDate.toLocaleDateString('en-US', { weekday: 'narrow' })}
+                </div>
+                {isToday && (
+                  <div
+                    className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2"
+                    style={{
+                      width: '3px',
+                      height: '3px',
+                      borderRadius: '50%',
+                      backgroundColor: designTokens.colors.today.line,
+                    }}
+                  />
+                )}
+              </div>
+            );
+          })
+        )}
+        
+        {zoomLevel === 'week' && (
+          // WEEK VIEW: Show week ranges (Mon-Sun)
+          (() => {
+            const weeks: Array<{ weekNum: number; startDate: Date; endDate: Date; dayCount: number }> = [];
+            let weekNum = 1;
+            let dayIndex = 0;
+            
+            while (dayIndex <= totalDays) {
+              const currentDate = new Date(startDate);
+              currentDate.setDate(currentDate.getDate() + dayIndex);
+              
+              // Find end of week (Sunday) or end of timeline
+              let weekEnd = new Date(currentDate);
+              let daysInWeek = 1;
+              
+              while (dayIndex + daysInWeek <= totalDays && weekEnd.getDay() !== 0) {
+                weekEnd.setDate(weekEnd.getDate() + 1);
+                daysInWeek++;
+              }
+              
+              weeks.push({
+                weekNum,
+                startDate: new Date(currentDate),
+                endDate: new Date(weekEnd),
+                dayCount: daysInWeek
+              });
+              
+              weekNum++;
+              dayIndex += daysInWeek;
+            }
+            
+            return weeks.map((week, idx) => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const isCurrentWeek = today >= week.startDate && today <= week.endDate;
+              
+              return (
+                <div
+                  key={idx}
+                  className="flex-shrink-0 px-2 py-1.5 relative flex flex-col items-center justify-center border-r border-slate-200/50 dark:border-slate-700/50"
+                  style={{ 
+                    width: week.dayCount * dayWidth,
+                    backgroundColor: isCurrentWeek ? 'rgba(239, 68, 68, 0.05)' : 'transparent'
+                  }}
+                >
+                  <div className="text-[10px] font-bold leading-none mb-1 text-slate-900 dark:text-white">
+                    W{week.weekNum}
+                  </div>
+                  <div className="text-[9px] font-medium leading-none text-slate-600 dark:text-slate-400">
+                    {week.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <div className="text-[8px] font-medium leading-none text-slate-500 dark:text-slate-500 mt-0.5">
+                    {week.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </div>
+                  {isCurrentWeek && (
+                    <div
+                      className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2"
+                      style={{
+                        width: '4px',
+                        height: '4px',
+                        borderRadius: '50%',
+                        backgroundColor: designTokens.colors.today.line,
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            });
+          })()
+        )}
+        
+        {zoomLevel === 'month' && (
+          // MONTH VIEW: Show sprint boundaries with dates and duration
+          (() => {
+            if (!sprints || sprints.length === 0) {
+              // Fallback: Show month bands if no sprints
+              return monthSpans.map((span, idx) => (
+                <div
+                  key={idx}
+                  className="flex-shrink-0 px-3 py-1.5 flex flex-col items-center justify-center border-r border-slate-200/50 dark:border-slate-700/50"
+                  style={{ width: span.days * dayWidth }}
+                >
+                  <div className="text-[11px] font-bold text-slate-900 dark:text-white">
+                    {span.label.split(' ')[0]}
+                  </div>
+                  <div className="text-[8px] text-slate-500 dark:text-slate-500 mt-0.5">
+                    {span.days}d
+                  </div>
+                </div>
+              ));
+            }
+            
+            // Show sprints with their date ranges
+            return sprints.map((sprint) => {
+              const sprintStart = new Date(sprint.startDate);
+              const sprintEnd = new Date(sprint.endDate);
+              const sprintDays = getDaysDifference(sprintStart, sprintEnd) + 1;
+              const capacity = sprintCapacities.get(sprint.id);
+              const utilizationPercent = capacity ? (capacity.plannedDays / capacity.totalTeamDays) * 100 : 0;
+              
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
+              const isCurrentSprint = today >= sprintStart && today <= sprintEnd;
+              
+              return (
+                <div
+                  key={sprint.id}
+                  className="flex-shrink-0 px-2 py-1.5 relative flex flex-col items-center justify-center border-r border-slate-300 dark:border-slate-600"
+                  style={{ 
+                    width: sprintDays * dayWidth,
+                    backgroundColor: isCurrentSprint ? 'rgba(239, 68, 68, 0.05)' : 'transparent'
+                  }}
+                >
+                  <div className="text-[10px] font-bold leading-none text-slate-900 dark:text-white truncate max-w-full px-1">
+                    {sprint.name}
+                  </div>
+                  <div className="text-[8px] font-medium leading-none text-slate-600 dark:text-slate-400 mt-1">
+                    {sprintStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <div className="text-[8px] font-medium leading-none text-slate-500 dark:text-slate-500">
+                    {sprintEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <div className="text-[7px] font-semibold leading-none mt-1" style={{
+                    color: utilizationPercent > 100 ? '#dc2626' : utilizationPercent >= 90 ? '#f59e0b' : '#10b981'
+                  }}>
+                    {sprintDays}d · {Math.round(utilizationPercent)}%
+                  </div>
+                  {isCurrentSprint && (
+                    <div
+                      className="absolute bottom-0.5 left-1/2 transform -translate-x-1/2"
+                      style={{
+                        width: '4px',
+                        height: '4px',
+                        borderRadius: '50%',
+                        backgroundColor: designTokens.colors.today.line,
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            });
+          })()
+        )}
       </div>
 
       {/* Sprint labels with integrated capacity */}
@@ -1387,222 +1681,90 @@ function TimelineHeader({
         getPositionFromDate={getPositionFromDate}
         getDaysDifference={getDaysDifference}
         dayWidth={dayWidth}
+        zoomLevel={zoomLevel}
       />
     </div>
   );
 }
 
-// SPRINT HEADER ROW: Integrated capacity visualization
+// SPRINT HEADER ROW: Simplified minimal bars to avoid scroll flickering
 // Phase 7: Memoized for performance
 const SprintHeaderRow = memo(function SprintHeaderRow({
   sprints,
   sprintCapacities,
   getPositionFromDate,
   getDaysDifference,
-  dayWidth
+  dayWidth,
+  zoomLevel = 'day'
 }: {
   sprints: any[];
   sprintCapacities: Map<string, SprintCapacity>;
   getPositionFromDate: (date: Date) => number;
   getDaysDifference: (date1: Date, date2:Date) => number;
   dayWidth: number;
+  zoomLevel?: 'day' | 'week' | 'month';
 }) {
-  const [hoveredSprint, setHoveredSprint] = useState<string | null>(null);
-
-  const getStatusBadge = (utilizationPercent: number) => {
-    if (utilizationPercent > 100) return { label: '⚠ Over', color: '#dc2626' };
-    if (utilizationPercent >= 90) return { label: 'Near', color: '#f59e0b' };
-    if (utilizationPercent >= 70) return { label: 'Good', color: '#10b981' };
-    return { label: 'Low', color: '#6b7280' };
+  const getStatusColor = (utilizationPercent: number) => {
+    if (utilizationPercent > 100) return '#dc2626';
+    if (utilizationPercent >= 90) return '#f59e0b';
+    if (utilizationPercent >= 70) return '#10b981';
+    return '#6b7280';
   };
 
+  // Only show sprint bars in day view, hidden in week/month view
+  if (zoomLevel === 'week' || zoomLevel === 'month') {
+    return null;
+  }
+
   return (
-    <div className="relative h-16" style={{ backgroundColor: 'rgba(0, 0, 0, 0.02)' }}>
+    <div className="relative h-12 border-b border-slate-200 dark:border-slate-700" style={{ backgroundColor: 'rgba(0, 0, 0, 0.015)' }}>
       {sprints.map((sprint) => {
         const left = getPositionFromDate(sprint.startDate);
         const width = getDaysDifference(sprint.startDate, sprint.endDate) * dayWidth;
         const capacity = sprintCapacities?.get(sprint.id);
-        const status = capacity ? getStatusBadge(capacity.utilizationPercent) : null;
+        const statusColor = capacity ? getStatusColor(capacity.utilizationPercent) : '#6b7280';
         
         return (
           <div
             key={sprint.id}
-            className="absolute px-3 py-1.5"
+            className="absolute px-2 py-1.5"
             style={{
               left,
               width,
               top: 0,
-              height: 64,
-              borderLeft: '1px solid rgba(0, 0, 0, 0.1)',
+              height: 48,
+              borderLeft: '2px solid rgba(0, 0, 0, 0.15)',
+              borderRight: '1px solid rgba(0, 0, 0, 0.05)',
             }}
-            onMouseEnter={() => setHoveredSprint(sprint.id)}
-            onMouseLeave={() => setHoveredSprint(null)}
           >
-            {/* Sprint name and dates - 1.3.3: Multi-line wrap for long names */}
-            <div className="flex items-start justify-between mb-1.5">
-              <div className="flex-1 pr-2">
-                <div 
-                  className="font-semibold"
-                  style={{
-                    fontSize: designTokens.typography.fontSize.xs,
-                    color: designTokens.colors.neutral[700],
-                    wordWrap: 'break-word',
-                    overflowWrap: 'break-word',
-                    letterSpacing: '0.025em'  // tracking-wide
-                  }}
-                >
-                  {sprint.name}
-                </div>
-                <div 
-                  className="text-gray-500 text-xs"
-                  style={{
-                    fontWeight: designTokens.typography.fontWeight.medium,
-                    marginTop: '2px'
-                  }}
-                >
-                  {sprint.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {sprint.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                </div>
-              </div>
-              {status && (
-                <span 
-                  className="rounded flex-shrink-0"
-                  style={{ 
-                    fontSize: '9px',
-                    fontWeight: designTokens.typography.fontWeight.bold,
-                    padding: '2px 6px',
-                    backgroundColor: `${status.color}15`,
-                    color: status.color,
-                    border: `1px solid ${status.color}30`,
-                    letterSpacing: designTokens.typography.letterSpacing.wide  // 1.3.2: Label tracking
-                  }}
-                >
-                  {status.label.toUpperCase()}
-                </span>
-              )}
+            {/* Sprint name */}
+            <div 
+              className="text-[10px] font-semibold truncate mb-1"
+              style={{ color: designTokens.colors.neutral[700] }}
+            >
+              {sprint.name}
             </div>
 
-            {/* Capacity visualization */}
+            {/* Capacity progress bar */}
             {capacity && (
               <div className="space-y-1">
-                {/* Progress bar with dots */}
                 <div className="flex items-center gap-1">
-                  <div className="flex-1 h-2.5 bg-gray-200 rounded-full overflow-hidden relative">
+                  <div className="flex-1 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                     <div 
                       className="h-full rounded-full transition-all duration-300"
                       style={{ 
                         width: `${Math.min(capacity.utilizationPercent, 100)}%`,
-                        backgroundColor: getCapacityStatusColor(capacity.utilizationPercent)
+                        backgroundColor: statusColor
                       }}
                     />
-                    {/* Milestone markers every 25% */}
-                    <div className="absolute inset-0 flex justify-between px-0.5">
-                      {[25, 50, 75].map((mark) => (
-                        <div 
-                          key={mark}
-                          className="w-0.5 h-full bg-white opacity-40"
-                          style={{ marginLeft: mark === 25 ? '24%' : mark === 50 ? '24%' : '24%' }}
-                        />
-                      ))}
-                    </div>
                   </div>
                   <span 
-                    className="text-[10px] font-bold whitespace-nowrap"
-                    style={{ color: getCapacityStatusColor(capacity.utilizationPercent) }}
+                    className="text-[9px] font-bold whitespace-nowrap"
+                    style={{ color: statusColor }}
                   >
                     {Math.round(capacity.utilizationPercent)}%
                   </span>
                 </div>
-
-                {/* Effort summary */}
-                <div className="text-[10px]" style={{ color: designTokens.colors.neutral[600], fontWeight: designTokens.typography.fontWeight.medium }}>
-                  <span className="font-semibold">{Math.round(capacity.plannedDays * 10) / 10}d planned</span>
-                  <span style={{ color: designTokens.colors.neutral[400] }}> · </span>
-                  <span>{capacity.totalTeamDays}d capacity</span>
-                </div>
-
-                {/* Phase 5: Inline indicators */}
-                <div className="flex items-center gap-2 text-[10px]" style={{ color: designTokens.colors.neutral[600], fontWeight: designTokens.typography.fontWeight.medium }}>
-                  <span className="flex items-center gap-0.5">
-                    👥 <span className="font-semibold">{capacity.teamSize}</span> devs
-                  </span>
-                  {capacity.holidayDays > 0 && (
-                    <>
-                      <span style={{ color: designTokens.colors.neutral[300] }}>│</span>
-                      <span className="flex items-center gap-0.5">
-                        🏖️ <span className="font-semibold">{capacity.holidayDays}</span> holiday{capacity.holidayDays !== 1 ? 's' : ''}
-                      </span>
-                    </>
-                  )}
-                  {capacity.overCapacity && (
-                    <>
-                      <span style={{ color: designTokens.colors.neutral[300] }}>│</span>
-                      <span className="flex items-center gap-0.5 text-red-600 font-semibold">
-                        ⚠️ Over capacity
-                      </span>
-                    </>
-                  )}
-                  {!capacity.overCapacity && capacity.utilizationPercent < 70 && (
-                    <>
-                      <span style={{ color: designTokens.colors.neutral[300] }}>│</span>
-                      <span className="flex items-center gap-0.5 text-gray-500">
-                        ✅ Available
-                      </span>
-                    </>
-                  )}
-                </div>
-
-                {/* Detailed hover tooltip */}
-                {hoveredSprint === sprint.id && (
-                  <div className="absolute z-50 mt-1 left-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-[11px] min-w-[220px]"
-                    style={{ top: '100%' }}
-                  >
-                    <div className="font-semibold text-gray-800 mb-2 flex items-center justify-between">
-                      <span>Sprint Capacity Details</span>
-                      <span 
-                        className="text-[10px] font-bold px-2 py-0.5 rounded"
-                        style={{ 
-                          backgroundColor: `${status!.color}15`,
-                          color: status!.color
-                        }}
-                      >
-                        {status!.label}
-                      </span>
-                    </div>
-                    
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-gray-700">
-                        <span>Team size:</span>
-                        <span className="font-medium">{capacity.teamSize} developers</span>
-                      </div>
-                      <div className="flex justify-between text-gray-700">
-                        <span>Working days:</span>
-                        <span className="font-medium">{capacity.workingDays} days</span>
-                      </div>
-                      <div className="flex justify-between text-gray-600">
-                        <span>Holidays:</span>
-                        <span className="font-medium">-{capacity.holidayDays} days</span>
-                      </div>
-                      <div className="flex justify-between text-gray-600">
-                        <span>PTO:</span>
-                        <span className="font-medium">-{capacity.ptoDays} days</span>
-                      </div>
-                      <div className="flex justify-between border-t border-gray-200 pt-1.5 mt-1.5 font-semibold text-gray-800">
-                        <span>Available capacity:</span>
-                        <span>{capacity.totalTeamDays} team-days</span>
-                      </div>
-                      <div className="flex justify-between font-semibold text-gray-800">
-                        <span>Planned work:</span>
-                        <span>{Math.round(capacity.plannedDays * 10) / 10} days</span>
-                      </div>
-                      {capacity.overCapacity && (
-                        <div className="mt-2 pt-2 border-t border-red-200 text-red-600 font-semibold flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3" />
-                          Over by {Math.round((capacity.plannedDays - capacity.totalTeamDays) * 10) / 10} days
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -1611,6 +1773,303 @@ const SprintHeaderRow = memo(function SprintHeaderRow({
     </div>
   );
 });
+
+// Sprint Summary Panel - Fixed position at top of sidebar
+function SprintSummaryPanel({
+  sprints,
+  sprintCapacities
+}: {
+  sprints: any[];
+  sprintCapacities: Map<string, SprintCapacity>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [hoveredSprintId, setHoveredSprintId] = useState<string | null>(null);
+
+  if (!sprints || sprints.length === 0) return null;
+
+  const getStatusColor = (utilizationPercent: number) => {
+    if (utilizationPercent > 100) return '#dc2626';
+    if (utilizationPercent >= 90) return '#f59e0b';
+    if (utilizationPercent >= 70) return '#10b981';
+    return '#6b7280';
+  };
+
+  const totalCapacity = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.totalTeamDays, 0);
+  const totalPlanned = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.plannedDays, 0);
+  const overallUtilization = totalCapacity > 0 ? (totalPlanned / totalCapacity) * 100 : 0;
+
+  return (
+    <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 overflow-visible">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full px-4 py-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold text-slate-900 dark:text-white">Sprint Summary</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400">({sprints.length} sprints)</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span 
+            className="text-[10px] font-bold px-2 py-0.5 rounded"
+            style={{ 
+              backgroundColor: `${getStatusColor(overallUtilization)}15`,
+              color: getStatusColor(overallUtilization),
+              border: `1px solid ${getStatusColor(overallUtilization)}30`
+            }}
+          >
+            {Math.round(overallUtilization)}%
+          </span>
+          <span className="text-slate-400 dark:text-slate-500">{expanded ? '▼' : '▶'}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <>
+          <div className="px-4 pb-3 space-y-2 max-h-48 overflow-y-auto">
+            {sprints.map((sprint) => {
+              const capacity = sprintCapacities.get(sprint.id);
+              if (!capacity) return null;
+
+              const statusColor = getStatusColor(capacity.utilizationPercent);
+
+              return (
+                <div 
+                  key={sprint.id}
+                  className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50 text-[10px] hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  onMouseEnter={() => setHoveredSprintId(sprint.id)}
+                  onMouseLeave={() => setHoveredSprintId(null)}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-900 dark:text-white truncate">{sprint.name}</div>
+                    <div className="text-slate-500 dark:text-slate-400 text-[9px]">
+                      {sprint.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {sprint.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                    <div className="text-right">
+                      <div className="font-semibold text-slate-700 dark:text-slate-300">{Math.round(capacity.plannedDays)}d / {capacity.totalTeamDays}d</div>
+                      <div className="text-slate-500 dark:text-slate-400 text-[9px]">{capacity.ticketCount} tickets</div>
+                    </div>
+                    <div 
+                      className="w-2 h-8 rounded-full"
+                      style={{ backgroundColor: statusColor }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tooltip rendered outside scrollable container to avoid clipping */}
+          {hoveredSprintId && (() => {
+            const sprint = sprints.find(s => s.id === hoveredSprintId);
+            const capacity = sprint ? sprintCapacities.get(sprint.id) : null;
+            if (!sprint || !capacity) return null;
+            
+            const statusColor = getStatusColor(capacity.utilizationPercent);
+            
+            return (
+              <div className="absolute left-full ml-2 top-32 z-[100] pointer-events-none">
+                <div 
+                  className="bg-white dark:bg-slate-800 rounded-lg shadow-2xl border-2 border-slate-300 dark:border-slate-600 p-4 text-[11px] w-[320px]"
+                >
+                    <div className="font-semibold text-slate-900 dark:text-white mb-2 flex items-center justify-between">
+                      <span>{sprint.name}</span>
+                      <span 
+                        className="text-[9px] font-bold px-2 py-0.5 rounded"
+                        style={{ 
+                          backgroundColor: `${statusColor}15`,
+                          color: statusColor,
+                          border: `1px solid ${statusColor}30`
+                        }}
+                      >
+                        {Math.round(capacity.utilizationPercent)}%
+                      </span>
+                    </div>
+                    
+                    <div className="text-[10px] text-slate-600 dark:text-slate-400 mb-3">
+                      {sprint.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {sprint.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </div>
+
+                    {/* Capacity Progress Bar */}
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between text-[9px] text-slate-600 dark:text-slate-400 mb-1">
+                        <span>Capacity Utilization</span>
+                        <span className="font-bold" style={{ color: statusColor }}>{Math.round(capacity.utilizationPercent)}%</span>
+                      </div>
+                      <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden relative">
+                        <div 
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{ 
+                            width: `${Math.min(capacity.utilizationPercent, 100)}%`,
+                            backgroundColor: statusColor
+                          }}
+                        />
+                        {/* Milestone markers at 25%, 50%, 75% */}
+                        <div className="absolute inset-0 flex justify-between px-0.5">
+                          {[0.25, 0.5, 0.75].map((_, idx) => (
+                            <div 
+                              key={idx}
+                              className="w-0.5 h-full bg-white/40"
+                              style={{ marginLeft: idx === 0 ? '24%' : idx === 1 ? '24%' : '24%' }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Inline Summary with Icons */}
+                    <div className="mb-3 flex flex-wrap items-center gap-2 text-[9px] text-slate-600 dark:text-slate-400 pb-2 border-b border-slate-200 dark:border-slate-700">
+                      <span className="flex items-center gap-0.5 font-semibold">
+                        👥 <span className="text-slate-900 dark:text-white">{capacity.teamSize}</span> devs
+                      </span>
+                      {capacity.holidayDays > 0 && (
+                        <>
+                          <span className="text-slate-300 dark:text-slate-600">│</span>
+                          <span className="flex items-center gap-0.5">
+                            🏖️ <span className="font-semibold text-orange-600 dark:text-orange-400">{capacity.holidayDays}</span> holidays
+                          </span>
+                        </>
+                      )}
+                      {capacity.ptoDays > 0 && (
+                        <>
+                          <span className="text-slate-300 dark:text-slate-600">│</span>
+                          <span className="flex items-center gap-0.5">
+                            🌴 <span className="font-semibold text-orange-600 dark:text-orange-400">{capacity.ptoDays}</span> PTO
+                          </span>
+                        </>
+                      )}
+                      <span className="text-slate-300 dark:text-slate-600">│</span>
+                      <span className="flex items-center gap-0.5">
+                        📋 <span className="font-semibold text-slate-900 dark:text-white">{capacity.ticketCount}</span> tickets
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-[10px] text-slate-700 dark:text-slate-300">
+                      {/* Effort Section */}
+                      <div className="text-[9px] font-bold text-slate-900 dark:text-white uppercase tracking-wide mb-1">
+                        Effort
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Planned Work:</span>
+                        <span className="font-semibold">{Math.round(capacity.plannedDays * 10) / 10}d</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Team Capacity:</span>
+                        <span className="font-semibold">{capacity.totalTeamDays}d</span>
+                      </div>
+                      <div className="flex justify-between mb-2">
+                        <span className="text-slate-500 dark:text-slate-400">Available Days:</span>
+                        <span className="font-semibold">{capacity.availableDays}d</span>
+                      </div>
+                      
+                      {/* Time Section */}
+                      <div className="text-[9px] font-bold text-slate-900 dark:text-white uppercase tracking-wide mb-1 pt-2 border-t border-slate-200 dark:border-slate-700">
+                        Time Breakdown
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Team Size:</span>
+                        <span className="font-semibold">{capacity.teamSize} developers</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Calendar Days:</span>
+                        <span className="font-semibold">{capacity.totalCalendarDays}d</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Working Days:</span>
+                        <span className="font-semibold">{capacity.workingDays}d</span>
+                      </div>
+                      {capacity.holidayDays > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Holidays:</span>
+                          <span className="font-semibold text-orange-600 dark:text-orange-400">-{capacity.holidayDays}d</span>
+                        </div>
+                      )}
+                      {capacity.ptoDays > 0 && (
+                        <div className="flex justify-between mb-2">
+                          <span className="text-slate-500 dark:text-slate-400">PTO:</span>
+                          <span className="font-semibold text-orange-600 dark:text-orange-400">-{capacity.ptoDays}d</span>
+                        </div>
+                      )}
+                      
+                      {/* Story Points Section */}
+                      <div className="text-[9px] font-bold text-slate-900 dark:text-white uppercase tracking-wide mb-1 pt-2 border-t border-slate-200 dark:border-slate-700">
+                        Story Points
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Planned Story Points:</span>
+                        <span className="font-semibold">{capacity.plannedStoryPoints} SP</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Capacity Story Points:</span>
+                        <span className="font-semibold">{capacity.capacityStoryPoints} SP</span>
+                      </div>
+                      <div className="flex justify-between mb-2">
+                        <span className="text-slate-500 dark:text-slate-400">Velocity Per Day:</span>
+                        <span className="font-semibold">{capacity.velocityPerDay} SP/d</span>
+                      </div>
+                      
+                      {/* Tickets Section */}
+                      <div className="text-[9px] font-bold text-slate-900 dark:text-white uppercase tracking-wide mb-1 pt-2 border-t border-slate-200 dark:border-slate-700">
+                        Tickets
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Total Tickets:</span>
+                        <span className="font-semibold">{capacity.ticketCount}</span>
+                      </div>
+                      {capacity.developersInSprint && capacity.developersInSprint.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-slate-500 dark:text-slate-400 mb-1">Assigned Developers:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {capacity.developersInSprint.map((dev, idx) => (
+                              <span 
+                                key={idx}
+                                className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-[9px] font-medium"
+                              >
+                                {dev}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {capacity.overCapacity && (
+                      <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-red-600 dark:text-red-400 flex items-center gap-1">
+                        <span>⚠️</span>
+                        <span className="font-semibold">Over capacity by {Math.round((capacity.utilizationPercent - 100) * capacity.totalTeamDays / 100)}d</span>
+                      </div>
+                    )}
+                    
+                    {!capacity.overCapacity && capacity.utilizationPercent < 70 && (
+                      <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-green-600 dark:text-green-400 flex items-center gap-1">
+                        <span>✅</span>
+                        <span className="font-semibold">Available - {Math.round((100 - capacity.utilizationPercent) * capacity.totalTeamDays / 100)}d spare capacity</span>
+                      </div>
+                    )}
+                    
+                    {!capacity.overCapacity && capacity.utilizationPercent >= 70 && capacity.utilizationPercent < 90 && (
+                      <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                        <span>👍</span>
+                        <span className="font-semibold">Good utilization</span>
+                      </div>
+                    )}
+                    
+                    {!capacity.overCapacity && capacity.utilizationPercent >= 90 && (
+                      <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                        <span>🟡</span>
+                        <span className="font-semibold">Near capacity limit</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </>
+        )}
+    </div>
+  );
+}
 
 // SIDEBAR HEADER: Left column header with controls
 function TimelineSidebarHeader({

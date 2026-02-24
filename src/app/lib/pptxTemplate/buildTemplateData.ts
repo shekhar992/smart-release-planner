@@ -1,4 +1,4 @@
-import type { Release, Ticket } from '../../data/mockData';
+import type { Release, Ticket, Phase, Milestone } from '../../data/mockData';
 import designTokens from '../designTokens';
 import type {
   PptxRoadmapTemplateData,
@@ -6,7 +6,16 @@ import type {
   PptxLaneItem,
   PptxStatusKey,
   PptxKeyDate,
+  PptxPhase,
+  PptxMilestone,
 } from './templateTypes';
+import type { Feature } from '../../data/mockData';
+
+export interface BuildTemplateOptions {
+  viewMode?: 'detailed' | 'executive';
+  milestones?: Milestone[];
+  phases?: Phase[];
+}
 
 function toIsoDate(date: Date): string {
   const d = new Date(date);
@@ -68,11 +77,8 @@ function ticketMeta(ticket: Ticket): string {
   return parts.join(' · ');
 }
 
-export function buildRoadmapTemplateDataFromRelease(release: Release): PptxRoadmapTemplateData {
-  const start = new Date(release.startDate);
-  const end = new Date(release.endDate);
-
-  const lanes: PptxLane[] = release.features.map((feature) => {
+function buildDetailedLanes(features: Feature[]): PptxLane[] {
+  return features.map((feature) => {
     const items: PptxLaneItem[] = feature.tickets.map((t) => ({
       id: t.id,
       title: t.title,
@@ -87,8 +93,90 @@ export function buildRoadmapTemplateDataFromRelease(release: Release): PptxRoadm
       items,
     };
   });
+}
+
+function buildExecutiveLanes(features: Feature[]): PptxLane[] {
+  return features.map((feature) => {
+    // Aggregate all tickets for this feature
+    const tickets = feature.tickets;
+    const ticketCount = tickets.length;
+    const totalDays = tickets.reduce(
+      (sum, ticket) => sum + (ticket.effortDays || ticket.storyPoints || 0),
+      0
+    );
+
+    if (tickets.length === 0) {
+      return {
+        id: feature.id,
+        name: feature.name,
+        items: [],
+      };
+    }
+
+    const featureStartDate = new Date(
+      Math.min(...tickets.map((t) => t.startDate.getTime()))
+    );
+    const featureEndDate = new Date(
+      Math.max(...tickets.map((t) => t.endDate.getTime()))
+    );
+
+    const items: PptxLaneItem[] = [
+      {
+        id: feature.id,
+        title: feature.name,
+        range: {
+          start: toIsoDate(featureStartDate),
+          end: toIsoDate(featureEndDate),
+        },
+        status: 'Complete', // Executive bars use a consistent style
+        meta: `${ticketCount} ticket${ticketCount !== 1 ? 's' : ''} · ${totalDays}d`,
+      },
+    ];
+
+    return {
+      id: feature.id,
+      name: feature.name,
+      items,
+    };
+  });
+}
+
+export function buildRoadmapTemplateDataFromRelease(
+  release: Release,
+  options?: BuildTemplateOptions
+): PptxRoadmapTemplateData {
+  const start = new Date(release.startDate);
+  const end = new Date(release.endDate);
+  const { viewMode = 'detailed', milestones = [], phases = [] } = options || {};
+
+  // Build lanes based on view mode
+  const lanes: PptxLane[] =
+    viewMode === 'executive'
+      ? buildExecutiveLanes(release.features)
+      : buildDetailedLanes(release.features);
 
   const statusKey = buildStatusKey();
+
+  // Map phases to PPTX format
+  const pptxPhases: PptxPhase[] = phases.map((phase) => ({
+    id: phase.id,
+    name: phase.name,
+    type: phase.type,
+    range: {
+      start: toIsoDate(phase.startDate),
+      end: toIsoDate(phase.endDate),
+    },
+    allowsWork: phase.allowsWork,
+  }));
+
+  // Map milestones to PPTX format
+  const pptxMilestones: PptxMilestone[] = milestones.map((milestone) => ({
+    id: milestone.id,
+    name: milestone.name,
+    type: milestone.type,
+    date: toIsoDate(milestone.startDate),
+    isBlocking: milestone.isBlocking,
+  }));
 
   const keyDates: PptxKeyDate[] = [
     { label: 'Release Start', date: toIsoDate(start) },
@@ -109,6 +197,8 @@ export function buildRoadmapTemplateDataFromRelease(release: Release): PptxRoadm
       })),
       lanes,
       goLive: { label: 'Go-live', date: toIsoDate(end) },
+      phases: pptxPhases.length > 0 ? pptxPhases : undefined,
+      milestones: pptxMilestones.length > 0 ? pptxMilestones : undefined,
     },
     statusKey,
     keyDates,
