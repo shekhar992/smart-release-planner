@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, GripVertical, ChevronDown, Calendar } from 'lucide-react';
+import { AlertTriangle, GripVertical, ChevronDown, Calendar, Plus, Trash2, X, Link2 } from 'lucide-react';
 import { Release, Ticket, Holiday, TeamMember, Milestone, MilestoneType, Phase, PhaseType, getMockPhasesForRelease } from '../data/mockData';
 import { SprintCreationPopover } from './SprintCreationPopover';
 import { TicketConflict, hasConflict } from '../lib/conflictDetection';
@@ -12,6 +12,8 @@ import { toLocalDateString } from '../lib/dateUtils';
 import { calculateWorkingDays } from '../lib/teamCapacityCalculation';
 import { loadMilestones, saveMilestones, loadPhases, savePhases } from '../lib/localStorage';
 import { AddMilestoneModal } from './AddMilestoneModal';
+import { getTicketDependencyStatus, countBlockedTickets, getStatusDotColor, getStatusLabel } from '../lib/ticketDependencies';
+import { getRoleColor, type TeamRole } from '../lib/roleColors';
 
 // Helper: Count working days (Mon-Fri) between two dates
 function countWorkingDays(start: Date, end: Date): number {
@@ -106,6 +108,19 @@ function getBlockingMilestonesForTicket(ticket: Ticket, milestones: Milestone[])
   });
 }
 
+// Helper: Get milestone color by type
+function getMilestoneColorForType(type: MilestoneType): string {
+  const colors: Record<MilestoneType, string> = {
+    Testing: '#eab308',
+    Deployment: '#a855f7',
+    Approval: '#3b82f6',
+    Freeze: '#ef4444',
+    Launch: '#22c55e',
+    Other: '#6b7280',
+  };
+  return colors[type];
+}
+
 // Helper: Check if a ticket falls within Dev Window phases
 function isTicketInDevWindow(ticket: Ticket, phases: Phase[]): boolean {
   const devPhases = phases.filter(p => p.allowsWork);
@@ -154,6 +169,17 @@ function getTicketColorScheme(
     };
   }
   
+  // Role-based color scheme (if requiredRole is set)
+  if (ticket.requiredRole) {
+    const roleColor = getRoleColor(ticket.requiredRole as TeamRole);
+    return {
+      background: `${roleColor}20`, // 20% opacity for background
+      border: roleColor,
+      accent: roleColor,
+      text: '#000000',
+    };
+  }
+  
   // Normal color scheme (existing logic)
   return {
     background: getTicketColors(ticket.status).bg,
@@ -182,10 +208,41 @@ interface TimelinePanelProps {
   onShowAddMilestoneModalChange?: (show: boolean) => void;
 }
 
-const DAY_WIDTH = 40;
-const ROW_HEIGHT = 48;
-const FEATURE_HEADER_HEIGHT = 40;
-const SIDEBAR_WIDTH = 320; // Fixed left sidebar width
+// ============================================
+// TIMELINE CONSTANTS (Phase 2: Row Model)
+// ============================================
+// All dimensions in pixels - single source of truth
+const GANTT_CONSTANTS = {
+  // Row heights
+  ROW_HEIGHT: 48,              // Ticket row height
+  FEATURE_HEADER_HEIGHT: 40,   // Feature/epic header row
+  PHASE_STRIP_HEIGHT: 32,      // Phase band strip at top (reduced from 60 for less noise)
+  MILESTONE_STRIP_HEIGHT: 32,  // Milestone strip below phases (reduced from 50 for less noise)
+  
+  // Column widths
+  DAY_WIDTH: 40,               // Default day column width (Day view)
+  DAY_WIDTH_WEEK: 16,          // Day width in Week view (compressed)
+  DAY_WIDTH_MONTH: 6,          // Day width in Month view (compressed)
+  SIDEBAR_WIDTH: 320,          // Left panel width
+  
+  // Bar dimensions
+  BAR_HEIGHT: 36,              // Actual bar height inside row
+  BAR_MARGIN_TOP: 6,           // (ROW_HEIGHT - BAR_HEIGHT) / 2
+  BAR_RADIUS: 6,               // Bar corner radius
+  
+  // Status indicator
+  STATUS_DOT_SIZE: 8,          // Status dot diameter
+  
+  // Spacing
+  BAR_PADDING_X: 8,            // Horizontal padding inside bar
+  BAR_PADDING_Y: 4,            // Vertical padding inside bar
+} as const;
+
+// Backwards compatibility aliases
+const DAY_WIDTH = GANTT_CONSTANTS.DAY_WIDTH;
+const ROW_HEIGHT = GANTT_CONSTANTS.ROW_HEIGHT;
+const FEATURE_HEADER_HEIGHT = GANTT_CONSTANTS.FEATURE_HEADER_HEIGHT;
+const SIDEBAR_WIDTH = GANTT_CONSTANTS.SIDEBAR_WIDTH;
 
 export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, onResizeTicket, onSelectTicket, onCloneTicket, onCreateSprint, onUpdateSprint, onDeleteSprint, conflicts, sprintCapacities, showSprintCreation: externalShowSprintCreation, onShowSprintCreationChange, showAddMilestoneModal: externalShowAddMilestoneModal, onShowAddMilestoneModalChange }: TimelinePanelProps) {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -207,8 +264,11 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
       setInternalShowAddMilestoneModal(show);
     }
   };
-  const [showHolidays, setShowHolidays] = useState(true);
+  const [showHolidays, setShowHolidays] = useState(false); // Default hidden to reduce noise
   const [showPTO, setShowPTO] = useState(true);
+  const [showPhases, setShowPhases] = useState(false); // Default hidden to reduce noise
+  const [showMilestones, setShowMilestones] = useState(false); // Default hidden to reduce noise
+  const [showMilestonesList, setShowMilestonesList] = useState(false); // Expand/collapse milestone list
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
   const [selectedDeveloperId, setSelectedDeveloperId] = useState<'all' | 'unassigned' | string>('all');
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -250,6 +310,21 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
     setMilestones(updated);
     saveMilestones(release.id, updated);
     setShowAddMilestoneModal(false);
+  };
+
+  // Handler to delete milestone
+  const handleDeleteMilestone = (milestoneId: string) => {
+    const updated = milestones.filter(m => m.id !== milestoneId);
+    setMilestones(updated);
+    saveMilestones(release.id, updated);
+  };
+
+  // Handler to clear all milestones
+  const handleClearAllMilestones = () => {
+    if (confirm(`Are you sure you want to delete all ${milestones.length} milestone(s)?`)) {
+      setMilestones([]);
+      saveMilestones(release.id, []);
+    }
   };
   
   // Synchronize vertical scroll positions
@@ -302,7 +377,10 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   };
 
   const getDaysDifference = (date1: Date, date2: Date) => {
-    const diffTime = Math.abs(date2.getTime() - date1.getTime());
+    // Normalize both dates to start of day for accurate day counting
+    const d1 = new Date(date1.getFullYear(), date1.getMonth(), date1.getDate());
+    const d2 = new Date(date2.getFullYear(), date2.getMonth(), date2.getDate());
+    const diffTime = Math.abs(d2.getTime() - d1.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
@@ -353,7 +431,19 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
     return sum + (isCollapsed ? 0 : f.tickets.length);
   }, 0);
   const totalFeatures = visibleFeatures.length;
-  const contentHeight = (totalFeatures * FEATURE_HEADER_HEIGHT) + (totalTickets * ROW_HEIGHT);
+  
+  // Calculate content height including all spacers
+  let contentHeight = (totalFeatures * FEATURE_HEADER_HEIGHT) + (totalTickets * ROW_HEIGHT);
+  // Add legend spacer
+  contentHeight += GANTT_CONSTANTS.ROW_HEIGHT;
+  // Add phase spacer if visible
+  if (showPhases && phases.length > 0) {
+    contentHeight += GANTT_CONSTANTS.PHASE_STRIP_HEIGHT;
+  }
+  // Add milestone spacer if visible
+  if (showMilestones) {
+    contentHeight += GANTT_CONSTANTS.MILESTONE_STRIP_HEIGHT;
+  }
 
   return (
     <div className="h-full flex flex-col bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm">
@@ -411,10 +501,10 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
       `}</style>
       
       {/* Sticky Header Row */}
-      <div className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 flex relative shadow-sm">
+      <div className="sticky top-0 z-30 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b-2 border-slate-200 dark:border-slate-700 flex relative shadow-md">
         {/* Left Sidebar Header */}
         <div 
-          className="border-r border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-800/90 backdrop-blur-sm"
+          className="border-r-2 border-slate-200 dark:border-slate-700 bg-slate-50/90 dark:bg-slate-800/90 backdrop-blur-sm"
           style={{ width: SIDEBAR_WIDTH, minWidth: SIDEBAR_WIDTH }}
         >
           <TimelineSidebarHeader 
@@ -422,6 +512,10 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             showPTO={showPTO}
             onToggleHolidays={setShowHolidays}
             onTogglePTO={setShowPTO}
+            showPhases={showPhases}
+            onTogglePhases={setShowPhases}
+            showMilestones={showMilestones}
+            onToggleMilestones={setShowMilestones}
             teamMembers={teamMembers}
             selectedDeveloperId={selectedDeveloperId}
             onChangeDeveloper={setSelectedDeveloperId}
@@ -462,12 +556,12 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
           style={{ width: SIDEBAR_WIDTH, minWidth: SIDEBAR_WIDTH }}
           onScroll={handleSidebarScroll}
         >
-          {/* Sticky Phases Label - Only visible when phases exist */}
-          {phases.length > 0 && (
+          {/* Sticky Phases Label - Only visible when enabled and phases exist */}
+          {showPhases && phases.length > 0 && (
             <div 
               className="sticky top-0 px-4 flex items-center border-b border-gray-200 bg-gray-50"
               style={{ 
-                height: 60,
+                height: GANTT_CONSTANTS.PHASE_STRIP_HEIGHT,
                 zIndex: 20
               }}
             >
@@ -484,50 +578,131 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             </div>
           )}
 
-          {/* Sticky Milestones Label */}
-          <div 
-            className="sticky px-4 flex items-center border-b border-gray-200 bg-white"
-            style={{ 
-              height: 50,
-              top: phases.length > 0 ? 60 : 0,
-              zIndex: 20
-            }}
-          >
-            <span
-              style={{
-                fontSize: designTokens.typography.fontSize.xs,
-                fontWeight: designTokens.typography.fontWeight.semibold,
-                color: designTokens.colors.neutral[700],
-                letterSpacing: designTokens.typography.letterSpacing.wide
+          {/* Sticky Milestones Label - Only visible when enabled */}
+          {showMilestones && (
+            <div 
+              className="sticky border-b border-gray-200 bg-white"
+              style={{ 
+                top: showPhases && phases.length > 0 ? GANTT_CONSTANTS.PHASE_STRIP_HEIGHT : 0,
+                zIndex: 20
               }}
             >
-              MILESTONES
-            </span>
-          </div>
+              {/* Header with controls */}
+              <div
+                className="px-4 flex items-center"
+                style={{ height: GANTT_CONSTANTS.MILESTONE_STRIP_HEIGHT }}
+              >
+                <span
+                  style={{
+                    fontSize: designTokens.typography.fontSize.xs,
+                    fontWeight: designTokens.typography.fontWeight.semibold,
+                    color: designTokens.colors.neutral[700],
+                    letterSpacing: designTokens.typography.letterSpacing.wide
+                  }}
+                >
+                  MILESTONES ({milestones.length})
+                </span>
+                <div className="ml-auto flex items-center gap-1">
+                  {milestones.length > 0 && (
+                    <>
+                      <button
+                        onClick={() => setShowMilestonesList(!showMilestonesList)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                        title={showMilestonesList ? "Hide list" : "Show list"}
+                      >
+                        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMilestonesList ? 'rotate-180' : ''}`} />
+                      </button>
+                      <button
+                        onClick={handleClearAllMilestones}
+                        className="p-1 hover:bg-red-50 text-red-600 rounded transition-colors"
+                        title="Clear all milestones"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                  <button
+                    onClick={() => setShowAddMilestoneModal(true)}
+                    className="p-1 hover:bg-blue-50 text-blue-600 rounded transition-colors"
+                    title="Add Milestone"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+              
+              {/* Expandable milestone list */}
+              {showMilestonesList && milestones.length > 0 && (
+                <div className="px-4 py-2 bg-slate-50 max-h-32 overflow-y-auto">
+                  {milestones.map((milestone) => (
+                    <div
+                      key={milestone.id}
+                      className="flex items-center justify-between py-1.5 px-2 mb-1 bg-white rounded border border-gray-200 hover:border-gray-300 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-700 truncate">
+                            {milestone.name}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded" style={{
+                            backgroundColor: `${getMilestoneColorForType(milestone.type)}20`,
+                            color: getMilestoneColorForType(milestone.type)
+                          }}>
+                            {milestone.type}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {milestone.dateType === 'single' 
+                            ? toLocalDateString(milestone.startDate)
+                            : `${toLocalDateString(milestone.startDate)} - ${milestone.endDate ? toLocalDateString(milestone.endDate) : '?'}`
+                          }
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteMilestone(milestone.id)}
+                        className="ml-2 p-1 hover:bg-red-50 text-red-500 rounded transition-colors"
+                        title="Delete milestone"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Timeline Legend - No more spillover warning here */}
-          <div className="px-4 py-3 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/30 border-b border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="px-5 py-3.5 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/30 border-b-2 border-slate-100 dark:border-slate-800 shadow-sm">
             {/* Timeline Legend */}
-            <div className="flex items-center gap-4 text-xs">
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 bg-blue-200 border-2 border-blue-500 rounded shadow-sm" />
-                <span className="text-slate-700 dark:text-slate-300 font-medium">Planned</span>
+            <div className="flex items-center gap-5 text-xs">
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 bg-blue-200 border-2 border-blue-500 rounded shadow-sm" />
+                <span className="text-slate-700 dark:text-slate-300 font-semibold">Planned</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-4 h-4 bg-yellow-200 border-2 border-yellow-500 rounded shadow-sm" />
-                <span className="text-slate-700 dark:text-slate-300 font-medium">In Progress</span>
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 bg-yellow-200 border-2 border-yellow-500 rounded shadow-sm" />
+                <span className="text-slate-700 dark:text-slate-300 font-semibold">In Progress</span>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-2">
                 <div 
-                  className="w-4 h-4 bg-orange-200 border-2 border-orange-500 rounded shadow-sm" 
+                  className="w-5 h-5 bg-orange-200 border-2 border-orange-500 rounded shadow-sm" 
                   style={{
                     backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(249, 115, 22, 0.2) 2px, rgba(249, 115, 22, 0.2) 4px)'
                   }}
                 />
-                <span className="text-slate-700 dark:text-slate-300 font-medium">Spillover</span>
+                <span className="text-slate-700 dark:text-slate-300 font-semibold">Spillover</span>
               </div>
             </div>
           </div>
+
+          {/* Spacers to align with timeline phases/milestones when visible */}
+          {showPhases && phases.length > 0 && (
+            <div style={{ height: GANTT_CONSTANTS.PHASE_STRIP_HEIGHT }} />
+          )}
+          {showMilestones && (
+            <div style={{ height: GANTT_CONSTANTS.MILESTONE_STRIP_HEIGHT }} />
+          )}
 
           {visibleFeatures.map((feature, featureIndex) => {
             const isCollapsed = collapsedFeatures.has(feature.id);
@@ -543,7 +718,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
               >
                 {/* Feature Header (Enhanced with 1.2.5 smooth arrow rotation) */}
                 <div 
-                  className="flex items-center px-4 cursor-pointer hover:bg-gray-50 transition-all duration-150"
+                  className="flex items-center px-5 cursor-pointer hover:bg-gray-50 transition-all duration-200"
                   style={{ height: FEATURE_HEADER_HEIGHT }}
                   onClick={() => {
                     const newCollapsed = new Set(collapsedFeatures);
@@ -555,7 +730,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                     setCollapsedFeatures(newCollapsed);
                   }}
                 >
-                  <div className="flex items-center gap-2 flex-1">
+                  <div className="flex items-center gap-2.5 flex-1">
                     {/* 1.2.5: Smooth arrow rotation */}
                     <span 
                       className="text-sm transition-transform duration-200 ease-out"
@@ -568,7 +743,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                       ▶
                     </span>
                     <span 
-                      className="font-semibold"
+                      className="font-bold tracking-tight"
                       style={{
                         fontSize: designTokens.typography.fontSize.sm,
                         color: designTokens.colors.neutral[800]  // 1.3.2: Better contrast
@@ -577,11 +752,11 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                       {feature.name}
                     </span>
                     <span 
-                      className="px-2 py-0.5 rounded-full"
+                      className="px-2.5 py-1 rounded-full shadow-sm"
                       style={{
                         fontSize: designTokens.typography.fontSize.xs,
-                        fontWeight: designTokens.typography.fontWeight.medium,  // 1.3.2: Medium weight
-                        color: designTokens.colors.neutral[600],
+                        fontWeight: designTokens.typography.fontWeight.semibold,
+                        color: designTokens.colors.neutral[700],
                         backgroundColor: designTokens.colors.neutral[100]
                       }}
                     >
@@ -627,7 +802,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
           <div className="relative" style={{ width: timelineWidth, minHeight: '100%' }}>
 
             {/* STICKY PHASES ROW - Scrolls horizontally, sticky vertically */}
-            {phases.length > 0 && (
+            {showPhases && phases.length > 0 && (
               <div 
                 className="sticky"
                 style={{ 
@@ -647,26 +822,28 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             )}
 
             {/* STICKY MILESTONES ROW - Scrolls horizontally, sticky vertically */}
-            <div 
-              className="sticky"
-              style={{ 
-                top: phases.length > 0 ? 60 : 0,
-                zIndex: 10
-              }}
-            >
-              <MilestonesRow
-                milestones={milestones}
-                startDate={startDate}
-                endDate={endDate}
-                getPositionFromDate={getPositionFromDate}
-                getDaysDifference={getDaysDifference}
-                dayWidth={DAY_WIDTH}
-              />
-            </div>
+            {showMilestones && (
+              <div 
+                className="sticky"
+                style={{ 
+                  top: showPhases && phases.length > 0 ? GANTT_CONSTANTS.PHASE_STRIP_HEIGHT : 0,
+                  zIndex: 10
+                }}
+              >
+                <MilestonesRow
+                  milestones={milestones}
+                  startDate={startDate}
+                  endDate={endDate}
+                  getPositionFromDate={getPositionFromDate}
+                  getDaysDifference={getDaysDifference}
+                  dayWidth={DAY_WIDTH}
+                />
+              </div>
+            )}
             
             {/* Absolute layers container - positioned below sticky strips to align with sidebar tickets */}
             <div className="absolute" style={{ 
-              top: phases.length > 0 ? 110 : 50,
+              top: (showPhases && phases.length > 0 ? GANTT_CONSTANTS.PHASE_STRIP_HEIGHT : 0) + (showMilestones ? GANTT_CONSTANTS.MILESTONE_STRIP_HEIGHT : 0),
               left: 0, 
               right: 0, 
               height: contentHeight
@@ -701,8 +878,17 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             </div>
 
             {/* LAYER 4: TICKET BARS - Rendered in natural flow matching sidebar */}
+            {/* Spacers to match the sidebar layout */}
+            {/* Spacer for phases strip (if visible) */}
+            {showPhases && phases.length > 0 && (
+              <div style={{ height: GANTT_CONSTANTS.PHASE_STRIP_HEIGHT }} />
+            )}
+            {/* Spacer for milestones strip (if visible) */}
+            {showMilestones && (
+              <div style={{ height: GANTT_CONSTANTS.MILESTONE_STRIP_HEIGHT }} />
+            )}
             {/* Spacer to match the legend height in left sidebar */}
-            <div style={{ height: 48 }} />
+            <div style={{ height: GANTT_CONSTANTS.ROW_HEIGHT }} />
             
             {visibleFeatures.map((feature) => {
               const isCollapsed = collapsedFeatures.has(feature.id);
@@ -747,6 +933,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
                         teamMembers={teamMembers}
                         milestones={milestones}
                         phases={phases}
+                        holidays={holidays}
                         isLastInFeature={ticketIndex === feature.tickets.length - 1}
                       />
                     </div>
@@ -787,7 +974,8 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
 }
 
 // LAYER 1: TIME GRID (Enhanced with today indicator, weekend shading, month boundaries - Premium styling)
-function TimeGrid({ 
+// Phase 7: Memoized for performance
+const TimeGrid = memo(function TimeGrid({ 
   totalDays, 
   dayWidth, 
   contentHeight,
@@ -861,7 +1049,7 @@ function TimeGrid({
       />
     </div>
   );
-}
+});
 
 // Today Indicator Component (red vertical line with badge)
 function TodayIndicator({ 
@@ -921,7 +1109,8 @@ function TodayIndicator({
 }
 
 // LAYER 2: SPRINT BANDS (Enhanced with gradients and progress overlay)
-function SprintBands({
+// Phase 7: Memoized for performance
+const SprintBands = memo(function SprintBands({
   sprints,
   getPositionFromDate,
   getDaysDifference,
@@ -956,10 +1145,11 @@ function SprintBands({
       })}
     </div>
   );
-}
+});
 
 // LAYER 3: HOLIDAYS (Vertical bars - Gantt standard)
-function HolidayBands({
+// Phase 7: Memoized for performance
+const HolidayBands = memo(function HolidayBands({
   holidays,
   startDate,
   endDate,
@@ -1021,7 +1211,7 @@ function HolidayBands({
       })}
     </div>
   );
-}
+});
 
 // HEADER - Premium MS Project/Smartsheet feel with daily date numbers
 function TimelineHeader({
@@ -1203,7 +1393,8 @@ function TimelineHeader({
 }
 
 // SPRINT HEADER ROW: Integrated capacity visualization
-function SprintHeaderRow({
+// Phase 7: Memoized for performance
+const SprintHeaderRow = memo(function SprintHeaderRow({
   sprints,
   sprintCapacities,
   getPositionFromDate,
@@ -1329,6 +1520,37 @@ function SprintHeaderRow({
                   <span>{capacity.totalTeamDays}d capacity</span>
                 </div>
 
+                {/* Phase 5: Inline indicators */}
+                <div className="flex items-center gap-2 text-[10px]" style={{ color: designTokens.colors.neutral[600], fontWeight: designTokens.typography.fontWeight.medium }}>
+                  <span className="flex items-center gap-0.5">
+                    👥 <span className="font-semibold">{capacity.teamSize}</span> devs
+                  </span>
+                  {capacity.holidayDays > 0 && (
+                    <>
+                      <span style={{ color: designTokens.colors.neutral[300] }}>│</span>
+                      <span className="flex items-center gap-0.5">
+                        🏖️ <span className="font-semibold">{capacity.holidayDays}</span> holiday{capacity.holidayDays !== 1 ? 's' : ''}
+                      </span>
+                    </>
+                  )}
+                  {capacity.overCapacity && (
+                    <>
+                      <span style={{ color: designTokens.colors.neutral[300] }}>│</span>
+                      <span className="flex items-center gap-0.5 text-red-600 font-semibold">
+                        ⚠️ Over capacity
+                      </span>
+                    </>
+                  )}
+                  {!capacity.overCapacity && capacity.utilizationPercent < 70 && (
+                    <>
+                      <span style={{ color: designTokens.colors.neutral[300] }}>│</span>
+                      <span className="flex items-center gap-0.5 text-gray-500">
+                        ✅ Available
+                      </span>
+                    </>
+                  )}
+                </div>
+
                 {/* Detailed hover tooltip */}
                 {hoveredSprint === sprint.id && (
                   <div className="absolute z-50 mt-1 left-0 bg-white rounded-lg shadow-xl border border-gray-200 p-3 text-[11px] min-w-[220px]"
@@ -1388,7 +1610,7 @@ function SprintHeaderRow({
       })}
     </div>
   );
-}
+});
 
 // SIDEBAR HEADER: Left column header with controls
 function TimelineSidebarHeader({
@@ -1396,6 +1618,10 @@ function TimelineSidebarHeader({
   showPTO,
   onToggleHolidays,
   onTogglePTO,
+  showPhases,
+  onTogglePhases,
+  showMilestones,
+  onToggleMilestones,
   teamMembers,
   selectedDeveloperId,
   onChangeDeveloper
@@ -1404,6 +1630,10 @@ function TimelineSidebarHeader({
   showPTO: boolean;
   onToggleHolidays: (value: boolean) => void;
   onTogglePTO: (value: boolean) => void;
+  showPhases: boolean;
+  onTogglePhases: (value: boolean) => void;
+  showMilestones: boolean;
+  onToggleMilestones: (value: boolean) => void;
   teamMembers: TeamMember[];
   selectedDeveloperId: 'all' | 'unassigned' | string;
   onChangeDeveloper: (developerId: 'all' | 'unassigned' | string) => void;
@@ -1430,6 +1660,25 @@ function TimelineSidebarHeader({
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowViewMenu(false)} />
                   <div className="absolute left-0 mt-1 w-36 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-50 py-1">
+                    <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={showPhases}
+                        onChange={(e) => onTogglePhases(e.target.checked)}
+                        className="w-3 h-3"
+                      />
+                      <span className="text-xs">Phases</span>
+                    </label>
+                    <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={showMilestones}
+                        onChange={(e) => onToggleMilestones(e.target.checked)}
+                        className="w-3 h-3"
+                      />
+                      <span className="text-xs">Milestones</span>
+                    </label>
+                    <div className="h-px bg-slate-200 dark:bg-slate-700 my-1" />
                     <label className="flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                       <input
                         type="checkbox"
@@ -1582,6 +1831,7 @@ function TicketTimelineBar({
   teamMembers,
   milestones,
   phases,
+  holidays,
   isLastInFeature: _isLastInFeature
 }: {
   ticket: Ticket;
@@ -1604,6 +1854,7 @@ function TicketTimelineBar({
   teamMembers: TeamMember[];
   milestones: Milestone[];
   phases: Phase[];
+  holidays: Holiday[];
   isLastInFeature?: boolean;
 }) {
   const [isDragging, setIsDragging] = useState(false);
@@ -1908,93 +2159,219 @@ function TicketTimelineBar({
           </>
         )}
         
-        <div className="flex flex-col justify-center h-full px-2 overflow-hidden">
+        <div className="flex items-center h-full pl-2 pr-2 overflow-hidden gap-1.5">
           
-          {/* Title */}
-          <div className="text-[12px] font-semibold truncate leading-tight text-gray-900">
-            {ticket.title}
-          </div>
+          {/* Phase 2: Status Dot with Dependency Awareness */}
+          <div 
+            className="flex-shrink-0 rounded-full"
+            style={{
+              width: GANTT_CONSTANTS.STATUS_DOT_SIZE,
+              height: GANTT_CONSTANTS.STATUS_DOT_SIZE,
+              backgroundColor: ticket.status === 'completed' 
+                ? designTokens.colors.semantic.success
+                : ticket.status === 'in-progress'
+                  ? designTokens.colors.semantic.warning
+                  : designTokens.colors.semantic.info,
+              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            }}
+            title={ticket.status}
+          />
 
-          {/* Metadata Row */}
-          <div className="flex items-center gap-2 text-[10px] text-gray-600 mt-[2px] truncate">
-            
-            {/* Assignee */}
-            {ticket.assignedTo && (
-              <span className="truncate">
-                {ticket.assignedTo}
-              </span>
-            )}
+          {/* Dependency Badge (Blocked By indicator) */}
+          {ticket.dependencies?.blockedBy && ticket.dependencies.blockedBy.length > 0 && (
+            <div
+              className="flex-shrink-0 flex items-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold"
+              style={{
+                backgroundColor: '#F59E0B20',
+                color: '#F59E0B',
+              }}
+              title={`Blocked by ${ticket.dependencies.blockedBy.length} ticket${ticket.dependencies.blockedBy.length !== 1 ? 's' : ''}`}
+            >
+              <Link2 className="w-2.5 h-2.5" />
+              <span>{ticket.dependencies.blockedBy.length}</span>
+            </div>
+          )}
+          
+          <div className="flex flex-col justify-center overflow-hidden flex-1 min-w-0">
+            {/* Title */}
+            <div className="text-[12px] font-semibold truncate leading-tight text-gray-900">
+              {ticket.title}
+            </div>
 
-            {/* Effort */}
-            <span className="text-gray-500">
-              · {ticket.effortDays ?? ticket.storyPoints ?? 1}d
-            </span>
+            {/* Metadata Row */}
+            <div className="flex items-center gap-2 text-[10px] text-gray-600 mt-[2px] truncate">
+              
+              {/* Assignee */}
+              {ticket.assignedTo && (
+                <span className="truncate">
+                  {ticket.assignedTo}
+                </span>
+              )}
 
-            {/* Experience + Velocity */}
-            {assignedMember && assignedMember.experienceLevel && (
-              <span className="inline-flex items-center px-1.5 py-[1px] rounded bg-gray-100 text-gray-700 text-[9px] font-medium">
-                {assignedMember.experienceLevel}
-                {assignedMember.velocityMultiplier && assignedMember.velocityMultiplier !== 1 && (
-                  <span className="ml-1 text-gray-500">
-                    ({assignedMember.velocityMultiplier}x)
+              {/* Phase 2: Effort → Duration (shows velocity impact) */}
+              <span className="text-gray-500 flex-shrink-0">
+                · {ticket.effortDays ?? ticket.storyPoints ?? 1}d
+                {assignedMember?.velocityMultiplier && assignedMember.velocityMultiplier !== 1 && (
+                  <span className="text-blue-600 font-medium">
+                    {' '}→ {Math.round((ticket.effortDays ?? ticket.storyPoints ?? 1) / assignedMember.velocityMultiplier)}d
                   </span>
                 )}
               </span>
-            )}
+
+              {/* Experience + Velocity */}
+              {assignedMember && assignedMember.experienceLevel && (
+                <span className="inline-flex items-center px-1.5 py-[1px] rounded bg-gray-100 text-gray-700 text-[9px] font-medium flex-shrink-0">
+                  {assignedMember.experienceLevel}
+                  {assignedMember.velocityMultiplier && assignedMember.velocityMultiplier !== 1 && (
+                    <span className="ml-1 text-gray-500">
+                      ({assignedMember.velocityMultiplier}x)
+                    </span>
+                  )}
+                </span>
+              )}
+
+            </div>
 
           </div>
-
         </div>
       </div>
 
       {/* Portal-based Tooltip - renders at document.body to avoid positioning context issues */}
-      {isHovered && tooltipPos && !isDragging && createPortal(
-        <div
-          style={{
-            position: 'fixed',
-            left: tooltipPos.x,
-            top: tooltipPos.y,
-            transform: 'translate(-50%, -100%)',
-            zIndex: 2000,
-            pointerEvents: 'none'
-          }}
-          className="w-72 bg-white border border-gray-200 rounded-md shadow-xl p-3 text-sm"
-        >
-          <div className="font-semibold text-sm mb-1">
-            {ticket.title}
-          </div>
-
-          {assignedMember && (
-            <div className="text-xs text-gray-600 mb-2">
-              {assignedMember.name}
-              {assignedMember.experienceLevel
-                ? ` (${assignedMember.experienceLevel} · ${assignedMember.velocityMultiplier ?? 1}x)`
-                : ''}
+      {isHovered && tooltipPos && !isDragging && (() => {
+        // Phase 2: Calculate working days breakdown
+        const calendarDaysCount = Math.ceil((ticket.endDate.getTime() - ticket.startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+        const workingDaysCount = countWorkingDays(ticket.startDate, ticket.endDate);
+        const weekendDaysCount = calendarDaysCount - workingDaysCount;
+        
+        // Count holidays in this range
+        const ticketHolidays = holidays.filter(h => {
+          const hStart = new Date(h.startDate);
+          hStart.setHours(0, 0, 0, 0);
+          const hEnd = new Date(h.endDate);
+          hEnd.setHours(0, 0, 0, 0);
+          const tStart = new Date(ticket.startDate);
+          tStart.setHours(0, 0, 0, 0);
+          const tEnd = new Date(ticket.endDate);
+          tEnd.setHours(0, 0, 0, 0);
+          return hEnd >= tStart && hStart <= tEnd;
+        });
+        
+        const holidayDaysCount = ticketHolidays.reduce((sum, h) => {
+          const hStart = h.startDate < ticket.startDate ? ticket.startDate : h.startDate;
+          const hEnd = h.endDate > ticket.endDate ? ticket.endDate : h.endDate;
+          return sum + countWorkingDays(hStart, hEnd);
+        }, 0);
+        
+        const actualWorkingDays = workingDaysCount - holidayDaysCount;
+        
+        return createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              left: tooltipPos.x,
+              top: tooltipPos.y,
+              transform: 'translate(-50%, -100%)',
+              zIndex: 2000,
+              pointerEvents: 'none'
+            }}
+            className="w-80 bg-white border border-gray-200 rounded-lg shadow-xl p-4 text-sm"
+          >
+            <div className="font-semibold text-sm mb-2">
+              {ticket.title}
             </div>
-          )}
 
-          <div className="text-xs mb-1">
-            Effort: {ticket.effortDays ?? ticket.storyPoints ?? 1}d
-          </div>
+            {assignedMember && (
+              <div className="text-xs text-gray-600 mb-3 flex items-center gap-2">
+                <span className="font-medium">{assignedMember.name}</span>
+                {assignedMember.experienceLevel && (
+                  <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-700 text-[10px]">
+                    {assignedMember.experienceLevel}
+                    {assignedMember.velocityMultiplier && assignedMember.velocityMultiplier !== 1 && (
+                      <span className="ml-1">({assignedMember.velocityMultiplier}x)</span>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
 
-          <div className="text-xs text-gray-500">
-            {ticket.startDate.toLocaleDateString()} – {ticket.endDate.toLocaleDateString()}
-          </div>
-
-          {hasConflict && (
-            <div className="text-xs text-amber-600 mt-2">
-              ⚠ Overallocated in sprint
+            <div className="space-y-1 text-xs mb-3">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Dates:</span>
+                <span className="font-medium">{ticket.startDate.toLocaleDateString()} – {ticket.endDate.toLocaleDateString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Effort:</span>
+                <span className="font-medium">{ticket.effortDays ?? ticket.storyPoints ?? 1} days</span>
+              </div>
+              {assignedMember?.velocityMultiplier && assignedMember.velocityMultiplier !== 1 && (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Adjusted Duration:</span>
+                  <span className="font-medium text-blue-600">
+                    {Math.round((ticket.effortDays ?? ticket.storyPoints ?? 1) / assignedMember.velocityMultiplier)} days
+                  </span>
+                </div>
+              )}
             </div>
-          )}
 
-          {hasBlockingConstraint && (
-            <div className="text-xs text-red-600 mt-2">
-              ⚠ Overlaps {blockingMilestones[0].name}
+            {/* Phase 2: Working Days Breakdown */}
+            <div className="border-t border-gray-200 pt-3 mt-3">
+              <div className="text-xs font-semibold text-gray-700 mb-2">📋 Working Day Breakdown:</div>
+              <div className="space-y-1 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Calendar days:</span>
+                  <span className="font-medium">{calendarDaysCount}</span>
+                </div>
+                {weekendDaysCount > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>− Weekend days:</span>
+                    <span>−{weekendDaysCount}</span>
+                  </div>
+                )}
+                {holidayDaysCount > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>− Holidays:</span>
+                    <span>−{holidayDaysCount}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-gray-200 pt-1 mt-1 font-semibold text-green-600">
+                  <span>= Working days:</span>
+                  <span>{actualWorkingDays} ✓</span>
+                </div>
+              </div>
+              
+              {ticketHolidays.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <div className="text-[10px] text-gray-500">
+                    Holidays: {ticketHolidays.map(h => h.name).join(', ')}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>,
-        document.body
-      )}
+
+            {hasConflict && (
+              <div className="text-xs text-amber-600 mt-3 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                <span>Overallocated in sprint</span>
+              </div>
+            )}
+
+            {hasBlockingConstraint && (
+              <div className="text-xs text-red-600 mt-2 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3" />
+                <span>Overlaps {blockingMilestones[0].name}</span>
+              </div>
+            )}
+
+            {ptoOverlapInfo.hasPtoRisk && (
+              <div className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                <span>PTO overlap: {ptoOverlapInfo.overlapDays} working day{ptoOverlapInfo.overlapDays > 1 ? 's' : ''}</span>
+              </div>
+            )}
+          </div>,
+          document.body
+        );
+      })()}
     </div>
   );
 }
@@ -2148,7 +2525,7 @@ function PhasesBandRow({
       <div 
         className="relative bg-white/80 backdrop-blur-sm border-b border-gray-200"
         style={{ 
-          height: 60,
+          height: 32, // Match GANTT_CONSTANTS.PHASE_STRIP_HEIGHT
           zIndex: 4
         }}
       >
@@ -2183,9 +2560,9 @@ function PhasesBandRow({
               >
                 {/* Phase label */}
                 <div
-                  className="absolute text-xs font-semibold px-2 py-1 rounded"
+                  className="absolute text-xs font-semibold px-2 py-0.5 rounded"
                   style={{
-                    top: 8,
+                    top: 4,
                     left: 8,
                     backgroundColor: `${color}20`,
                     color: color,
@@ -2206,7 +2583,7 @@ function PhasesBandRow({
                 <div
                   className="absolute text-[10px] font-medium px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{
-                    bottom: 4,
+                    bottom: 2,
                     right: 8,
                     backgroundColor: `${color}15`,
                     color: color,

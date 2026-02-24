@@ -158,6 +158,8 @@ export function mapReleasePlanToAppRelease(
     endDate: releaseEnd,
     features,
     sprints: mappedSprints,
-    storyPointMapping: undefined
+    storyPointMapping: undefined,
+    milestones: [],
+    phases: []
   };
 }

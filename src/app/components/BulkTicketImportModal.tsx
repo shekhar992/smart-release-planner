@@ -23,6 +23,8 @@ interface ParsedTicketRow {
   storyPoints: number;
   assignedTo: string;
   feature?: string;
+  requiredRole?: 'Frontend' | 'Backend' | 'Fullstack' | 'QA' | 'Designer' | 'DataEngineer' | 'iOS' | 'Android';
+  blockedBy?: string[];
 }
 
 type Step = 'upload' | 'preview';
@@ -153,6 +155,10 @@ export function BulkTicketImportModal({
           effortDays, // Calculated from storyPoints using mapping
           storyPoints: ticket.storyPoints, // Backward compatibility
           assignedTo: ticket.assignedTo,
+          requiredRole: ticket.requiredRole || undefined,
+          dependencies: ticket.blockedBy && ticket.blockedBy.length > 0 
+            ? { blockedBy: ticket.blockedBy } 
+            : undefined,
         });
         count++;
       }
@@ -164,18 +170,18 @@ export function BulkTicketImportModal({
   };
 
   const handleDownloadTemplate = () => {
-    const template = `title,epic,effortDays,priority,assignedTo
-Configure AWS hosting services,Infra Setup,15,High,AI Tech Lead
-Configure AWS GenAI services,Infra Setup,10,High,AI Tech Lead
-Configure AWS storage services,Infra Setup,5,High,AI Tech Lead
-Configure Environments and Deployments,Infra Setup,10,High,AI Tech Lead
-Agents codebase setup,Code Setup,10,High,AI Tech Lead
-Backend setup (BFF layer),Code Setup,10,High,AI Tech Lead
-Develop framework to build and orchestrate multiple agents,Agentic AI Foundation,5,High,AI Tech Backend 1
-Develop data source connectors,Agentic AI Foundation,10,High,AI Tech Backend 1
-Develop tools (or MCP server) for external operations,Agentic AI Foundation,15,High,AI Tech Backend 1
-Setup memory layer,Agentic AI Foundation,10,High,AI Tech Backend 1
-Setup knowledge bases,Agentic AI Foundation,10,High,AI Tech Backend 1
+    const template = `title,epic,effortDays,priority,assignedTo,requiredRole,blockedBy
+Configure AWS hosting services,Infra Setup,15,High,AI Tech Lead,Backend,
+Configure AWS GenAI services,Infra Setup,10,High,AI Tech Lead,Backend,ticket-001
+Configure AWS storage services,Infra Setup,5,High,AI Tech Lead,Backend,
+Configure Environments and Deployments,Infra Setup,10,High,AI Tech Lead,Backend,
+Agents codebase setup,Code Setup,10,High,AI Tech Lead,Fullstack,
+Backend setup (BFF layer),Code Setup,10,High,AI Tech Lead,Backend,
+Develop framework to build and orchestrate multiple agents,Agentic AI Foundation,5,High,AI Tech Backend 1,Backend,
+Develop data source connectors,Agentic AI Foundation,10,High,AI Tech Backend 1,Backend,
+Develop tools (or MCP server) for external operations,Agentic AI Foundation,15,High,AI Tech Backend 1,Backend,
+Setup memory layer,Agentic AI Foundation,10,High,AI Tech Backend 1,Backend,
+Setup knowledge bases,Agentic AI Foundation,10,High,AI Tech Backend 1,Backend,
 SSO Login,Authentication,5,High,AI Tech Backend 1
 SSO token verification,Authentication,5,High,AI Tech Backend 1
 Role Based access control and User groups,Account Management,15,High,AI Tech Backend 1

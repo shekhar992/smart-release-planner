@@ -158,23 +158,33 @@ export const spacing = {
 // ============================================
 
 export const shadows = {
-  // Standard shadows
-  sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-  base: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1)',
-  md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
-  lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
-  xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-  '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+  // Standard shadows (enhanced depth)
+  sm: '0 1px 2px 0 rgba(0, 0, 0, 0.06)',
+  base: '0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 1px 2px -1px rgba(0, 0, 0, 0.1)',
+  md: '0 4px 6px -1px rgba(0, 0, 0, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.08)',
+  lg: '0 10px 15px -3px rgba(0, 0, 0, 0.12), 0 4px 6px -4px rgba(0, 0, 0, 0.08)',
+  xl: '0 20px 25px -5px rgba(0, 0, 0, 0.14), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+  '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.3)',
+  '3xl': '0 35px 60px -15px rgba(0, 0, 0, 0.35)',  // New - premium depth
   
   // Special shadows
   glow: '0 0 0 3px rgba(59, 130, 246, 0.5)',      // Selection glow
-  glowLg: '0 0 15px 0 rgba(59, 130, 246, 0.5)',   // Emphasized glow
-  inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.05)', // Inset shadow
+  glowLg: '0 0 20px 0 rgba(59, 130, 246, 0.6)',   // Emphasized glow (improved)
+  inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)', // Inset shadow
+  innerLg: 'inset 0 4px 8px 0 rgba(0, 0, 0, 0.08)', // Deeper inset (new)
   
   // State-specific shadows
-  hover: '0 10px 15px -3px rgba(0, 0, 0, 0.15), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
-  active: '0 1px 2px 0 rgba(0, 0, 0, 0.1)',
+  hover: '0 12px 20px -4px rgba(0, 0, 0, 0.16), 0 4px 6px -2px rgba(0, 0, 0, 0.1)',
+  active: '0 2px 4px 0 rgba(0, 0, 0, 0.12)',
   focus: '0 0 0 3px rgba(59, 130, 246, 0.5)',
+  
+  // Button shadows (new)
+  button: '0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.06)',
+  buttonHover: '0 4px 8px -2px rgba(0, 0, 0, 0.12), 0 2px 4px -2px rgba(0, 0, 0, 0.08)',
+  
+  // Card shadows (new)
+  card: '0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.06)',
+  cardHover: '0 10px 20px -5px rgba(0, 0, 0, 0.12), 0 4px 8px -4px rgba(0, 0, 0, 0.08)',
   
   // Conflict shadows
   conflictError: '0 0 0 2px rgba(220, 38, 38, 0.3), 0 4px 6px -1px rgba(220, 38, 38, 0.1)',
@@ -194,30 +204,37 @@ export const typography = {
   fontSize: {
     xs: '11px',      // Metadata, counts, tiny labels
     sm: '13px',      // Ticket names, labels
-    base: '15px',    // Body text, descriptions
-    lg: '17px',      // Section headers
-    xl: '19px',      // Page titles
+    base: '14px',    // Body text, descriptions (improved from 15px)
+    md: '15px',      // Emphasized body text
+    lg: '16px',      // Section headers (improved from 17px)
+    xl: '20px',      // Page titles (improved from 19px)
     '2xl': '24px',   // Dashboard titles
-    '3xl': '30px'    // Hero text
+    '3xl': '32px'    // Hero text (improved from 30px)
   },
   
   fontWeight: {
     normal: '400',
     medium: '500',
     semibold: '600',
-    bold: '700'
+    bold: '700',
+    extrabold: '800'  // Added for emphasis
   },
   
   lineHeight: {
-    tight: '1.25',
-    normal: '1.5',
-    relaxed: '1.75'
+    tight: '1.3',     // Headlines (improved from 1.25)
+    snug: '1.4',      // Subheadings (new)
+    normal: '1.5',    // Body text
+    relaxed: '1.6',   // Comfortable reading (improved from 1.75)
+    loose: '1.8'      // Spacious (new)
   },
   
   letterSpacing: {
-    tight: '-0.025em',
+    tighter: '-0.04em',  // Tight headlines (new)
+    tight: '-0.02em',    // Headlines (improved from -0.025em)
     normal: '0',
-    wide: '0.025em'
+    wide: '0.02em',      // Improved from 0.025em
+    wider: '0.05em',     // Uppercase labels (new)
+    widest: '0.1em'      // All caps (new)
   }
 };
 
@@ -227,12 +244,13 @@ export const typography = {
 
 export const borderRadius = {
   none: '0',
-  sm: '4px',
-  base: '6px',
-  md: '8px',
-  lg: '12px',
-  xl: '16px',
-  '2xl': '24px',
+  sm: '6px',       // Improved from 4px - modern look
+  base: '8px',     // Improved from 6px
+  md: '10px',      // Improved from 8px
+  lg: '12px',      // Unchanged
+  xl: '16px',      // Unchanged
+  '2xl': '20px',   // Improved from 24px - more subtle
+  '3xl': '24px',   // New - large cards
   full: '9999px'
 };
 
@@ -250,6 +268,66 @@ export const transitions = {
   easeOut: 'cubic-bezier(0, 0, 0.2, 1)',
   easeIn: 'cubic-bezier(0.4, 0, 1, 1)',
   spring: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+};
+
+// ============================================
+// INTERACTION TOKENS
+// ============================================
+
+export const interaction = {
+  hoverOpacity: 0.08,      // For hover overlay backgrounds
+  hoverBrightness: 1.05,   // For button hover brightness (new)
+  pressedScale: 0.97,      // For button press states (improved from 0.98)
+  disabledOpacity: 0.5,    // For disabled states
+  focusRingWidth: '3px',   // Focus ring width
+  focusRingOffset: '2px',  // Focus ring offset
+  
+  // Touch/click targets (new)
+  minTouchTarget: '44px',  // WCAG minimum touch target
+  iconSize: {
+    xs: '14px',
+    sm: '16px',
+    base: '20px',
+    lg: '24px',
+    xl: '32px'
+  },
+  iconStroke: '2px'        // Icon stroke width for better visibility
+};
+
+// ============================================
+// GANTT-SPECIFIC CONSTANTS
+// ============================================
+
+export const gantt = {
+  // Row dimensions
+  rowHeight: '48px',
+  featureHeaderHeight: '40px',
+  phaseStripHeight: '60px',
+  milestoneStripHeight: '50px',
+  legendHeight: '48px',
+  
+  // Bar dimensions
+  barHeight: '36px',
+  barMarginTop: '6px',      // (rowHeight - barHeight) / 2
+  barRadius: '6px',
+  barMinWidth: '20px',
+  barBorderWidth: '3px',     // For status left border
+  
+  // Column widths
+  dayWidth: '40px',
+  dayWidthWeek: '120px',     // Week zoom mode
+  dayWidthMonth: '200px',    // Month zoom mode
+  sidebarWidth: '320px',
+  
+  // Visual details
+  weekendBg: 'rgba(0, 0, 0, 0.03)',
+  holidayBg: 'rgba(239, 68, 68, 0.08)',
+  todayLineColor: '#3B82F6',
+  todayLineWidth: '2px',
+  
+  // Tooltip
+  tooltipMaxWidth: '360px',
+  tooltipOffset: '12px'
 };
 
 // ============================================
@@ -329,6 +407,8 @@ export default {
   typography,
   borderRadius,
   transitions,
+  interaction,
+  gantt,
   zIndex,
   getTicketColors,
   getConflictColors,

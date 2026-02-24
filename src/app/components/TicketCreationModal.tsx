@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Plus, ChevronDown, Check, User, Sparkles, Layers } from 'lucide-react';
+import { X, Plus, ChevronDown, Check, User, Sparkles, Layers, Link2 } from 'lucide-react';
 import { cn } from './ui/utils';
 import { Release, Ticket, TeamMember, mockHolidays } from '../data/mockData';
 import { suggestEffortDays } from '../lib/effortSuggestion';
-import{ calculateEndDateFromEffort, calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
+import { calculateEndDateFromEffort, calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
 import { loadHolidays } from '../lib/localStorage';
+import { type TeamRole } from '../lib/roleColors';
 
 interface TicketCreationModalProps {
   release: Release;
@@ -43,6 +44,8 @@ export function TicketCreationModal({
   );
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const [assigneeSearch, setAssigneeSearch] = useState('');
+  const [requiredRole, setRequiredRole] = useState<TeamRole | ''>('');
+  const [blockedBy, setBlockedBy] = useState<string[]>([]);
   const assigneeRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   
@@ -127,7 +130,9 @@ export function TicketCreationModal({
       status,
       effortDays,
       storyPoints: effortDays, // Backward compatibility
-      assignedTo
+      assignedTo,
+      requiredRole: requiredRole || undefined,
+      dependencies: blockedBy.length > 0 ? { blockedBy } : undefined
     });
     onClose();
   };
@@ -142,12 +147,16 @@ export function TicketCreationModal({
       status,
       effortDays,
       storyPoints: effortDays, // Backward compatibility
-      assignedTo
+      assignedTo,
+      requiredRole: requiredRole || undefined,
+      dependencies: blockedBy.length > 0 ? { blockedBy } : undefined
     });
     // Reset ticket fields for next one
     setTitle('');
     setDescription('');
     setEffortDays(3);
+    setRequiredRole('');
+    setBlockedBy([]);
     setStartDate(endDate); // Next ticket starts where this one ends
     const nextEnd = new Date(new Date(endDate).getTime() + 5 * 24 * 60 * 60 * 1000);
     setEndDate(toLocalDateString(nextEnd));
@@ -479,6 +488,63 @@ export function TicketCreationModal({
                         ))}
                       </div>
                     </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Required Role & Dependencies Row */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Required Role */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Required Role (Optional)</label>
+                  <select
+                    value={requiredRole}
+                    onChange={(e) => setRequiredRole(e.target.value as TeamRole | '')}
+                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
+                  >
+                    <option value="">Any Role</option>
+                    <optgroup label="Web Development">
+                      <option value="Frontend">Frontend</option>
+                      <option value="Backend">Backend</option>
+                      <option value="Fullstack">Fullstack</option>
+                      <option value="DataEngineer">Data Engineer</option>
+                    </optgroup>
+                    <optgroup label="Mobile Development">
+                      <option value="iOS">iOS</option>
+                      <option value="Android">Android</option>
+                    </optgroup>
+                    <optgroup label="Other">
+                      <option value="Designer">Designer</option>
+                      <option value="QA">QA</option>
+                    </optgroup>
+                  </select>
+                </div>
+
+                {/* Blocked By (Dependencies) */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+                    <Link2 className="w-3 h-3" />
+                    Blocked By (Optional)
+                  </label>
+                  <select
+                    multiple
+                    value={blockedBy}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value);
+                      setBlockedBy(selected);
+                    }}
+                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200 min-h-[44px]"
+                  >
+                    {release.features.flatMap(f => f.tickets).map(ticket => (
+                      <option key={ticket.id} value={ticket.id} className="py-1">
+                        {ticket.title.substring(0, 40)}{ticket.title.length > 40 ? '...' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  {blockedBy.length > 0 && (
+                    <p className="mt-1.5 text-[10px] text-slate-500 dark:text-slate-400">
+                      {blockedBy.length} ticket{blockedBy.length !== 1 ? 's' : ''} selected
+                    </p>
                   )}
                 </div>
               </div>

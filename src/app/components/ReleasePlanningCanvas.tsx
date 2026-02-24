@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, AlertTriangle } from 'lucide-react';
+import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, AlertTriangle, Wand2 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { WorkloadModal } from './WorkloadModal';
@@ -10,11 +10,19 @@ import { ConflictResolutionPanel } from './ConflictResolutionPanel';
 import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct, storyPointsToDays, Phase } from '../data/mockData';
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
-import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
+import { loadProducts, saveProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
 import { calculateEffortFromDates, toLocalDateString, calculateEndDateFromEffort } from '../lib/dateUtils';
 import { calculateDurationDays } from '../lib/durationCalculator';
 import { addDays } from 'date-fns';
 import { exportReleaseTimelinePptx } from '../lib/exporters/exportReleaseTimelinePptx';
+import { autoAllocateRelease } from '../lib/planningBridge';
+import { toastSuccess, toastError, toastPromise, toastInfo } from '../lib/toastHelpers';
+// COMMENTED OUT: Release Health Header - Removed to free up UI real estate
+// import { ReleaseHealthHeader } from './ReleaseHealthHeader';
+import { SmartAssistantPanel } from './SmartAssistantPanel';
+// COMMENTED OUT: Release Health metrics calculations
+// import { calculateCapacityUtilization, calculateTimelineStatus, calculateTeamVelocity, calculateConflictMetrics } from '../lib/capacityMetrics';
+// import { generateInsights } from '../lib/insightEngine';
 
 // Helper function to check if ticket is in dev window
 function isTicketInDevWindow(ticket: Ticket, phases: Phase[]): boolean {
@@ -71,8 +79,8 @@ function HeaderAlertsPanel({
       
       {isExpanded && (
         <>
-          <div className="fixed inset-0 z-[55]" onClick={() => setIsExpanded(false)} />
-          <div className="absolute right-0 top-full mt-2 w-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-amber-200 dark:border-amber-800 rounded-xl shadow-2xl z-[60] overflow-hidden animate-fade-in">
+          <div className="fixed inset-0 z-[85]" onClick={() => setIsExpanded(false)} />
+          <div className="absolute right-0 top-full mt-2 w-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-amber-200 dark:border-amber-800 rounded-xl shadow-2xl z-[90] overflow-hidden animate-fade-in">
             {/* Dev Window Issues */}
             {spilloverCount > 0 && (
               <div className="border-b border-amber-100 dark:border-amber-900/50 p-3 bg-gradient-to-br from-amber-50/50 to-transparent dark:from-amber-950/20">
@@ -148,6 +156,7 @@ export function ReleasePlanningCanvas() {
   const [initialized, setInitialized] = useState(false);
   const [teamMembersRefreshKey, setTeamMembersRefreshKey] = useState(0);
   const [holidaysRefreshKey, setHolidaysRefreshKey] = useState(0);
+  const [productsRefreshKey, setProductsRefreshKey] = useState(0);
   
   useEffect(() => {
     if (!initialized) {
@@ -155,6 +164,17 @@ export function ReleasePlanningCanvas() {
       setInitialized(true);
     }
   }, [initialized]);
+
+  // Listen for products updates (when releases are created/modified)
+  useEffect(() => {
+    const handleProductsUpdate = () => {
+      console.log('[Event] Products updated, triggering refresh...');
+      setProductsRefreshKey(prev => prev + 1);
+    };
+
+    window.addEventListener('productsUpdated', handleProductsUpdate);
+    return () => window.removeEventListener('productsUpdated', handleProductsUpdate);
+  }, []);
 
   // Listen for team members updates (from PTO Calendar, etc.)
   useEffect(() => {
@@ -178,7 +198,7 @@ export function ReleasePlanningCanvas() {
   }, []);
   
   // Load products, holidays, and team members from localStorage or use mock data
-  const products = useMemo(() => loadProducts() || mockProducts, [initialized]);
+  const products = useMemo(() => loadProducts() || mockProducts, [initialized, productsRefreshKey]);
   const holidays = useMemo(() => loadHolidays() || mockHolidays, [initialized, holidaysRefreshKey]);
   const milestones = useMemo(() => {
     if (!releaseId) return [];
@@ -228,6 +248,17 @@ export function ReleasePlanningCanvas() {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showSprintCreation, setShowSprintCreation] = useState(false);
   const [showAddMilestoneModal, setShowAddMilestoneModal] = useState(false);
+
+  // Phase 3: Smart Assistant Panel state
+  const [assistantPanelOpen, setAssistantPanelOpen] = useState(() => {
+    const stored = localStorage.getItem('assistantPanelOpen');
+    return stored === 'true';
+  });
+
+  // Persist assistant panel state
+  useEffect(() => {
+    localStorage.setItem('assistantPanelOpen', String(assistantPanelOpen));
+  }, [assistantPanelOpen]);
 
   // SCENARIO SIMULATION STATE (Phase 1)
   // Feature flag: disabled per user request
@@ -392,6 +423,107 @@ export function ReleasePlanningCanvas() {
     }
   };
 
+  // Handle auto-allocation using planning engine
+  const handleAutoAllocate = async () => {
+    if (!release || !selectedProduct) return;
+
+    // Check preconditions
+    if (!release.sprints || release.sprints.length === 0) {
+      toastError('No sprints defined', 'Create sprints before auto-allocating tickets.');
+      return;
+    }
+
+    if (teamMembers.length === 0) {
+      toastError('No team members', 'Add team members before auto-allocating tickets.');
+      return;
+    }
+
+    const developers = teamMembers.filter(tm => tm.role === 'Developer');
+    if (developers.length === 0) {
+      toastError('No developers', 'At least one team member must have the Developer role.');
+      return;
+    }
+
+    // Get sprint length from first sprint
+    const sprintLengthDays = release.sprints.length > 0
+      ? Math.round((release.sprints[0].endDate.getTime() - release.sprints[0].startDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 14;
+
+    // Call planning engine with toast feedback
+    const result = await toastPromise(
+      Promise.resolve(autoAllocateRelease(release, teamMembers, holidays, sprintLengthDays)),
+      {
+        loading: 'Analyzing capacity and allocating tickets...',
+        success: (res) => {
+          if (res.success) {
+            const feasible = Math.round(res.plan.feasiblePercentage);
+            const overflow = res.plan.overflowTickets.length;
+            if (overflow === 0) {
+              return `All tickets allocated! (${feasible}% feasible)`;
+            } else {
+              return `Allocated ${feasible}% of backlog (${overflow} tickets deferred)`;
+            }
+          }
+          return 'Allocation complete';
+        },
+        error: 'Auto-allocation failed'
+      }
+    );
+
+    if (result.success) {
+      // Replace the current release with the allocated one
+      const updatedProducts = products.map(p => 
+        p.id === selectedProduct.id
+          ? { ...p, releases: p.releases.map(r => 
+              r.id === release.id ? result.release : r
+            )}
+          : p
+      );
+
+      // Save to localStorage using proper API
+      saveProducts(updatedProducts);
+      
+      // Trigger refresh by navigating
+      window.location.reload();
+    } else {
+      toastError('Auto-allocation failed', result.error);
+    }
+  };
+
+  // Handle insight action clicks
+  const handleInsightAction = (actionType: string) => {
+    switch (actionType) {
+      case 'auto-allocate':
+        handleAutoAllocate();
+        break;
+      case 'resolve-conflicts':
+        setShowConflictResolution(true);
+        break;
+      case 'add-sprint':
+        setShowSprintCreation(true);
+        break;
+      case 'add-team-member':
+        if (selectedProduct) {
+          navigate(`/product/${selectedProduct.id}/team`);
+        }
+        break;
+      case 'import-tickets':
+        setShowBulkImport({});
+        break;
+      case 'view-capacity':
+        // Future: Open capacity panel
+        toastPromise(
+          Promise.resolve({ success: true }),
+          {
+            loading: 'Loading capacity details...',
+            success: 'Capacity analysis complete',
+            error: 'Failed to load capacity'
+          }
+        );
+        break;
+    }
+  };
+
   // Detect conflicts whenever release data changes
   const allTickets = useMemo(() => {
     return release?.features.flatMap(feature => feature.tickets) ?? [];
@@ -447,6 +579,46 @@ export function ReleasePlanningCanvas() {
       return tm;
     });
   }, [teamMembers, scenarioMode, scenarioOverrides]);
+
+  // COMMENTED OUT: Release health metrics calculations - Removed to free up UI real estate
+  // const capacityUtilization = useMemo(() => {
+  //   if (!release) return { percentage: 0, allocatedDays: 0, availableCapacityDays: 0, status: 'under' as const };
+  //   return calculateCapacityUtilization(allTickets, release.sprints, derivedTeamMembers, holidays, release);
+  // }, [allTickets, release, derivedTeamMembers, holidays]);
+
+  // const timelineStatus = useMemo(() => {
+  //   if (!release) return { status: 'upcoming' as const, daysRemaining: null, progressPercentage: 0, message: 'No release' };
+  //   return calculateTimelineStatus(release, allTickets);
+  // }, [release, allTickets]);
+
+  // const teamVelocity = useMemo(() => {
+  //   return calculateTeamVelocity(derivedTeamMembers);
+  // }, [derivedTeamMembers]);
+
+  // const conflictMetrics = useMemo(() => {
+  //   return calculateConflictMetrics(enhancedConflicts);
+  // }, [enhancedConflicts]);
+
+  // // Generate proactive insights
+  // const insights = useMemo(() => {
+  //   if (!release) return [];
+  //   return generateInsights(
+  //     allTickets,
+  //     release.sprints,
+  //     derivedTeamMembers,
+  //     release,
+  //     capacityUtilization,
+  //     timelineStatus,
+  //     teamVelocity,
+  //     conflictMetrics,
+  //     enhancedConflicts
+  //   );
+  // }, [allTickets, release, derivedTeamMembers, capacityUtilization, timelineStatus, teamVelocity, conflictMetrics, enhancedConflicts]);
+
+  // Provide default values for SmartAssistantPanel (since Release Health is commented out)
+  const capacityUtilization = { percentage: 0, allocatedDays: 0, availableCapacityDays: 0, status: 'under' as const };
+  const conflictMetrics = { total: 0, blocking: 0, warning: 0, info: 0 };
+  const insights: any[] = [];
 
   // SCENARIO SIMULATION: Derive tickets for capacity calculations
   const derivedTickets = useMemo(() => {
@@ -588,7 +760,12 @@ export function ReleasePlanningCanvas() {
   const handleMoveTicket = (featureId: string, ticketId: string, newStartDate: Date) => {
     setRelease(prev => {
       if (!prev) return prev;
-      return {
+      
+      // Find the ticket to get its name for toast
+      const feature = prev.features.find(f => f.id === featureId);
+      const ticket = feature?.tickets.find(t => t.id === ticketId);
+      
+      const updated = {
       ...prev,
       features: prev.features.map(f => {
         if (f.id === featureId) {
@@ -606,6 +783,13 @@ export function ReleasePlanningCanvas() {
                 
                 const newEndDate = calculateEndDateFromEffort(newStartDate, adjustedDuration, holidays);
                 console.log(`[Move Ticket] ${t.title}: ${effortDays} effort → ${adjustedDuration} working days (${velocity}x velocity) → ${newEndDate.toDateString()}`);
+                
+                // Phase 2: Toast feedback for ticket move
+                toastSuccess(
+                  `Ticket moved to ${newStartDate.toLocaleDateString()}`,
+                  `Ends ${newEndDate.toLocaleDateString()} (${adjustedDuration} working days)`
+                );
+                
                 return { ...t, startDate: newStartDate, endDate: newEndDate };
               }
               return t;
@@ -615,6 +799,8 @@ export function ReleasePlanningCanvas() {
         return f;
       })
     };
+    
+    return updated;
     });
   };
 
@@ -631,6 +817,13 @@ export function ReleasePlanningCanvas() {
               if (t.id === ticketId) {
                 // Recalculate effortDays from new duration (working days, not calendar days)
                 const newEffort = calculateEffortFromDates(t.startDate, newEndDate, holidays);
+                
+                // Phase 2: Toast feedback for ticket resize
+                toastSuccess(
+                  `Ticket duration changed to ${newEffort} days`,
+                  `${t.startDate.toLocaleDateString()} – ${newEndDate.toLocaleDateString()}`
+                );
+                
                 return {
                   ...t,
                   endDate: newEndDate,
@@ -722,6 +915,121 @@ export function ReleasePlanningCanvas() {
     });
   };
 
+  // Phase 3: Smart Assistant Panel handlers
+  const handleApplyInsight = (insightId: string) => {
+    const insight = insights.find(i => i.id === insightId);
+    if (!insight) return;
+    
+    // Find the Apply action
+    const applyAction = insight.actions.find(a => a.type === 'apply');
+    if (!applyAction) {
+      toastInfo('No Action', 'This insight has no actionable items.');
+      return;
+    }
+    
+    // Dispatch action based on handler type
+    switch (applyAction.handler) {
+      case 'auto-allocate':
+        handleAutoAllocate();
+        break;
+      case 'resolve-conflicts':
+        setShowConflictResolution(true);
+        toastInfo('Conflicts Panel', 'Opening conflict resolution panel');
+        break;
+      case 'import-tickets':
+        setShowBulkImport({});
+        toastInfo('Import Tickets', 'Opening CSV import modal');
+        break;
+      case 'add-sprint':
+        // Navigate to timeline and suggest sprint creation
+        toastInfo('Add Sprint', 'Scroll down to the timeline and click "Add Sprint" button');
+        break;
+      case 'add-team-member':
+        // Navigate to product page where team is managed
+        toastInfo('Add Team Member', 'Go to Planning Dashboard to manage team members');
+        break;
+      case 'view-capacity':
+        // Scroll to capacity metrics or show capacity panel
+        toastInfo('Capacity View', 'Check the timeline and sprint capacity bars for capacity details');
+        break;
+      default:
+        toastInfo('Action Not Implemented', `Handler "${applyAction.handler}" is not yet implemented`);
+    }
+  };
+
+  const handleDismissInsight = (insightId: string) => {
+    // Already handled in component via localStorage
+    toastInfo('Insight Dismissed', 'You can clear dismissed insights from your browser settings.');
+  };
+
+  const handleViewInsight = (insightId: string) => {
+    const insight = insights.find(i => i.id === insightId);
+    if (!insight) return;
+    
+    // If there's specific context, navigate to it
+    if (insight.context) {
+      if (insight.context.ticketId && insight.context.featureId) {
+        setSelectedTicket({ 
+          featureId: insight.context.featureId, 
+          ticketId: insight.context.ticketId 
+        });
+        toastInfo('Viewing Ticket', 'Ticket details panel opened');
+        return;
+      }
+    }
+    
+    // Otherwise, dispatch view action based on insight type
+    const viewAction = insight.actions.find(a => a.type === 'view');
+    if (viewAction) {
+      switch (viewAction.handler) {
+        case 'resolve-conflicts':
+          setShowConflictResolution(true);
+          break;
+        case 'auto-allocate':
+        case 'view-capacity':
+          // Can view timeline details
+          toastInfo('View Details', 'Check the timeline for ticket allocation details');
+          break;
+        default:
+          toastInfo('View', `Viewing details for: ${insight.title}`);
+      }
+    } else {
+      toastInfo('View', `Viewing: ${insight.title}`);
+    }
+  };
+
+  // Phase 3: What-If Scenario handlers
+  const handleAddHoliday = () => {
+    toastInfo('Add Holiday', 'Holiday management coming soon. This will let you add custom holidays and see impact on sprint capacity.');
+    // TODO: Implement holiday management modal
+    // This would:
+    // 1. Show a modal to pick date and name
+    // 2. Update holidays in localStorage
+    // 3. Recalculate all sprint capacities
+    // 4. Show before/after impact
+  };
+
+  const handleAddPTO = () => {
+    toastInfo('Add PTO', 'PTO management coming soon. This will let you add developer time-off and see impact on assignments.');
+    // TODO: Implement PTO management modal
+    // This would:
+    // 1. Show a modal to pick developer, dates
+    // 2. Update team member PTO in localStorage
+    // 3. Recalculate affected sprint capacities
+    // 4. Show conflicts that arise from reduced capacity
+  };
+
+  const handleSimulateReallocation = () => {
+    toastInfo('Simulate Reallocation', 'Running auto-allocation preview. Check the timeline to see proposed changes.');
+    // TODO: Implement simulation mode
+    // This would:
+    // 1. Run auto-allocation without saving
+    // 2. Show diff view of current vs proposed
+    // 3. Let user accept/reject changes
+    // 4. Show capacity improvements
+    handleAutoAllocate(); // For now, just run the actual allocation
+  };
+
   const handleUpdateSprint = (sprintId: string, name: string, startDate: Date, endDate: Date) => {
     setRelease(prev => {
       if (!prev) return prev;
@@ -751,7 +1059,7 @@ export function ReleasePlanningCanvas() {
   return (
     <div className="h-screen flex flex-col bg-[#F7F8FA]">
       {/* Top Navigation Bar */}
-      <div className="relative z-50 flex items-center justify-between px-6 py-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 shadow-sm">
+      <div className="sticky top-0 z-[80] flex items-center justify-between px-6 py-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 shadow-sm">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/')}
@@ -822,10 +1130,10 @@ export function ReleasePlanningCanvas() {
             {showActionsMenu && (
               <>
                 <div 
-                  className="fixed inset-0 z-[55]"
+                  className="fixed inset-0 z-[85]"
                   onClick={() => setShowActionsMenu(false)}
                 />
-                <div className="absolute right-0 mt-1 w-56 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-[60] py-1 overflow-hidden">
+                <div className="absolute right-0 mt-1 w-56 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl z-[90] py-1 overflow-hidden">
                   <button
                     onClick={() => {
                       setShowSprintCreation(true);
@@ -856,6 +1164,17 @@ export function ReleasePlanningCanvas() {
                   >
                     <Upload className="w-4 h-4" />
                     <span>Import Tickets</span>
+                  </button>
+                  <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
+                  <button
+                    onClick={() => {
+                      handleAutoAllocate();
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-all text-left font-medium bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 text-purple-700 dark:text-purple-400 hover:from-purple-100 hover:to-blue-100 dark:hover:from-purple-900/30 dark:hover:to-blue-900/30"
+                  >
+                    <Wand2 className="w-4 h-4" />
+                    <span>Auto-Allocate Tickets</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1084,8 +1403,20 @@ export function ReleasePlanningCanvas() {
       )}
 
       {/* Main Canvas */}
-      <div className="flex-1 overflow-hidden">
-        <TimelinePanel
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {/* COMMENTED OUT: Release Health Header - Removed to free up UI real estate */}
+        {/* <ReleaseHealthHeader
+          capacityUtil={capacityUtilization}
+          timelineStatus={timelineStatus}
+          teamVelocity={teamVelocity}
+          conflictMetrics={conflictMetrics}
+          insights={insights}
+          onInsightAction={handleInsightAction}
+        /> */}
+
+        {/* Timeline */}
+        <div className="flex-1 overflow-hidden">
+          <TimelinePanel
           release={release}
           holidays={holidays}
           teamMembers={teamMembers}
@@ -1102,7 +1433,8 @@ export function ReleasePlanningCanvas() {
           onShowSprintCreationChange={setShowSprintCreation}
           showAddMilestoneModal={showAddMilestoneModal}
           onShowAddMilestoneModalChange={setShowAddMilestoneModal}
-        />
+          />
+        </div>
       </div>
 
       {/* Workload Modal */}
@@ -1152,23 +1484,34 @@ export function ReleasePlanningCanvas() {
 
       {/* Conflict Resolution Panel */}
       {showConflictResolution && (
-        <div className="fixed inset-0 z-[70] flex justify-end bg-black/20">
-          <ConflictResolutionPanel
-            conflicts={enhancedConflicts}
-            tickets={allTickets}
-            onClose={() => setShowConflictResolution(false)}
-            onReassignTicket={handleReassignTicket}
-            onMoveTicketToSprint={handleMoveTicketToSprintById}
-            onShiftTicket={handleShiftTicket}
-            onIgnoreConflict={handleIgnoreConflict}
-          />
+        <div 
+          className="fixed inset-0 z-[70] flex justify-end bg-black/20"
+          onClick={() => setShowConflictResolution(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <ConflictResolutionPanel
+              conflicts={enhancedConflicts}
+              tickets={allTickets}
+              onClose={() => setShowConflictResolution(false)}
+              onReassignTicket={handleReassignTicket}
+              onMoveTicketToSprint={handleMoveTicketToSprintById}
+              onShiftTicket={handleShiftTicket}
+              onIgnoreConflict={handleIgnoreConflict}
+            />
+          </div>
         </div>
       )}
 
       {/* Edit Release Dialog */}
       {editingRelease && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-[380px] border border-slate-200 dark:border-slate-700">
+        <div 
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
+          onClick={() => setEditingRelease(false)}
+        >
+          <div 
+            className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-[380px] border border-slate-200 dark:border-slate-700"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Edit Release</h3>
             <div className="space-y-3">
               <div>
@@ -1225,8 +1568,14 @@ export function ReleasePlanningCanvas() {
 
       {/* Delete Release Confirmation */}
       {confirmDeleteRelease && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-[380px] border border-red-200 dark:border-red-800">
+        <div 
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
+          onClick={() => setConfirmDeleteRelease(false)}
+        >
+          <div 
+            className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-[380px] border border-red-200 dark:border-red-800"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2">Delete Release</h3>
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
               Are you sure you want to delete <strong className="text-slate-900 dark:text-white">{release.name}</strong>? All features, tickets, and sprints within this release will be permanently removed.
@@ -1248,6 +1597,63 @@ export function ReleasePlanningCanvas() {
           </div>
         </div>
       )}
+
+      {/* Phase 3: Smart Assistant Panel */}
+      <SmartAssistantPanel
+        isOpen={assistantPanelOpen}
+        onClose={() => setAssistantPanelOpen(false)}
+        totalTickets={allTickets.length}
+        totalSprints={release?.sprints?.length || 0}
+        capacityPercentage={capacityUtilization.percentage}
+        healthStatus={
+          conflictMetrics.total > 0 || capacityUtilization.percentage > 100
+            ? 'critical'
+            : capacityUtilization.percentage >= 80
+              ? 'at-risk'
+              : 'healthy'
+        }
+        insights={insights}
+        onApplyInsight={handleApplyInsight}
+        onDismissInsight={handleDismissInsight}
+        onViewInsight={handleViewInsight}
+        onAddHoliday={handleAddHoliday}
+        onAddPTO={handleAddPTO}
+        onSimulateReallocation={handleSimulateReallocation}
+      />
+
+      {/* Phase 3: Floating Assistant Toggle Button */}
+      {!assistantPanelOpen && (
+        <button
+          onClick={() => setAssistantPanelOpen(true)}
+          className="fixed bottom-6 right-6 z-50 p-4 rounded-full shadow-2xl transition-all hover:scale-110 active:scale-95 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
+          title="Open Smart Assistant"
+          style={{
+            animation: 'float 3s ease-in-out infinite'
+          }}
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          
+          {/* Badge for unread insights */}
+          {insights.length > 0 && (
+            <span className="absolute -top-1 -right-1 flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 rounded-full shadow-lg">
+              {insights.length}
+            </span>
+          )}
+        </button>
+      )}
+
+      <style>{`
+        @keyframes float {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-10px);
+          }
+        }
+      `}</style>
     </div>
   );
 }

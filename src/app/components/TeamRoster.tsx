@@ -4,6 +4,7 @@ import { cn } from './ui/utils';
 import { useNavigate, useParams } from 'react-router';
 import { mockTeamMembers, TeamMember, mockProducts } from '../data/mockData';
 import { loadTeamMembers, loadProducts, saveTeamMembers } from '../lib/localStorage';
+import { loadRoleColors, getRoleColor as getRoleColorUtil, type TeamRole } from '../lib/roleColors';
 
 export function TeamRoster() {
   const navigate = useNavigate();
@@ -41,20 +42,19 @@ export function TeamRoster() {
   }, [allTeamMembers, resolvedProductId]);
 
   const [showAddForm, setShowAddForm] = useState(false);
+  const roleColors = useMemo(() => loadRoleColors(), []);
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case 'Developer': return 'bg-blue-100 text-blue-700';
-      case 'Designer': return 'bg-purple-100 text-purple-700';
-      case 'QA': return 'bg-green-100 text-green-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
+  const getRoleBadgeColor = (role: string) => {
+    // Get hex color and convert to Tailwind-friendly classes (fallback to solid color via style)
+    const hexColor = getRoleColorUtil(role as TeamRole, roleColors);
+    return hexColor;
   };
 
   const getExperienceLevelColor = (level?: string) => {
     switch (level) {
-      case 'Senior': return 'bg-purple-100 text-purple-700';
-      case 'Mid': return 'bg-blue-100 text-blue-700';
+      case 'Lead': return 'bg-purple-100 text-purple-700';
+      case 'Senior': return 'bg-blue-100 text-blue-700';
+      case 'Mid': return 'bg-slate-100 text-slate-700';
       case 'Junior': return 'bg-gray-100 text-gray-700';
       default: return 'bg-gray-100 text-gray-600';
     }
@@ -211,11 +211,15 @@ interface AddTeamMemberModalProps {
 
 function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalProps) {
   const [name, setName] = useState('');
-  const [role, setRole] = useState<'Developer' | 'Designer' | 'QA'>('Developer');
-  const [experienceLevel, setExperienceLevel] = useState<'Junior' | 'Mid' | 'Senior'>('Mid');
+  const [role, setRole] = useState<TeamRole>('Frontend');
+  const [experienceLevel, setExperienceLevel] = useState<'Junior' | 'Mid' | 'Senior' | 'Lead'>('Mid');
 
   // Automatically calculate velocity multiplier based on experience level
-  const velocityMultiplier = experienceLevel === 'Junior' ? 0.7 : experienceLevel === 'Senior' ? 1.3 : 1.0;
+  const velocityMultiplier = 
+    experienceLevel === 'Junior' ? 0.7 : 
+    experienceLevel === 'Senior' ? 1.3 : 
+    experienceLevel === 'Lead' ? 1.5 : 
+    1.0;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -299,12 +303,24 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
               </label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value as 'Developer' | 'Designer' | 'QA')}
+                onChange={(e) => setRole(e.target.value as TeamRole)}
                 className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
               >
-                <option value="Developer">Developer</option>
-                <option value="Designer">Designer</option>
-                <option value="QA">QA</option>
+                <optgroup label="Web Development">
+                  <option value="Frontend">Frontend</option>
+                  <option value="Backend">Backend</option>
+                  <option value="Fullstack">Fullstack</option>
+                  <option value="DataEngineer">Data Engineer</option>
+                </optgroup>
+                <optgroup label="Mobile Development">
+                  <option value="iOS">iOS</option>
+                  <option value="Android">Android</option>
+                </optgroup>
+                <optgroup label="Other">
+                  <option value="Designer">Designer</option>
+                  <option value="QA">QA</option>
+                  <option value="Developer">Developer (Legacy)</option>
+                </optgroup>
               </select>
             </div>
 
@@ -314,18 +330,20 @@ function AddTeamMemberModal({ productId, onClose, onAdd }: AddTeamMemberModalPro
               </label>
               <select
                 value={experienceLevel}
-                onChange={(e) => setExperienceLevel(e.target.value as 'Junior' | 'Mid' | 'Senior')}
+                onChange={(e) => setExperienceLevel(e.target.value as 'Junior' | 'Mid' | 'Senior' | 'Lead')}
                 className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm transition-all"
               >
                 <option value="Junior">Junior</option>
                 <option value="Mid">Mid</option>
                 <option value="Senior">Senior</option>
+                <option value="Lead">Lead</option>
               </select>
               <p className="mt-2 text-xs text-slate-600 dark:text-slate-400">
                 Velocity: <span className="font-semibold text-slate-900 dark:text-white">{velocityMultiplier.toFixed(1)}x</span>
                 {experienceLevel === 'Junior' && ' (slower pace)'}
                 {experienceLevel === 'Mid' && ' (standard pace)'}
                 {experienceLevel === 'Senior' && ' (faster pace)'}
+                {experienceLevel === 'Lead' && ' (expert pace)'}
               </p>
             </div>
           </div>

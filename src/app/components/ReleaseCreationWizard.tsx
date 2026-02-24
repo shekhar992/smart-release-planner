@@ -10,6 +10,7 @@ import { parseCSV, validateAndTransformCSV } from '../lib/csvParser';
 import { ticketImportMapping } from '../lib/importMappings';
 import { calculateEndDateFromEffort, toLocalDateString, parseLocalDate } from '../lib/dateUtils';
 import { loadHolidays, loadTeamMembers } from '../lib/localStorage';
+import { calculateSprintCapacity } from '../../domain/capacityUtils';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -843,6 +844,51 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
     return uploadedTickets.reduce((sum, ticket) => sum + (ticket.effortDays ?? ticket.storyPoints ?? 1), 0);
   }, [uploadedTickets]);
 
+  // Calculate sprint-level capacity breakdown
+  const sprintCapacities = useMemo(() => {
+    if (!state.sprintData.enabled || state.sprintData.sprints.length === 0) {
+      return [];
+    }
+
+    // Load team members to get PTO data
+    const allTeamMembers = loadTeamMembers() || [];
+    const productTeam = allTeamMembers.filter(tm => tm.productId === state.releaseData.productId);
+    const numberOfDevelopers = productTeam.filter(m => m.role === 'Developer').length || teamSize;
+
+    // Convert PTO to date format expected by capacity calculator
+    const ptoDates = productTeam.flatMap(member => 
+      (member.pto || []).map(pto => ({
+        startDate: pto.startDate,
+        endDate: pto.endDate,  
+      }))
+    );
+
+    return state.sprintData.sprints.map(sprint => {
+      const capacity = calculateSprintCapacity({
+        startDate: sprint.startDate,
+        endDate: sprint.endDate,
+        numberOfDevelopers,
+        holidays,
+        ptoDates,
+      });
+
+      return {
+        sprintName: sprint.name,
+        startDate: sprint.startDate,
+        endDate: sprint.endDate,
+        capacityDays: capacity.capacityDays,
+        workingDays: capacity.workingDays,
+        ptoDays: capacity.ptoDays,
+        holidayDays: capacity.holidayDays,
+        numberOfDevelopers,
+      };
+    });
+  }, [state.sprintData, state.releaseData.productId, holidays, teamSize]);
+
+  const totalSprintCapacity = useMemo(() => {
+    return sprintCapacities.reduce((sum, sc) => sum + sc.capacityDays, 0);
+  }, [sprintCapacities]);
+
   const capacityUtilization = devWindowCapacity.totalCapacity > 0 
     ? (totalTicketEffort / devWindowCapacity.totalCapacity) * 100 
     : 0;
@@ -1236,6 +1282,110 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               </span>
             </div>
           </div>
+
+          {/* Sprint Capacity Preview (NEW in Phase 2) */}
+          {sprintCapacities.length > 0 && (
+            <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 mb-4 shadow-sm">
+              <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                <h5 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  Sprint Capacity Breakdown
+                </h5>
+                <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                  Auto-allocation will fill each sprint to 85%+ utilization before moving to the next
+                </p>
+              </div>
+              
+              <div className="p-4">
+                <div className="space-y-3">
+                  {sprintCapacities.map((sprint, index) => {
+                    const utilizationPercent = totalSprintCapacity > 0 
+                      ? (sprint.capacityDays / totalSprintCapacity) * 100 
+                      : 0;
+                    
+                    return (
+                      <div 
+                        key={index}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/30 border border-slate-200 dark:border-slate-700"
+                      >
+                        {/* Sprint Name & Dates */}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm text-slate-900 dark:text-white">
+                            {sprint.sprintName}
+                          </div>
+                          <div className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
+                            {sprint.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {sprint.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </div>
+                        </div>
+
+                        {/* Capacity Formula */}
+                        <div className="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-300">
+                          <span className="font-medium">👥 {sprint.numberOfDevelopers} devs</span>
+                          <span className="text-slate-400">×</span>
+                          <span className="font-medium">{sprint.workingDays} days</span>
+                          {sprint.ptoDays > 0 && (
+                            <>
+                              <span className="text-slate-400">-</span>
+                              <span className="font-medium text-amber-600 dark:text-amber-400">{sprint.ptoDays}d PTO</span>
+                            </>
+                          )}
+                          {sprint.holidayDays > 0 && (
+                            <>
+                              <span className="text-slate-400">-</span>
+                              <span className="font-medium text-purple-600 dark:text-purple-400">{sprint.holidayDays}d holidays</span>
+                            </>
+                          )}
+                        </div>
+
+                        {/* Capacity Result */}
+                        <div className="flex items-center gap-2">
+                          <div className="text-right">
+                            <div className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                              {sprint.capacityDays}
+                            </div>
+                            <div className="text-xs text-slate-600 dark:text-slate-400">
+                              days
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Summary */}
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                  <div className="flex items-center gap-4 text-sm">
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Total Sprint Capacity:</span>
+                      <span className="ml-2 font-bold text-blue-600 dark:text-blue-400">{totalSprintCapacity} days</span>
+                    </div>
+                    <div className="w-px h-4 bg-slate-300 dark:bg-slate-600" />
+                    <div>
+                      <span className="text-slate-600 dark:text-slate-400">Ticket Effort:</span>
+                      <span className="ml-2 font-bold text-slate-900 dark:text-white">{totalTicketEffort} days</span>
+                    </div>
+                  </div>
+                  
+                  {totalSprintCapacity > 0 && (
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className={`text-sm font-semibold ${
+                          (totalTicketEffort / totalSprintCapacity) > 1 
+                            ? 'text-red-600 dark:text-red-400' 
+                            : (totalTicketEffort / totalSprintCapacity) > 0.9 
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-emerald-600 dark:text-emerald-400'
+                        }`}>
+                          {((totalTicketEffort / totalSprintCapacity) * 100).toFixed(0)}% utilization
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Uploaded Tickets Table */}
           <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 mb-4 shadow-sm">

@@ -92,6 +92,23 @@ export const ticketImportMapping: ColumnMapping[] = [
     dataField: 'feature', // Map 'epic' to 'feature' field
     required: false,
     transformer: transformers.toString,
+  },
+  {
+    csvColumn: 'requiredRole',
+    dataField: 'requiredRole',
+    required: false,
+    transformer: transformers.toEnum(['Frontend', 'Backend', 'Fullstack', 'QA', 'Designer', 'DataEngineer', 'iOS', 'Android']),
+    validator: (value) => !value || ['Frontend', 'Backend', 'Fullstack', 'QA', 'Designer', 'DataEngineer', 'iOS', 'Android'].includes(value)
+  },
+  {
+    csvColumn: 'blockedBy',
+    dataField: 'blockedBy',
+    required: false,
+    transformer: (value: any): string[] => {
+      if (!value || !value.trim()) return [];
+      // Split by comma and trim each ID
+      return value.toString().split(',').map((id: string) => id.trim()).filter((id: string) => id.length > 0);
+    },
   }
 ];
 
@@ -112,8 +129,8 @@ export const teamMemberImportMapping: ColumnMapping[] = [
     csvColumn: 'role',
     dataField: 'role',
     required: true,
-    transformer: transformers.toEnum(['Developer', 'Designer', 'QA']),
-    validator: (value) => ['Developer', 'Designer', 'QA'].includes(value)
+    transformer: transformers.toEnum(['Developer', 'Designer', 'QA', 'Frontend', 'Backend', 'Fullstack', 'DataEngineer', 'iOS', 'Android']),
+    validator: (value) => ['Developer', 'Designer', 'QA', 'Frontend', 'Backend', 'Fullstack', 'DataEngineer', 'iOS', 'Android'].includes(value)
   },
   {
     csvColumn: 'experienceLevel',
@@ -126,7 +143,7 @@ export const teamMemberImportMapping: ColumnMapping[] = [
       const rest = normalized.slice(1).toLowerCase();
       return firstChar + rest; // Capitalize first letter
     },
-    validator: (value) => ['Junior', 'Mid', 'Senior'].includes(value)
+    validator: (value) => ['Junior', 'Mid', 'Senior', 'Lead'].includes(value)
   }
 ];
 
@@ -140,6 +157,8 @@ export const deriveVelocityMultiplier = (experienceLevel?: string): number => {
       return 0.7;
     case 'senior':
       return 1.3;
+    case 'lead':
+      return 1.5;
     case 'mid':
     default:
       return 1.0;

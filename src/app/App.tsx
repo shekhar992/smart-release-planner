@@ -4,12 +4,15 @@ import { HTML5Backend } from 'react-dnd-html5-backend';
 import { router } from './routes';
 import { ModeSelector } from './components/ModeSelector';
 import { FreshLanding } from './components/FreshLanding';
+import { Toaster } from './components/ui/sonner';
 
 export default function App() {
   const appMode = localStorage.getItem('appMode');
 
   return (
     <>
+      {/* Toast notifications - activated in Phase 0 */}
+      <Toaster position="bottom-right" richColors closeButton />
 
       <DndProvider backend={HTML5Backend}>
         <div className="h-screen bg-gray-50">

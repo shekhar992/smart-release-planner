@@ -95,12 +95,21 @@ function reviveDates(obj: any): any {
 
 /**
  * Save products to localStorage with local date strings (not ISO timestamps)
+ * Dispatches 'productsUpdated' event for auto-refresh in planning views (unless silent=true)
+ * 
+ * @param products - Products array to save
+ * @param silent - If true, don't dispatch event (used for auto-saves to prevent infinite loops)
  */
-export function saveProducts(products: Product[]): void {
+export function saveProducts(products: Product[], silent = false): void {
   try {
     const serialized = serializeDates(products);
     localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(serialized));
     localStorage.setItem(STORAGE_KEYS.LAST_UPDATED, new Date().toISOString());
+    
+    // Dispatch event for auto-refresh in planning views (skip for silent saves)
+    if (!silent) {
+      window.dispatchEvent(new Event('productsUpdated'));
+    }
   } catch (error) {
     console.error('Failed to save products to localStorage:', error);
   }
@@ -249,6 +258,7 @@ export function loadTeamMembersByProduct(productId: string): TeamMember[] | null
 
 /**
  * Save a specific release to localStorage
+ * Uses silent mode to prevent triggering productsUpdated events (avoids infinite loops in auto-save)
  */
 export function saveRelease(productId: string, release: Release): void {
   try {
@@ -267,7 +277,9 @@ export function saveRelease(productId: string, release: Release): void {
       return product;
     });
     
-    saveProducts(updatedProducts);
+    // Use silent=true to prevent triggering productsUpdated event
+    // This avoids infinite loops when ReleasePlanningCanvas auto-saves
+    saveProducts(updatedProducts, true);
   } catch (error) {
     console.error('Failed to save release:', error);
   }
