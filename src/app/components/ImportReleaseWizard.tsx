@@ -768,17 +768,15 @@ function ReviewStep({
             Timeline
           </label>
           <div className="grid grid-cols-2 gap-3">
-            <input
-              type="date"
+            <DatePicker
+              label="Start Date"
               value={startDate}
-              onChange={(e) => onSetStartDate(e.target.value)}
-              className="text-sm font-medium text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 shadow-sm transition-all duration-200"
+              onChange={(isoDate) => onSetStartDate(isoDate)}
             />
-            <input
-              type="date"
+            <DatePicker
+              label="End Date"
               value={endDate}
-              onChange={(e) => onSetEndDate(e.target.value)}
-              className="text-sm font-medium text-slate-900 dark:text-white bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 shadow-sm transition-all duration-200"
+              onChange={(isoDate) => onSetEndDate(isoDate)}
             />
           </div>
         </div>

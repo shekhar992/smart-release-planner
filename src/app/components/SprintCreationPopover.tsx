@@ -3,6 +3,7 @@ import { X, Trash2, Edit3, AlertTriangle, Info, Calendar } from 'lucide-react';
 import { cn } from './ui/utils';
 import { Sprint } from '../data/mockData';
 import { toLocalDateString } from '../lib/dateUtils';
+import { DatePicker } from './DatePicker';
 
 interface SprintCreationPopoverProps {
   onClose: () => void;
@@ -247,24 +248,16 @@ export function SprintCreationPopover({
 
                 {/* Date Range */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Start Date</label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => handleStartDateChange(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">End Date</label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => handleEndDateChange(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
-                    />
-                  </div>
+                  <DatePicker
+                    label="Start Date"
+                    value={startDate}
+                    onChange={(isoDate) => handleStartDateChange(isoDate)}
+                  />
+                  <DatePicker
+                    label="End Date"
+                    value={endDate}
+                    onChange={(isoDate) => handleEndDateChange(isoDate)}
+                  />
                 </div>
 
                 {/* Overlap Warning */}
@@ -398,15 +391,11 @@ export function SprintCreationPopover({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">First Sprint Starts On</label>
-                  <input
-                    type="date"
-                    value={bulkStartDate}
-                    onChange={(e) => setBulkStartDate(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
-                  />
-                </div>
+                <DatePicker
+                  label="First Sprint Starts On"
+                  value={bulkStartDate}
+                  onChange={(isoDate) => setBulkStartDate(isoDate)}
+                />
 
                 {/* Preview */}
                 <div>

@@ -1,10 +1,10 @@
 import { useState, useRef, useMemo, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertTriangle, GripVertical, ChevronDown, Calendar, Plus, Trash2, X, Link2 } from 'lucide-react';
+import { AlertTriangle, GripVertical, ChevronDown, Calendar, Plus, Trash2, X, Link2, Info } from 'lucide-react';
 import { Release, Ticket, Holiday, TeamMember, Milestone, MilestoneType, Phase, PhaseType, Feature, getMockPhasesForRelease } from '../data/mockData';
 import { SprintCreationPopover } from './SprintCreationPopover';
 import { TicketConflict, hasConflict } from '../lib/conflictDetection';
-import { SprintCapacity, getCapacityStatusColor } from '../lib/capacityCalculation';
+import { SprintCapacity } from '../lib/capacityCalculation';
 import designTokens, { getTicketColors, getConflictColors } from '../lib/designTokens';
 import { TruncatedText } from './Tooltip';
 import { resolveEffortDays } from '../lib/effortResolver';
@@ -12,7 +12,6 @@ import { toLocalDateString } from '../lib/dateUtils';
 import { calculateWorkingDays } from '../lib/teamCapacityCalculation';
 import { loadMilestones, saveMilestones, loadPhases, savePhases } from '../lib/localStorage';
 import { AddMilestoneModal } from './AddMilestoneModal';
-import { getTicketDependencyStatus, countBlockedTickets, getStatusDotColor, getStatusLabel } from '../lib/ticketDependencies';
 import { getRoleColor, loadRoleColors, type TeamRole } from '../lib/roleColors';
 
 // Helper: Count working days (Mon-Fri) between two dates
@@ -607,19 +606,19 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             selectedDeveloperId={selectedDeveloperId}
             onChangeDeveloper={setSelectedDeveloperId}
           />
-          {/* Role Legend - Between TICKETS and Sprint Summary */}
-          <div className="px-4 py-2 bg-white dark:bg-slate-900 border-b border-slate-200/50 dark:border-slate-700/50">
-            <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wider">Roles</div>
-            <div className="grid grid-cols-4 gap-x-2 gap-y-1.5">
+          {/* Role Legend */}
+          <div className="px-4 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200/50 dark:border-slate-700/50">
+            <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Roles</div>
+            <div className="grid grid-cols-4 gap-x-2.5 gap-y-2">
               {(['Frontend', 'Backend', 'Fullstack', 'QA', 'Designer', 'DataEngineer', 'iOS', 'Android'] as const).map((role) => {
                 const color = getRoleColor(role, roleColors);
                 return (
-                  <div key={role} className="flex items-center gap-1">
+                  <div key={role} className="flex items-center gap-1.5">
                     <div 
-                      className="w-2 h-2 rounded-full shadow-sm flex-shrink-0"
+                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
                       style={{ backgroundColor: color }}
                     />
-                    <span className="text-[9px] text-slate-600 dark:text-slate-400 truncate">
+                    <span className="text-[10px] text-slate-700 dark:text-slate-300 truncate font-medium">
                       {role === 'DataEngineer' ? 'Data' : role}
                     </span>
                   </div>
@@ -627,10 +626,6 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
               })}
             </div>
           </div>
-          <SprintSummaryPanel
-            sprints={release.sprints || []}
-            sprintCapacities={sprintCapacities}
-          />
         </div>
 
         {/* Timeline Header (Dates + Sprints) - Scrollbar hidden, synced with timeline */}
@@ -784,26 +779,26 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
             </div>
           )}
 
-          {/* Timeline Legend - No more spillover warning here */}
-          <div className="px-5 py-3.5 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/30 border-b-2 border-slate-100 dark:border-slate-800 shadow-sm">
-            {/* Timeline Legend */}
-            <div className="flex items-center gap-5 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-blue-200 border-2 border-blue-500 rounded shadow-sm" />
-                <span className="text-slate-700 dark:text-slate-300 font-semibold">Planned</span>
+          {/* Status Legend */}
+          <div className="px-4 py-2.5 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-900/30 border-b border-slate-200/50 dark:border-slate-700/50">
+            <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wider">Status</div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 bg-blue-500 rounded-sm flex-shrink-0" />
+                <span className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Planned</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 bg-yellow-200 border-2 border-yellow-500 rounded shadow-sm" />
-                <span className="text-slate-700 dark:text-slate-300 font-semibold">In Progress</span>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 bg-yellow-500 rounded-sm flex-shrink-0" />
+                <span className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">In Progress</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <div 
-                  className="w-5 h-5 bg-orange-200 border-2 border-orange-500 rounded shadow-sm" 
+                  className="w-2.5 h-2.5 bg-orange-500 rounded-sm flex-shrink-0" 
                   style={{
-                    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(249, 115, 22, 0.2) 2px, rgba(249, 115, 22, 0.2) 4px)'
+                    backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 1px, rgba(255, 255, 255, 0.3) 1px, rgba(255, 255, 255, 0.3) 2px)'
                   }}
                 />
-                <span className="text-slate-700 dark:text-slate-300 font-semibold">Spillover</span>
+                <span className="text-[10px] text-slate-700 dark:text-slate-300 font-medium">Spillover</span>
               </div>
             </div>
           </div>
@@ -1687,6 +1682,179 @@ function TimelineHeader({
   );
 }
 
+// Sprint Info Tooltip - Shows detailed capacity breakdown
+function SprintInfoTooltip({
+  sprint,
+  capacity,
+  statusColor,
+  triggerRect
+}: {
+  sprint: any;
+  capacity: SprintCapacity;
+  statusColor: string;
+  triggerRect: DOMRect | null;
+}) {
+  // Calculate derived values
+  const weekendDays = capacity.totalCalendarDays - capacity.workingDays;
+  const daysOverUnder = capacity.plannedDays - capacity.totalTeamDays;
+  const isOverloaded = capacity.utilizationPercent > 95;
+  const isNearCapacity = capacity.utilizationPercent >= 85 && capacity.utilizationPercent <= 95;
+  
+  if (!triggerRect) return null;
+  
+  const tooltipContent = (
+    <div 
+      className="fixed z-[9999] pointer-events-auto"
+      style={{
+        left: `${triggerRect.left}px`,
+        top: `${triggerRect.bottom + 8}px`,
+      }}
+    >
+      <div className="bg-white border-2 border-slate-300 p-4 rounded-lg shadow-xl w-80 text-sm">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3 pb-3 border-b border-slate-200">
+          <div className="font-semibold text-base text-slate-900">{sprint.name}</div>
+          <div 
+            className="px-2 py-0.5 rounded text-xs font-bold"
+            style={{ backgroundColor: statusColor, color: 'white' }}
+          >
+            {Math.round(capacity.utilizationPercent)}%
+          </div>
+        </div>
+
+        {/* Duration Breakdown */}
+        <div className="mb-3 pb-3 border-b border-slate-200">
+          <div className="text-xs font-semibold text-slate-700 mb-2">⏱️ Duration</div>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-slate-600">Calendar days:</span>
+              <span className="font-medium text-slate-900">{capacity.totalCalendarDays} days</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-600">Working days:</span>
+              <span className="font-medium text-slate-900">{capacity.workingDays} days</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-600">Weekend days:</span>
+              <span className="font-medium text-slate-500">{weekendDays} days</span>
+            </div>
+            {capacity.holidayDays > 0 && (
+              <div className="flex justify-between">
+                <span className="text-slate-600">Holidays:</span>
+                <span className="font-medium text-orange-600">{capacity.holidayDays} days</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Team Capacity */}
+        <div className="mb-3 pb-3 border-b border-slate-200">
+          <div className="text-xs font-semibold text-slate-700 mb-2">👥 Team Capacity</div>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-slate-600">Team size:</span>
+              <span className="font-medium text-slate-900">{capacity.teamSize} members</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-600">Available days:</span>
+              <span className="font-medium text-slate-900">{capacity.availableDays} days</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600">Total capacity:</span>
+              <span className="font-bold text-green-600">
+                {capacity.totalTeamDays} person-days
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-500 mt-1 italic">
+              = {capacity.teamSize} members × {capacity.availableDays} days
+            </div>
+          </div>
+        </div>
+
+        {/* Current Allocation */}
+        <div className="mb-3 pb-3 border-b border-slate-200">
+          <div className="text-xs font-semibold text-slate-700 mb-2">📊 Current Allocation</div>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between">
+              <span className="text-slate-600">Days allocated:</span>
+              <span className="font-medium text-slate-900">{capacity.plannedDays.toFixed(1)} days</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-600">Utilization:</span>
+              <span className="font-bold" style={{ color: statusColor }}>
+                {Math.round(capacity.utilizationPercent)}%
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-slate-600">
+                {daysOverUnder > 0 ? 'Days OVER:' : daysOverUnder < 0 ? 'Days UNDER:' : 'Status:'}
+              </span>
+              <span 
+                className="font-bold"
+                style={{ 
+                  color: daysOverUnder > 0 ? '#dc2626' : daysOverUnder < 0 ? '#10b981' : '#6b7280' 
+                }}
+              >
+                {daysOverUnder > 0 ? `+${Math.abs(daysOverUnder).toFixed(1)}` : daysOverUnder < 0 ? Math.abs(daysOverUnder).toFixed(1) : 'At capacity'}
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-500 mt-1">
+              {capacity.ticketCount} ticket{capacity.ticketCount !== 1 ? 's' : ''} in sprint
+            </div>
+          </div>
+        </div>
+
+        {/* Team Members */}
+        {capacity.developersInSprint.length > 0 && (
+          <div className="mb-3 pb-3 border-b border-slate-200">
+            <div className="text-xs font-semibold text-slate-700 mb-2">👤 Team Members</div>
+            <div className="flex flex-wrap gap-1">
+              {capacity.developersInSprint.map((dev, idx) => (
+                <span 
+                  key={idx}
+                  className="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs border border-slate-200"
+                >
+                  {dev}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Suggestions */}
+        {isOverloaded && (
+          <div className="bg-red-50 border border-red-200 rounded p-2.5">
+            <div className="text-xs font-semibold text-red-700 mb-1">⚠️ Sprint Overloaded</div>
+            <div className="text-xs text-red-600 space-y-0.5">
+              <div>• Move {Math.ceil(daysOverUnder)}d work to next sprint</div>
+              <div>• Reassign to available members</div>
+              <div>• Reduce scope or split tickets</div>
+            </div>
+          </div>
+        )}
+        {isNearCapacity && (
+          <div className="bg-amber-50 border border-amber-200 rounded p-2.5">
+            <div className="text-xs font-semibold text-amber-700 mb-1">✓ Near Optimal</div>
+            <div className="text-xs text-amber-700">
+              Well-utilized (85-95% target)
+            </div>
+          </div>
+        )}
+        {!isOverloaded && !isNearCapacity && capacity.utilizationPercent < 85 && (
+          <div className="bg-slate-50 border border-slate-200 rounded p-2.5">
+            <div className="text-xs font-semibold text-slate-700 mb-1">💡 Capacity Available</div>
+            <div className="text-xs text-slate-600">
+              ~{Math.floor(capacity.totalTeamDays - capacity.plannedDays)} person-days available
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+  
+  return createPortal(tooltipContent, document.body);
+}
+
 // SPRINT HEADER ROW: Simplified minimal bars to avoid scroll flickering
 // Phase 7: Memoized for performance
 const SprintHeaderRow = memo(function SprintHeaderRow({
@@ -1711,10 +1879,27 @@ const SprintHeaderRow = memo(function SprintHeaderRow({
     return '#6b7280';
   };
 
+  const [hoveredSprintId, setHoveredSprintId] = useState<string | null>(null);
+  const [tooltipRect, setTooltipRect] = useState<DOMRect | null>(null);
+  const sprintRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+
   // Only show sprint bars in day view, hidden in week/month view
   if (zoomLevel === 'week' || zoomLevel === 'month') {
     return null;
   }
+
+  const handleMouseEnter = (sprintId: string) => {
+    setHoveredSprintId(sprintId);
+    const element = sprintRefs.current.get(sprintId);
+    if (element) {
+      setTooltipRect(element.getBoundingClientRect());
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredSprintId(null);
+    setTooltipRect(null);
+  };
 
   return (
     <div className="relative h-12 border-b border-slate-200 dark:border-slate-700" style={{ backgroundColor: 'rgba(0, 0, 0, 0.015)' }}>
@@ -1727,7 +1912,10 @@ const SprintHeaderRow = memo(function SprintHeaderRow({
         return (
           <div
             key={sprint.id}
-            className="absolute px-2 py-1.5"
+            ref={(el) => {
+              if (el) sprintRefs.current.set(sprint.id, el);
+            }}
+            className="absolute px-2 py-1.5 group"
             style={{
               left,
               width,
@@ -1737,12 +1925,21 @@ const SprintHeaderRow = memo(function SprintHeaderRow({
               borderRight: '1px solid rgba(0, 0, 0, 0.05)',
             }}
           >
-            {/* Sprint name */}
-            <div 
-              className="text-[10px] font-semibold truncate mb-1"
-              style={{ color: designTokens.colors.neutral[700] }}
-            >
-              {sprint.name}
+            {/* Sprint name with info icon */}
+            <div className="flex items-center gap-1 mb-1">
+              <div 
+                className="text-[10px] font-semibold truncate flex-1"
+                style={{ color: designTokens.colors.neutral[700] }}
+              >
+                {sprint.name}
+              </div>
+              <button
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-slate-200 dark:hover:bg-slate-600 rounded"
+                onMouseEnter={() => handleMouseEnter(sprint.id)}
+                onMouseLeave={handleMouseLeave}
+              >
+                <Info className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+              </button>
             </div>
 
             {/* Capacity progress bar */}
@@ -1770,306 +1967,25 @@ const SprintHeaderRow = memo(function SprintHeaderRow({
           </div>
         );
       })}
+      
+      {/* Render tooltip outside the loop using portal */}
+      {hoveredSprintId && tooltipRect && (() => {
+        const sprint = sprints.find(s => s.id === hoveredSprintId);
+        const capacity = sprint ? sprintCapacities?.get(sprint.id) : null;
+        const statusColor = capacity ? getStatusColor(capacity.utilizationPercent) : '#6b7280';
+        
+        return sprint && capacity && (
+          <SprintInfoTooltip
+            sprint={sprint}
+            capacity={capacity}
+            statusColor={statusColor}
+            triggerRect={tooltipRect}
+          />
+        );
+      })()}
     </div>
   );
 });
-
-// Sprint Summary Panel - Fixed position at top of sidebar
-function SprintSummaryPanel({
-  sprints,
-  sprintCapacities
-}: {
-  sprints: any[];
-  sprintCapacities: Map<string, SprintCapacity>;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const [hoveredSprintId, setHoveredSprintId] = useState<string | null>(null);
-
-  if (!sprints || sprints.length === 0) return null;
-
-  const getStatusColor = (utilizationPercent: number) => {
-    if (utilizationPercent > 100) return '#dc2626';
-    if (utilizationPercent >= 90) return '#f59e0b';
-    if (utilizationPercent >= 70) return '#10b981';
-    return '#6b7280';
-  };
-
-  const totalCapacity = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.totalTeamDays, 0);
-  const totalPlanned = Array.from(sprintCapacities.values()).reduce((sum, c) => sum + c.plannedDays, 0);
-  const overallUtilization = totalCapacity > 0 ? (totalPlanned / totalCapacity) * 100 : 0;
-
-  return (
-    <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 overflow-visible">
-      <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full px-4 py-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold text-slate-900 dark:text-white">Sprint Summary</span>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400">({sprints.length} sprints)</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span 
-            className="text-[10px] font-bold px-2 py-0.5 rounded"
-            style={{ 
-              backgroundColor: `${getStatusColor(overallUtilization)}15`,
-              color: getStatusColor(overallUtilization),
-              border: `1px solid ${getStatusColor(overallUtilization)}30`
-            }}
-          >
-            {Math.round(overallUtilization)}%
-          </span>
-          <span className="text-slate-400 dark:text-slate-500">{expanded ? '▼' : '▶'}</span>
-        </div>
-      </button>
-
-      {expanded && (
-        <>
-          <div className="px-4 pb-3 space-y-2 max-h-48 overflow-y-auto">
-            {sprints.map((sprint) => {
-              const capacity = sprintCapacities.get(sprint.id);
-              if (!capacity) return null;
-
-              const statusColor = getStatusColor(capacity.utilizationPercent);
-
-              return (
-                <div 
-                  key={sprint.id}
-                  className="flex items-center justify-between p-2 rounded bg-slate-50 dark:bg-slate-800/50 text-[10px] hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  onMouseEnter={() => setHoveredSprintId(sprint.id)}
-                  onMouseLeave={() => setHoveredSprintId(null)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-slate-900 dark:text-white truncate">{sprint.name}</div>
-                    <div className="text-slate-500 dark:text-slate-400 text-[9px]">
-                      {sprint.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {sprint.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-                    <div className="text-right">
-                      <div className="font-semibold text-slate-700 dark:text-slate-300">{Math.round(capacity.plannedDays)}d / {capacity.totalTeamDays}d</div>
-                      <div className="text-slate-500 dark:text-slate-400 text-[9px]">{capacity.ticketCount} tickets</div>
-                    </div>
-                    <div 
-                      className="w-2 h-8 rounded-full"
-                      style={{ backgroundColor: statusColor }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Tooltip rendered outside scrollable container to avoid clipping */}
-          {hoveredSprintId && (() => {
-            const sprint = sprints.find(s => s.id === hoveredSprintId);
-            const capacity = sprint ? sprintCapacities.get(sprint.id) : null;
-            if (!sprint || !capacity) return null;
-            
-            const statusColor = getStatusColor(capacity.utilizationPercent);
-            
-            return (
-              <div className="absolute left-full ml-2 top-32 z-[100] pointer-events-none">
-                <div 
-                  className="bg-white dark:bg-slate-800 rounded-lg shadow-2xl border-2 border-slate-300 dark:border-slate-600 p-4 text-[11px] w-[320px]"
-                >
-                    <div className="font-semibold text-slate-900 dark:text-white mb-2 flex items-center justify-between">
-                      <span>{sprint.name}</span>
-                      <span 
-                        className="text-[9px] font-bold px-2 py-0.5 rounded"
-                        style={{ 
-                          backgroundColor: `${statusColor}15`,
-                          color: statusColor,
-                          border: `1px solid ${statusColor}30`
-                        }}
-                      >
-                        {Math.round(capacity.utilizationPercent)}%
-                      </span>
-                    </div>
-                    
-                    <div className="text-[10px] text-slate-600 dark:text-slate-400 mb-3">
-                      {sprint.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {sprint.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    </div>
-
-                    {/* Capacity Progress Bar */}
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between text-[9px] text-slate-600 dark:text-slate-400 mb-1">
-                        <span>Capacity Utilization</span>
-                        <span className="font-bold" style={{ color: statusColor }}>{Math.round(capacity.utilizationPercent)}%</span>
-                      </div>
-                      <div className="h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden relative">
-                        <div 
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{ 
-                            width: `${Math.min(capacity.utilizationPercent, 100)}%`,
-                            backgroundColor: statusColor
-                          }}
-                        />
-                        {/* Milestone markers at 25%, 50%, 75% */}
-                        <div className="absolute inset-0 flex justify-between px-0.5">
-                          {[0.25, 0.5, 0.75].map((_, idx) => (
-                            <div 
-                              key={idx}
-                              className="w-0.5 h-full bg-white/40"
-                              style={{ marginLeft: idx === 0 ? '24%' : idx === 1 ? '24%' : '24%' }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Inline Summary with Icons */}
-                    <div className="mb-3 flex flex-wrap items-center gap-2 text-[9px] text-slate-600 dark:text-slate-400 pb-2 border-b border-slate-200 dark:border-slate-700">
-                      <span className="flex items-center gap-0.5 font-semibold">
-                        👥 <span className="text-slate-900 dark:text-white">{capacity.teamSize}</span> devs
-                      </span>
-                      {capacity.holidayDays > 0 && (
-                        <>
-                          <span className="text-slate-300 dark:text-slate-600">│</span>
-                          <span className="flex items-center gap-0.5">
-                            🏖️ <span className="font-semibold text-orange-600 dark:text-orange-400">{capacity.holidayDays}</span> holidays
-                          </span>
-                        </>
-                      )}
-                      {capacity.ptoDays > 0 && (
-                        <>
-                          <span className="text-slate-300 dark:text-slate-600">│</span>
-                          <span className="flex items-center gap-0.5">
-                            🌴 <span className="font-semibold text-orange-600 dark:text-orange-400">{capacity.ptoDays}</span> PTO
-                          </span>
-                        </>
-                      )}
-                      <span className="text-slate-300 dark:text-slate-600">│</span>
-                      <span className="flex items-center gap-0.5">
-                        📋 <span className="font-semibold text-slate-900 dark:text-white">{capacity.ticketCount}</span> tickets
-                      </span>
-                    </div>
-
-                    <div className="space-y-1.5 text-[10px] text-slate-700 dark:text-slate-300">
-                      {/* Effort Section */}
-                      <div className="text-[9px] font-bold text-slate-900 dark:text-white uppercase tracking-wide mb-1">
-                        Effort
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-slate-400">Planned Work:</span>
-                        <span className="font-semibold">{Math.round(capacity.plannedDays * 10) / 10}d</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-slate-400">Team Capacity:</span>
-                        <span className="font-semibold">{capacity.totalTeamDays}d</span>
-                      </div>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-slate-500 dark:text-slate-400">Available Days:</span>
-                        <span className="font-semibold">{capacity.availableDays}d</span>
-                      </div>
-                      
-                      {/* Time Section */}
-                      <div className="text-[9px] font-bold text-slate-900 dark:text-white uppercase tracking-wide mb-1 pt-2 border-t border-slate-200 dark:border-slate-700">
-                        Time Breakdown
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-slate-400">Team Size:</span>
-                        <span className="font-semibold">{capacity.teamSize} developers</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-slate-400">Calendar Days:</span>
-                        <span className="font-semibold">{capacity.totalCalendarDays}d</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-slate-400">Working Days:</span>
-                        <span className="font-semibold">{capacity.workingDays}d</span>
-                      </div>
-                      {capacity.holidayDays > 0 && (
-                        <div className="flex justify-between">
-                          <span className="text-slate-500 dark:text-slate-400">Holidays:</span>
-                          <span className="font-semibold text-orange-600 dark:text-orange-400">-{capacity.holidayDays}d</span>
-                        </div>
-                      )}
-                      {capacity.ptoDays > 0 && (
-                        <div className="flex justify-between mb-2">
-                          <span className="text-slate-500 dark:text-slate-400">PTO:</span>
-                          <span className="font-semibold text-orange-600 dark:text-orange-400">-{capacity.ptoDays}d</span>
-                        </div>
-                      )}
-                      
-                      {/* Story Points Section */}
-                      <div className="text-[9px] font-bold text-slate-900 dark:text-white uppercase tracking-wide mb-1 pt-2 border-t border-slate-200 dark:border-slate-700">
-                        Story Points
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-slate-400">Planned Story Points:</span>
-                        <span className="font-semibold">{capacity.plannedStoryPoints} SP</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-slate-400">Capacity Story Points:</span>
-                        <span className="font-semibold">{capacity.capacityStoryPoints} SP</span>
-                      </div>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-slate-500 dark:text-slate-400">Velocity Per Day:</span>
-                        <span className="font-semibold">{capacity.velocityPerDay} SP/d</span>
-                      </div>
-                      
-                      {/* Tickets Section */}
-                      <div className="text-[9px] font-bold text-slate-900 dark:text-white uppercase tracking-wide mb-1 pt-2 border-t border-slate-200 dark:border-slate-700">
-                        Tickets
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500 dark:text-slate-400">Total Tickets:</span>
-                        <span className="font-semibold">{capacity.ticketCount}</span>
-                      </div>
-                      {capacity.developersInSprint && capacity.developersInSprint.length > 0 && (
-                        <div className="mt-2">
-                          <div className="text-slate-500 dark:text-slate-400 mb-1">Assigned Developers:</div>
-                          <div className="flex flex-wrap gap-1">
-                            {capacity.developersInSprint.map((dev, idx) => (
-                              <span 
-                                key={idx}
-                                className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-[9px] font-medium"
-                              >
-                                {dev}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {capacity.overCapacity && (
-                      <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-red-600 dark:text-red-400 flex items-center gap-1">
-                        <span>⚠️</span>
-                        <span className="font-semibold">Over capacity by {Math.round((capacity.utilizationPercent - 100) * capacity.totalTeamDays / 100)}d</span>
-                      </div>
-                    )}
-                    
-                    {!capacity.overCapacity && capacity.utilizationPercent < 70 && (
-                      <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-green-600 dark:text-green-400 flex items-center gap-1">
-                        <span>✅</span>
-                        <span className="font-semibold">Available - {Math.round((100 - capacity.utilizationPercent) * capacity.totalTeamDays / 100)}d spare capacity</span>
-                      </div>
-                    )}
-                    
-                    {!capacity.overCapacity && capacity.utilizationPercent >= 70 && capacity.utilizationPercent < 90 && (
-                      <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                        <span>👍</span>
-                        <span className="font-semibold">Good utilization</span>
-                      </div>
-                    )}
-                    
-                    {!capacity.overCapacity && capacity.utilizationPercent >= 90 && (
-                      <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                        <span>🟡</span>
-                        <span className="font-semibold">Near capacity limit</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-          </>
-        )}
-    </div>
-  );
-}
 
 // SIDEBAR HEADER: Left column header with controls
 function TimelineSidebarHeader({
@@ -2097,7 +2013,15 @@ function TimelineSidebarHeader({
   selectedDeveloperId: 'all' | 'unassigned' | string;
   onChangeDeveloper: (developerId: 'all' | 'unassigned' | string) => void;
 }) {
-  const developers = teamMembers.filter(m => m.role === 'Developer');
+  const developers = teamMembers.filter(m => 
+    m.role === 'Frontend' || 
+    m.role === 'Backend' || 
+    m.role === 'Fullstack' || 
+    m.role === 'iOS' || 
+    m.role === 'Android' || 
+    m.role === 'DataEngineer' ||
+    m.role === 'Developer' // Legacy role support
+  );
   const [showViewMenu, setShowViewMenu] = useState(false);
   
   return (
@@ -2165,13 +2089,13 @@ function TimelineSidebarHeader({
 
             {/* Filter */}
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-medium text-slate-600 dark:text-slate-400">Filter</span>
+              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Filter:</span>
               <select
                 value={selectedDeveloperId}
                 onChange={(e) => onChangeDeveloper(e.target.value as 'all' | 'unassigned' | string)}
-                className="text-xs px-2 py-0.5 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-400/50 shadow-sm"
+                className="text-xs px-2.5 py-1 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 shadow-sm font-medium"
               >
-                <option value="all">All</option>
+                <option value="all">All Developers</option>
                 <option value="unassigned">Unassigned</option>
                 {developers.map(dev => (
                   <option key={dev.id} value={dev.id}>{dev.name}</option>

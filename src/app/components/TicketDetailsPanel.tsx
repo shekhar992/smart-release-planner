@@ -5,6 +5,7 @@ import { resolveEffortDays } from '../lib/effortResolver';
 import { calculateEndDateFromEffort, calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
 import { loadHolidays } from '../lib/localStorage';
 import { cn } from './ui/utils';
+import { DatePicker } from './DatePicker';
 
 // Helper: Count working days (Mon-Fri) between two dates
 function countWorkingDays(start: Date, end: Date): number {
@@ -125,9 +126,12 @@ export function TicketDetailsPanel({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [showPTODetails, setShowPTODetails] = useState(false);
+  const [showEffortTooltip, setShowEffortTooltip] = useState(false);
   const [assigneeSearch, setAssigneeSearch] = useState('');
   const assigneeRef = useRef<HTMLDivElement>(null);
   const moveMenuRef = useRef<HTMLDivElement>(null);
+  const effortTooltipRef = useRef<HTMLDivElement>(null);
   
   // Load holidays for date calculations
   const holidays = useMemo(() => loadHolidays() || mockHolidays, []);
@@ -159,6 +163,9 @@ export function TicketDetailsPanel({
       }
       if (moveMenuRef.current && !moveMenuRef.current.contains(e.target as Node)) {
         setShowMoveMenu(false);
+      }
+      if (effortTooltipRef.current && !effortTooltipRef.current.contains(e.target as Node)) {
+        setShowEffortTooltip(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -240,9 +247,9 @@ export function TicketDetailsPanel({
       />
 
       {/* Center Modal */}
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl z-50 flex flex-col max-h-[85vh]">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-700 shadow-2xl z-50 flex flex-col max-h-[75vh]">
         {/* Header */}
-        <div className="flex items-start justify-between px-6 py-5 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
+        <div className="flex items-start justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-br from-slate-50/50 to-white/50 dark:from-slate-900/50 dark:to-slate-800/50">
           <div className="flex-1 min-w-0">
             {/* Feature breadcrumb with move */}
             <div className="flex items-center gap-2 mb-2">
@@ -325,7 +332,7 @@ export function TicketDetailsPanel({
         )}
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
           {/* Description */}
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 leading-relaxed">
@@ -335,8 +342,8 @@ export function TicketDetailsPanel({
               value={ticket.description || ''}
               onChange={(e) => handleUpdate('description', e.target.value)}
               placeholder="Add a description..."
-              className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent text-sm resize-none bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm transition-all duration-200 leading-relaxed placeholder-slate-400 text-slate-900 dark:text-white"
-              rows={4}
+              className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent text-sm resize-y bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm transition-all duration-200 leading-relaxed placeholder-slate-400 text-slate-900 dark:text-white min-h-[60px]"
+              rows={2}
             />
           </div>
 
@@ -346,10 +353,16 @@ export function TicketDetailsPanel({
               Effort (Days)
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="decimal"
               value={ticket.effortDays || resolveEffortDays(ticket)}
               onChange={(e) => {
-                const value = parseFloat(e.target.value) || 1;
+                let value = parseFloat(e.target.value);
+                
+                // Validate minimum 0.5, treat 0 or empty as 0.5
+                if (isNaN(value) || value <= 0) {
+                  value = 0.5;
+                }
                 
                 // Get assigned developer's velocity
                 const assignedDev = teamMembers.find(m => m.name === ticket.assignedTo);
@@ -367,53 +380,75 @@ export function TicketDetailsPanel({
                   endDate: newEndDate
                 });
               }}
-              min="0.5"
-              step="0.5"
-              max="100"
+              onBlur={(e) => {
+                // Ensure minimum 0.5 on blur
+                const value = parseFloat(e.target.value);
+                if (isNaN(value) || value < 0.5) {
+                  const assignedDev = teamMembers.find(m => m.name === ticket.assignedTo);
+                  const velocity = assignedDev?.velocityMultiplier ?? 1;
+                  const adjustedDuration = Math.max(1, Math.round(0.5 / velocity));
+                  const newEndDate = calculateEndDateFromEffort(ticket.startDate, adjustedDuration, holidays);
+                  
+                  onUpdate(featureId, ticket.id, {
+                    effortDays: 0.5,
+                    storyPoints: 0.5,
+                    endDate: newEndDate
+                  });
+                }
+              }}
               className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm transition-all duration-200 text-slate-900 dark:text-white placeholder-slate-400"
               placeholder="e.g., 3"
             />
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Estimated effort in working days</p>
-
-            {/* Effort Breakdown - Read-only calculation display */}
-            {ticket.assignedTo && (() => {
-              const assignedMember = teamMembers.find(m => m.name === ticket.assignedTo);
-              if (!assignedMember) return null;
-              
-              const effort = resolveEffortDays(ticket);
-              const velocityMultiplier = assignedMember.velocityMultiplier ?? 1;
-              const adjustedDuration = Math.max(1, Math.round(effort / velocityMultiplier));
-              
-              return (
-                <div className="mt-3 p-3 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300">Effort Breakdown</h4>
-                    <span 
-                      className="text-[10px] text-slate-500 dark:text-slate-400 cursor-help" 
-                      title="Duration = max(1, round(effort ÷ velocityMultiplier))"
+            <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+              <span>Minimum 0.5 days</span>
+              {ticket.assignedTo && (() => {
+                const assignedMember = teamMembers.find(m => m.name === ticket.assignedTo);
+                if (!assignedMember) return null;
+                
+                const effort = resolveEffortDays(ticket);
+                const velocityMultiplier = assignedMember.velocityMultiplier ?? 1;
+                const adjustedDuration = Math.max(1, Math.round(effort / velocityMultiplier));
+                
+                return (
+                  <div ref={effortTooltipRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowEffortTooltip(!showEffortTooltip)}
+                      className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
                     >
-                      ⓘ
-                    </span>
+                      <span>→ {adjustedDuration} working days</span>
+                      <span className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 text-[9px] hover:bg-blue-200 dark:hover:bg-blue-800/50 transition-colors">i</span>
+                    </button>
+                    
+                    {showEffortTooltip && (
+                      <div className="absolute right-0 bottom-full mb-2 w-64 p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50">
+                        <div className="text-xs space-y-2">
+                          <div className="font-semibold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2">
+                            Duration Calculation
+                          </div>
+                          <div className="space-y-1.5 text-slate-700 dark:text-slate-300">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 dark:text-slate-400">Effort:</span>
+                              <span className="font-medium">{effort} days</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500 dark:text-slate-400">Velocity:</span>
+                              <span className="font-medium">{velocityMultiplier}x</span>
+                            </div>
+                            <div className="flex justify-between pt-1.5 border-t border-slate-200 dark:border-slate-700 text-blue-600 dark:text-blue-400">
+                              <span>Result:</span>
+                              <span className="font-medium">{adjustedDuration} working days</span>
+                            </div>
+                          </div>
+                        </div>
+                        {/* Arrow pointing down */}
+                        <div className="absolute bottom-0 right-4 translate-y-1/2 w-2 h-2 bg-white dark:bg-slate-800 border-r border-b border-slate-200 dark:border-slate-700 rotate-45"></div>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-1.5 text-xs text-slate-600 dark:text-slate-400">
-                    <div className="flex justify-between">
-                      <span>Effort:</span>
-                      <span className="font-medium text-slate-900 dark:text-white">{effort} days</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Developer:</span>
-                      <span className="font-medium text-slate-900 dark:text-white">
-                        {assignedMember.name} {assignedMember.experienceLevel && `(${assignedMember.experienceLevel} · ${velocityMultiplier}x)`}
-                      </span>
-                    </div>
-                    <div className="flex justify-between pt-1.5 border-t border-slate-200 dark:border-slate-700">
-                      <span className="font-medium">Calculated Duration:</span>
-                      <span className="font-semibold text-blue-600 dark:text-blue-400">{adjustedDuration} working days</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
+                );
+              })()}
+            </div>
           </div>
 
           {/* Assigned Developer - Searchable Dropdown */}
@@ -435,9 +470,9 @@ export function TicketDetailsPanel({
                     const developer = teamMembers.find(m => m.name === ticket.assignedTo);
                     if (developer?.experienceLevel) {
                       return (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          {developer.experienceLevel} · {developer.velocityMultiplier ?? 1}x velocity
-                        </div>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 ml-1">
+                          ({developer.experienceLevel} · {developer.velocityMultiplier ?? 1}x)
+                        </span>
                       );
                     }
                     return null;
@@ -470,25 +505,35 @@ export function TicketDetailsPanel({
                       Unassigned
                       {ticket.assignedTo === 'Unassigned' && <Check className="w-3 h-3 text-blue-600 dark:text-blue-400" />}
                     </button>
-                    {filteredNames.map(name => (
-                      <button
-                        key={name}
-                        className="w-full text-left px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-700 dark:hover:text-blue-400 transition-colors flex items-center justify-between"
-                        onClick={() => {
-                          handleUpdate('assignedTo', name);
-                          setShowAssigneeDropdown(false);
-                          setAssigneeSearch('');
-                        }}
-                      >
-                        <span className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-medium shadow-sm">
-                            {name.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                          </div>
-                          {name}
-                        </span>
-                        {ticket.assignedTo === name && <Check className="w-3 h-3 text-blue-600 dark:text-blue-400" />}
-                      </button>
-                    ))}
+                    {filteredNames.map(name => {
+                      const member = teamMembers.find(m => m.name === name);
+                      return (
+                        <button
+                          key={name}
+                          className="w-full text-left px-3 py-2 text-xs text-slate-700 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-700 dark:hover:text-blue-400 transition-colors flex items-center justify-between"
+                          onClick={() => {
+                            handleUpdate('assignedTo', name);
+                            setShowAssigneeDropdown(false);
+                            setAssigneeSearch('');
+                          }}
+                        >
+                          <span className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/40 dark:to-blue-800/40 text-blue-700 dark:text-blue-300 flex items-center justify-center text-[10px] font-medium shadow-sm">
+                              {name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                            </div>
+                            <div className="flex flex-col">
+                              <span>{name}</span>
+                              {member?.experienceLevel && (
+                                <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                                  {member.experienceLevel} · {member.velocityMultiplier ?? 1}x
+                                </span>
+                              )}
+                            </div>
+                          </span>
+                          {ticket.assignedTo === name && <Check className="w-3 h-3 text-blue-600 dark:text-blue-400" />}
+                        </button>
+                      );
+                    })}
                     {filteredNames.length === 0 && assigneeSearch && (
                       <div className="px-3 py-4 text-xs text-slate-400 dark:text-slate-500 text-center">
                         No team members found
@@ -500,91 +545,82 @@ export function TicketDetailsPanel({
             </div>
           </div>
 
-          {/* Status - Segmented Control */}
+          {/* Status - Dropdown */}
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 leading-relaxed">
               Status
             </label>
-            <div className="flex gap-2">
-              {[
-                { value: 'planned', label: 'Planned', color: 'bg-slate-100 text-slate-700 border-slate-200', ring: 'ring-slate-300' },
-                { value: 'in-progress', label: 'In Progress', color: 'bg-blue-50 text-blue-700 border-blue-200', ring: 'ring-blue-300' },
-                { value: 'completed', label: 'Completed', color: 'bg-emerald-50 text-emerald-700 border-emerald-200', ring: 'ring-emerald-300' }
-              ].map(s => (
-                <button
-                  key={s.value}
-                  onClick={() => handleUpdate('status', s.value)}
-                  className={cn(
-                    "flex-1 px-3 py-2 text-xs font-medium rounded-xl border transition-all duration-200",
-                    ticket.status === s.value 
-                      ? `${s.color} ring-2 ring-offset-1 ${s.ring} shadow-sm dark:ring-offset-slate-900`
-                      : 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  )}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            <select
+              value={ticket.status}
+              onChange={(e) => handleUpdate('status', e.target.value)}
+              className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm transition-all duration-200 text-slate-900 dark:text-white cursor-pointer"
+            >
+              <option value="planned">Planned</option>
+              <option value="in-progress">In Progress</option>
+              <option value="completed">Completed</option>
+            </select>
           </div>
 
           {/* Constraints & Risks - PTO Overlap Warning */}
           {ptoOverlapInfo.hasPtoRisk && (
-            <div className="p-4 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl space-y-3 shadow-sm">
-              <div className="flex items-start gap-2">
+            <div className="p-3 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl shadow-sm">
+              <button
+                onClick={() => setShowPTODetails(!showPTODetails)}
+                className="w-full flex items-start gap-2 text-left"
+              >
                 <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-500 mt-0.5 flex-shrink-0" />
                 <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-2">Constraints & Risks</h3>
-                  
-                  <div className="space-y-2 text-sm text-amber-800 dark:text-amber-200">
-                    <p className="leading-relaxed">
-                      <strong>Assigned developer PTO overlaps this ticket by {ptoOverlapInfo.overlapDays} working day{ptoOverlapInfo.overlapDays > 1 ? 's' : ''}.</strong>
-                    </p>
-                    
-                    <div className="space-y-1">
-                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Overlapping PTO entries:</p>
-                      {ptoOverlapInfo.overlappingPTO.map((pto, idx) => (
-                        <div key={idx} className="text-xs bg-white/60 dark:bg-amber-950/30 backdrop-blur-sm rounded-lg px-2 py-1.5 border border-amber-200 dark:border-amber-800">
-                          <div className="font-medium text-amber-900 dark:text-amber-300">{pto.name}</div>
-                          <div className="text-amber-600 dark:text-amber-400 mt-0.5">
-                            {pto.startDate.toLocaleDateString()} - {pto.endDate.toLocaleDateString()} 
-                            <span className="ml-1">({pto.workingDays} working day{pto.workingDays > 1 ? 's' : ''})</span>
-                          </div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-300">
+                      PTO Overlap: {ptoOverlapInfo.overlapDays} day{ptoOverlapInfo.overlapDays > 1 ? 's' : ''} affected
+                    </h3>
+                    <ChevronDown className={cn(
+                      "w-4 h-4 text-amber-600 dark:text-amber-500 transition-transform duration-200",
+                      showPTODetails && "rotate-180"
+                    )} />
+                  </div>
+                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                    Developer has PTO during ticket timeline
+                  </p>
+                </div>
+              </button>
+              
+              {showPTODetails && (
+                <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800 space-y-2 text-sm text-amber-800 dark:text-amber-200">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400">Overlapping PTO:</p>
+                    {ptoOverlapInfo.overlappingPTO.map((pto, idx) => (
+                      <div key={idx} className="text-xs bg-white/60 dark:bg-amber-950/30 backdrop-blur-sm rounded-lg px-2 py-1.5 border border-amber-200 dark:border-amber-800">
+                        <div className="font-medium text-amber-900 dark:text-amber-300">{pto.name}</div>
+                        <div className="text-amber-600 dark:text-amber-400 mt-0.5">
+                          {pto.startDate.toLocaleDateString()} - {pto.endDate.toLocaleDateString()} 
+                          <span className="ml-1">({pto.workingDays} working day{pto.workingDays > 1 ? 's' : ''})</span>
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
+                  </div>
 
-                    <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800">
-                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1.5">Schedule Risk:</p>
-                      <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">
-                        May delay completion by ~{ptoOverlapInfo.overlapDays} working day{ptoOverlapInfo.overlapDays > 1 ? 's' : ''} if work is sequential for this assignee.
-                      </p>
-                    </div>
-
-                    <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-800">
-                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1.5">Suggested next steps:</p>
-                      <ul className="text-xs space-y-1 ml-4 list-disc text-amber-700 dark:text-amber-300">
-                        <li>Reassign to another developer</li>
-                        <li>Adjust ticket dates around PTO</li>
-                        <li>Split into smaller tickets</li>
-                      </ul>
-                    </div>
+                  <div className="pt-2 border-t border-amber-200 dark:border-amber-800">
+                    <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Actions:</p>
+                    <ul className="text-xs space-y-0.5 ml-3 list-disc text-amber-700 dark:text-amber-300">
+                      <li>Reassign to another developer</li>
+                      <li>Adjust ticket dates around PTO</li>
+                      <li>Split into smaller tickets</li>
+                    </ul>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
           {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 leading-relaxed">
-                Start Date
-              </label>
-              <input
-                type="date"
+              <DatePicker
+                label="Start Date"
                 value={toLocalDateString(ticket.startDate)}
-                onChange={(e) => {
-                  const newStartDate = new Date(e.target.value);
+                onChange={(isoDate) => {
+                  const newStartDate = new Date(isoDate);
                   // Recalculate endDate with velocity-adjusted duration
                   const currentEffort = ticket.effortDays || resolveEffortDays(ticket);
                   const assignedDev = teamMembers.find(m => m.name === ticket.assignedTo);
@@ -596,18 +632,14 @@ export function TicketDetailsPanel({
                     endDate: newEndDate
                   });
                 }}
-                className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent text-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm transition-all duration-200 leading-relaxed text-slate-900 dark:text-white"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 leading-relaxed">
-                End Date
-              </label>
-              <input
-                type="date"
+              <DatePicker
+                label="End Date"
                 value={toLocalDateString(ticket.endDate)}
-                onChange={(e) => {
-                  const newEndDate = new Date(e.target.value);
+                onChange={(isoDate) => {
+                  const newEndDate = new Date(isoDate);
                   // Recalculate effortDays from new duration (working days)
                   const newEffort = calculateEffortFromDates(ticket.startDate, newEndDate, holidays);
                   onUpdate(featureId, ticket.id, {
@@ -616,53 +648,29 @@ export function TicketDetailsPanel({
                     storyPoints: newEffort // Backward compatibility
                   });
                 }}
-                className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-transparent text-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm transition-all duration-200 leading-relaxed text-slate-900 dark:text-white"
               />
-            </div>
-          </div>
-
-          {/* Derived Information */}
-          <div className="pt-4 border-t border-slate-200/50 dark:border-slate-700/50 space-y-3">
-            <div className="flex items-center justify-between text-sm leading-relaxed">
-              <span className="text-slate-500 dark:text-slate-400">Duration</span>
-              <span className="font-normal text-slate-900 dark:text-white">{getDuration()} working days</span>
-            </div>
-            
-            <div className="flex items-center justify-between text-sm leading-relaxed">
-              <span className="text-slate-500 dark:text-slate-400">Sprint</span>
-              <span className={cn(
-                "font-normal",
-                associatedSprint 
-                  ? 'text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 rounded-lg' 
-                  : 'text-slate-400 dark:text-slate-500'
-              )}>
-                {associatedSprint ? associatedSprint.name : 'Not in sprint'}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between text-sm leading-relaxed">
-              <span className="text-slate-500 dark:text-slate-400">Feature</span>
-              <span className="font-normal text-slate-900 dark:text-white">{featureName}</span>
             </div>
           </div>
 
           {/* Scheduling Constraints */}
           {blockingMilestones.length > 0 && (
-            <div className="mt-4 p-3 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800 rounded-xl shadow-sm">
-              <div className="text-sm font-semibold text-red-800 dark:text-red-300 mb-1">Scheduling Constraint</div>
-              <div className="text-xs text-red-700 dark:text-red-400">
-                This ticket overlaps {blockingMilestones[0].name} ({blockingMilestones[0].startDate.toLocaleDateString()}
-                {blockingMilestones[0].endDate ? ` – ${blockingMilestones[0].endDate.toLocaleDateString()}` : ''}).
-              </div>
-              <div className="text-xs text-red-600 dark:text-red-400 mt-2">
-                Suggested: Move ticket start after milestone or adjust scope.
+            <div className="p-2.5 bg-gradient-to-br from-red-50 to-red-100 dark:from-red-950/30 dark:to-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+              <div className="flex items-start gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                <div>
+                  <div className="text-xs font-semibold text-red-800 dark:text-red-300">Milestone Conflict</div>
+                  <div className="text-xs text-red-700 dark:text-red-400 mt-0.5">
+                    Overlaps {blockingMilestones[0].name} ({blockingMilestones[0].startDate.toLocaleDateString()}
+                    {blockingMilestones[0].endDate ? ` – ${blockingMilestones[0].endDate.toLocaleDateString()}` : ''})
+                  </div>
+                </div>
               </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 rounded-b-2xl flex items-center justify-between">
+        <div className="px-6 py-3.5 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 rounded-b-2xl flex items-center justify-between">
           <span className="text-[10px] text-slate-400 dark:text-slate-500">Press Esc to close</span>
           <button
             onClick={onClose}

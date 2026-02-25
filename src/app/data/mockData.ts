@@ -222,1012 +222,1681 @@ export function getMockPhasesForRelease(release: Release): Phase[] {
 }
 
 // ===========================================
-// MOCK DATA - ENHANCED WITH ROLES & DEPENDENCIES
+// COMPREHENSIVE MOCK DATA - ALL CAPABILITIES
 // ===========================================
 /*
- * This mock data demonstrates the new role-based allocation and dependency management system.
+ * 🎯 SHOWCASE DATASET - 4 Products with Complete Feature Coverage
  * 
- * Key Features:
- * - 3 Products (E-Commerce Web, Analytics Dashboard Web, Food Delivery Mobile)
- * - Role-based team composition (Frontend, Backend, iOS, Android, QA, Designer, DataEngineer, Fullstack)
- * - Realistic dependency chains (blockedBy relationships)
- * - Required roles per ticket
- * - Mixed experience levels (Junior, Mid, Senior, Lead)
- * - Realistic PTO schedules
+ * PRODUCT 1: ✨ Perfect Pipeline (ZERO CONFLICTS)
+ * - Showcases ideal planning with no issues
+ * - Well-paced sprints, no PTO conflicts
+ * - All tickets within dev window
+ * - Proper dependency chains
+ * - Baseline for comparison
+ * 
+ * PRODUCT 2: 🛒 E-Commerce Express (COMPLEX)
+ * - Multiple assignee conflicts
+ * - PTO overlaps with critical tickets
+ * - Holiday impact on capacity
+ * - Dev window spillover scenarios
+ * - Complex dependency chains
+ * - Milestones for deployment gates
+ * 
+ * PRODUCT 3: 📱 MobileFit Tracker (MOBILE)
+ * - iOS/Android development
+ * - Cross-platform coordination
+ * - App store submission milestones
+ * - Some PTO conflicts
+ * - Designer involvement
+ * 
+ * PRODUCT 4: 📊 DataHub Analytics (COMPREHENSIVE)
+ * - Full team diversity (DataEngineer, Designer, QA)
+ * - Complex data pipeline dependencies
+ * - Testing phase workflows
+ * - Approval milestones
+ * - Holiday & PTO impact
  */
 
 // ===========================================
-// PRODUCT 1: E-Commerce Platform (Web)
+// PRODUCT 1: ✨ PERFECT PIPELINE (0 CONFLICTS)
 // ===========================================
 const product1: Product = {
-  id: 'ecom01',
-  name: 'ShopEasy - E-Commerce Platform',
+  id: 'perfect-pipeline-01',
+  name: '✨ Perfect Pipeline - CRM Platform',
   releases: [
     {
-      id: 'ecom-r1',
-      name: 'v2.0 - Payment & Checkout Redesign',
-      startDate: new Date('2026-01-06'),
-      endDate: new Date('2026-03-31'),
+      id: 'rel-perfect-1',
+      name: 'v2.0 - Customer Management Suite',
+      startDate: new Date('2026-03-02'),
+      endDate: new Date('2026-05-29'),
       storyPointMapping: SP_PRESETS.fibonacci,
-      milestones: [],
+      milestones: [
+        {
+          id: 'ms-perfect-1',
+          releaseId: 'rel-perfect-1',
+          name: 'Code Freeze',
+          type: 'Freeze',
+          dateType: 'single',
+          startDate: new Date('2026-04-30'),
+          description: 'No new features after this date',
+          isBlocking: true,
+          order: 1
+        },
+        {
+          id: 'ms-perfect-2',
+          releaseId: 'rel-perfect-1',
+          name: 'UAT Sign-off',
+          type: 'Approval',
+          dateType: 'single',
+          startDate: new Date('2026-05-22'),
+          description: 'Stakeholder approval required',
+          isBlocking: true,
+          order: 2
+        },
+        {
+          id: 'ms-perfect-3',
+          releaseId: 'rel-perfect-1',
+          name: 'Production Launch',
+          type: 'Launch',
+          dateType: 'single',
+          startDate: new Date('2026-05-29'),
+          description: 'Go-live to production',
+          isBlocking: false,
+          order: 3
+        }
+      ],
       features: [
         {
-          id: 'ecom-f1',
-          name: '💰 Payment Gateway Integration',
+          id: 'pf1',
+          name: '👤 Customer Profile Management',
           tickets: [
             {
-              id: 'ecom-t1',
-              title: 'Payment Gateway API Integration',
-              description: 'Integrate Stripe Payment Intent API with webhook handlers',
-              startDate: new Date('2026-01-06'),
-              endDate: new Date('2026-01-15'),
-              status: 'completed',
-              storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Alex Kumar',
-              requiredRole: 'Backend',
-            },
-            {
-              id: 'ecom-t2',
-              title: 'Order Processing Service',
-              description: 'Build order management microservice with payment status tracking',
-              startDate: new Date('2026-01-16'),
-              endDate: new Date('2026-01-22'),
+              id: 'pt1',
+              title: 'Customer Database Schema',
+              description: 'PostgreSQL schema design and migrations',
+              startDate: new Date('2026-03-02'),
+              endDate: new Date('2026-03-06'),
               status: 'completed',
               storyPoints: 5,
               effortDays: 5,
-              assignedTo: 'Alex Kumar',
-              requiredRole: 'Backend',
-              dependencies: {
-                blockedBy: ['ecom-t1'],
-              },
+              assignedTo: 'Jennifer Wu',
+              requiredRole: 'Backend'
             },
             {
-              id: 'ecom-t3',
-              title: 'User Wallet Backend',
-              description: 'Implement stored payment methods and wallet balance APIs',
-              startDate: new Date('2026-01-23'),
-              endDate: new Date('2026-01-29'),
+              id: 'pt2',
+              title: 'REST API Endpoints',
+              description: 'CRUD APIs for customer management',
+              startDate: new Date('2026-03-09'),
+              endDate: new Date('2026-03-13'),
               status: 'in-progress',
               storyPoints: 5,
               effortDays: 5,
-              assignedTo: 'Maria Lopez',
+              assignedTo: 'Jennifer Wu',
               requiredRole: 'Backend',
-              dependencies: {
-                blockedBy: ['ecom-t1'],
-              },
-            },
-          ]
-        },
-        {
-          id: 'ecom-f2',
-          name: '🛒 Checkout UI Redesign',
-          tickets: [
-            {
-              id: 'ecom-t4',
-              title: 'Checkout Flow UI Components',
-              description: 'Build reusable checkout step components with validation',
-              startDate: new Date('2026-01-27'),
-              endDate: new Date('2026-02-04'),
-              status: 'in-progress',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Sarah Chen',
-              requiredRole: 'Frontend',
-              dependencies: {
-                blockedBy: ['ecom-t1', 'ecom-t2'],
-              },
+              dependencies: { blockedBy: ['pt1'] }
             },
             {
-              id: 'ecom-t5',
-              title: 'Payment Method Selector UI',
-              description: 'Interactive payment selection with card input and validation',
-              startDate: new Date('2026-02-05'),
-              endDate: new Date('2026-02-09'),
-              status: 'planned',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Sarah Chen',
-              requiredRole: 'Frontend',
-              dependencies: {
-                blockedBy: ['ecom-t1', 'ecom-t4'],
-              },
-            },
-            {
-              id: 'ecom-t6',
-              title: 'Order Summary Page',
-              description: 'Final review screen with edit capability',
-              startDate: new Date('2026-02-10'),
-              endDate: new Date('2026-02-15'),
-              status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Tom Wilson',
-              requiredRole: 'Frontend',
-              dependencies: {
-                blockedBy: ['ecom-t4'],
-              },
-            },
-            {
-              id: 'ecom-t7',
-              title: 'Wallet Dashboard UI',
-              description: 'Saved payment methods management interface',
-              startDate: new Date('2026-02-16'),
-              endDate: new Date('2026-02-22'),
+              id: 'pt3',
+              title: 'Customer Profile UI',
+              description: 'React components for customer profiles',
+              startDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-20'),
               status: 'planned',
               storyPoints: 5,
               effortDays: 5,
-              assignedTo: 'Sarah Chen',
+              assignedTo: 'Lucas Brown',
               requiredRole: 'Frontend',
-              dependencies: {
-                blockedBy: ['ecom-t3'],
-              },
-            },
+              dependencies: { blockedBy: ['pt2'] }
+            }
           ]
         },
         {
-          id: 'ecom-f3',
-          name: '🎨 UI/UX Design',
+          id: 'pf2',
+          name: '📞 Communication Hub',
           tickets: [
             {
-              id: 'ecom-t8',
-              title: 'Checkout Flow Mockups',
-              description: 'Design multi-step checkout experience in Figma',
-              startDate: new Date('2026-01-06'),
-              endDate: new Date('2026-01-08'),
-              status: 'completed',
-              storyPoints: 2,
-              effortDays: 2,
-              assignedTo: 'Emma Davis',
-              requiredRole: 'Designer',
-            },
-            {
-              id: 'ecom-t9',
-              title: 'Payment UI Components Design',
-              description: 'Design system components for payment forms',
-              startDate: new Date('2026-01-09'),
-              endDate: new Date('2026-01-11'),
-              status: 'completed',
-              storyPoints: 2,
-              effortDays: 2,
-              assignedTo: 'Emma Davis',
-              requiredRole: 'Designer',
-            },
-          ]
-        },
-        {
-          id: 'ecom-f4',
-          name: '✅ QA & Testing',
-          tickets: [
-            {
-              id: 'ecom-t10',
-              title: 'Payment Flow E2E Testing',
-              description: 'Automated test suite for complete payment scenarios',
-              startDate: new Date('2026-02-16'),
-              endDate: new Date('2026-02-22'),
+              id: 'pt4',
+              title: 'Email Integration Service',
+              description: 'SendGrid integration for customer emails',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-27'),
               status: 'planned',
               storyPoints: 5,
               effortDays: 5,
-              assignedTo: 'David Lee',
-              requiredRole: 'QA',
-              dependencies: {
-                blockedBy: ['ecom-t4', 'ecom-t5'],
-              },
+              assignedTo: 'Marcus Johnson',
+              requiredRole: 'Backend'
             },
             {
-              id: 'ecom-t11',
-              title: 'Checkout Integration Tests',
-              description: 'Test checkout with various payment methods and edge cases',
-              startDate: new Date('2026-02-23'),
-              endDate: new Date('2026-02-27'),
+              id: 'pt5',
+              title: 'SMS Notification System',
+              description: 'Twilio integration for SMS alerts',
+              startDate: new Date('2026-03-30'),
+              endDate: new Date('2026-04-03'),
               status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'David Lee',
-              requiredRole: 'QA',
-              dependencies: {
-                blockedBy: ['ecom-t10'],
-              },
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Marcus Johnson',
+              requiredRole: 'Backend'
             },
+            {
+              id: 'pt6',
+              title: 'Communication Dashboard UI',
+              description: 'Message history and templates UI',
+              startDate: new Date('2026-04-06'),
+              endDate: new Date('2026-04-10'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Lucas Brown',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['pt4', 'pt5'] }
+            }
           ]
         },
+        {
+          id: 'pf3',
+          name: '📊 Analytics & Reporting',
+          tickets: [
+            {
+              id: 'pt7',
+              title: 'Analytics Data Pipeline',
+              description: 'ETL pipeline for customer analytics',
+              startDate: new Date('2026-04-13'),
+              endDate: new Date('2026-04-17'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Jennifer Wu',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'pt8',
+              title: 'Reporting Dashboard',
+              description: 'Interactive charts and reports',
+              startDate: new Date('2026-04-20'),
+              endDate: new Date('2026-04-24'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Lucas Brown',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['pt7'] }
+            }
+          ]
+        }
       ],
       sprints: [
         {
-          id: 'ecom-s1',
-          name: 'Sprint 1',
-          startDate: new Date('2026-01-06'),
-          endDate: new Date('2026-01-19')
+          id: 'ps1',
+          name: 'Sprint 1: Foundation',
+          startDate: new Date('2026-03-02'),
+          endDate: new Date('2026-03-13')
         },
         {
-          id: 'ecom-s2',
-          name: 'Sprint 2',
-          startDate: new Date('2026-01-20'),
-          endDate: new Date('2026-02-02')
+          id: 'ps2',
+          name: 'Sprint 2: Core Features',
+          startDate: new Date('2026-03-16'),
+          endDate: new Date('2026-03-27')
         },
         {
-          id: 'ecom-s3',
-          name: 'Sprint 3',
-          startDate: new Date('2026-02-03'),
-          endDate: new Date('2026-02-16')
+          id: 'ps3',
+          name: 'Sprint 3: Integration',
+          startDate: new Date('2026-03-30'),
+          endDate: new Date('2026-04-10')
         },
         {
-          id: 'ecom-s4',
-          name: 'Sprint 4',
-          startDate: new Date('2026-02-17'),
-          endDate: new Date('2026-03-02')
-        },
-        {
-          id: 'ecom-s5',
-          name: 'Sprint 5',
-          startDate: new Date('2026-03-03'),
-          endDate: new Date('2026-03-16')
-        },
-        {
-          id: 'ecom-s6',
-          name: 'Sprint 6',
-          startDate: new Date('2026-03-17'),
-          endDate: new Date('2026-03-31')
-        },
-      ],
+          id: 'ps4',
+          name: 'Sprint 4: Polish & Testing',
+          startDate: new Date('2026-04-13'),
+          endDate: new Date('2026-04-24')
+        }
+      ]
     }
   ]
 };
 
 // ===========================================
-// PRODUCT 2: Analytics Dashboard (Web)
+// PRODUCT 2: 🛒 E-COMMERCE EXPRESS (COMPLEX)
 // ===========================================
 const product2: Product = {
-  id: 'analytics01',
-  name: 'DataViz Pro - Analytics Dashboard',
+  id: 'ecommerce-01',
+  name: '🛒 E-Commerce Express - Online Store',
   releases: [
     {
-      id: 'analytics-r1',
-      name: 'v1.0 - Initial Launch',
-      startDate: new Date('2026-02-02'),
-      endDate: new Date('2026-03-31'),
+      id: 'rel-ecom-1',
+      name: 'v4.0 - Marketplace Expansion',
+      startDate: new Date('2026-02-16'),
+      endDate: new Date('2026-05-15'),
       storyPointMapping: SP_PRESETS.fibonacci,
-      milestones: [],
+      milestones: [
+        {
+          id: 'ms-ecom-1',
+          releaseId: 'rel-ecom-1',
+          name: 'Beta Launch',
+          type: 'Launch',
+          dateType: 'single',
+          startDate: new Date('2026-04-10'),
+          description: 'Limited beta release to select customers',
+          isBlocking: false,
+          order: 1
+        },
+        {
+          id: 'ms-ecom-2',
+          releaseId: 'rel-ecom-1',
+          name: 'Security Audit',
+          type: 'Approval',
+          dateType: 'range',
+          startDate: new Date('2026-04-20'),
+          endDate: new Date('2026-04-24'),
+          description: 'External security audit required',
+          isBlocking: true,
+          order: 2
+        },
+        {
+          id: 'ms-ecom-3',
+          releaseId: 'rel-ecom-1',
+          name: 'Production Release',
+          type: 'Deployment',
+          dateType: 'single',
+          startDate: new Date('2026-05-15'),
+          description: 'Full production deployment',
+          isBlocking: false,
+          order: 3
+        }
+      ],
       features: [
         {
-          id: 'analytics-f1',
-          name: '📊 Data Pipeline',
+          id: 'ef1',
+          name: '🛍️ Product Catalog & Search',
           tickets: [
             {
-              id: 'analytics-t1',
-              title: 'Data Pipeline Setup',
-              description: 'Configure Apache Airflow for ETL orchestration',
-              startDate: new Date('2026-02-02'),
-              endDate: new Date('2026-02-11'),
+              id: 'et1',
+              title: 'Product Search Engine',
+              description: 'Elasticsearch integration for product search',
+              startDate: new Date('2026-02-16'),
+              endDate: new Date('2026-02-20'),
               status: 'completed',
               storyPoints: 8,
-              effortDays: 8,
-              assignedTo: 'Priya Sharma',
-              requiredRole: 'DataEngineer',
+              effortDays: 5,
+              assignedTo: 'Sophia Rodriguez',
+              requiredRole: 'Backend'
             },
             {
-              id: 'analytics-t2',
-              title: 'ETL Jobs for Analytics',
-              description: 'Build data transformation pipelines for metrics calculation',
-              startDate: new Date('2026-02-12'),
-              endDate: new Date('2026-02-19'),
+              id: 'et2',
+              title: '⚡ CONFLICT: Category Management',
+              description: 'Product category hierarchy - OVERLAPS with et1',
+              startDate: new Date('2026-02-18'),
+              endDate: new Date('2026-02-24'),
               status: 'in-progress',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Priya Sharma',
-              requiredRole: 'DataEngineer',
-              dependencies: {
-                blockedBy: ['analytics-t1'],
-              },
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Sophia Rodriguez',
+              requiredRole: 'Backend'
             },
             {
-              id: 'analytics-t3',
-              title: 'Real-time Data Streaming',
-              description: 'Kafka-based streaming pipeline for live metrics',
-              startDate: new Date('2026-02-20'),
-              endDate: new Date('2026-02-26'),
+              id: 'et3',
+              title: 'Product Detail Pages',
+              description: 'Rich product detail UI with zoom',
+              startDate: new Date('2026-02-25'),
+              endDate: new Date('2026-03-03'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Emma Watson',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['et1'] }
+            },
+            {
+              id: 'et4',
+              title: '🏖️ PTO CONFLICT: Product Recommendations',
+              description: 'ML-based recommendations - during PTO (Mar 10-14)',
+              startDate: new Date('2026-03-10'),
+              endDate: new Date('2026-03-16'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Sophia Rodriguez',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et31',
+              title: 'Advanced Filters & Faceting',
+              description: 'Multi-attribute filtering with faceted search',
+              startDate: new Date('2026-03-04'),
+              endDate: new Date('2026-03-10'),
               status: 'planned',
               storyPoints: 5,
               effortDays: 5,
-              assignedTo: 'Priya Sharma',
-              requiredRole: 'DataEngineer',
-              dependencies: {
-                blockedBy: ['analytics-t1'],
-              },
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et1'] }
             },
+            {
+              id: 'et32',
+              title: 'Product Comparison Tool',
+              description: 'Side-by-side product comparison UI',
+              startDate: new Date('2026-03-17'),
+              endDate: new Date('2026-03-23'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Emma Watson',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['et3'] }
+            }
           ]
         },
         {
-          id: 'analytics-f2',
-          name: '🔌 Backend APIs',
+          id: 'ef2',
+          name: '🛒 Shopping Cart & Checkout',
           tickets: [
             {
-              id: 'analytics-t4',
-              title: 'Analytics API Endpoints',
-              description: 'REST API for querying aggregated metrics',
-              startDate: new Date('2026-02-20'),
-              endDate: new Date('2026-02-26'),
+              id: 'et5',
+              title: 'Shopping Cart Service',
+              description: 'Redis-backed cart with session management',
+              startDate: new Date('2026-03-04'),
+              endDate: new Date('2026-03-10'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Oliver Kim',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et6',
+              title: 'Payment Gateway Integration',
+              description: 'Stripe payment processing integration',
+              startDate: new Date('2026-03-11'),
+              endDate: new Date('2026-03-17'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Oliver Kim',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et5'] }
+            },
+            {
+              id: 'et7',
+              title: '⚡ CONFLICT: Order Confirmation System',
+              description: 'Email confirmations - OVERLAPS with et6',
+              startDate: new Date('2026-03-13'),
+              endDate: new Date('2026-03-19'),
               status: 'planned',
               storyPoints: 5,
               effortDays: 5,
-              assignedTo: 'Carlos Rodriguez',
-              requiredRole: 'Backend',
-              dependencies: {
-                blockedBy: ['analytics-t2'],
-              },
+              assignedTo: 'Oliver Kim',
+              requiredRole: 'Backend'
             },
             {
-              id: 'analytics-t5',
-              title: 'Aggregation Service',
-              description: 'Pre-compute common metric aggregations for performance',
-              startDate: new Date('2026-02-27'),
-              endDate: new Date('2026-03-04'),
+              id: 'et8',
+              title: 'Checkout UI Flow',
+              description: 'Multi-step checkout with validation',
+              startDate: new Date('2026-03-20'),
+              endDate: new Date('2026-03-26'),
               status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Carlos Rodriguez',
-              requiredRole: 'Backend',
-              dependencies: {
-                blockedBy: ['analytics-t2'],
-              },
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Emma Watson',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['et6'] }
             },
             {
-              id: 'analytics-t6',
-              title: 'Export Service',
-              description: 'CSV/PDF export functionality for reports',
-              startDate: new Date('2026-03-05'),
-              endDate: new Date('2026-03-08'),
+              id: 'et33',
+              title: 'Coupon & Discount Engine',
+              description: 'Promotional codes and discount calculation',
+              startDate: new Date('2026-03-24'),
+              endDate: new Date('2026-03-30'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et5'] }
+            },
+            {
+              id: 'et34',
+              title: 'Cart Analytics & Abandonment',
+              description: 'Track cart abandonment and recovery emails',
+              startDate: new Date('2026-04-03'),
+              endDate: new Date('2026-04-09'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et5'] }
+            }
+          ]
+        },
+        {
+          id: 'ef3',
+          name: '📦 Inventory & Warehouse',
+          tickets: [
+            {
+              id: 'et9',
+              title: 'Warehouse Integration API',
+              description: 'Real-time inventory sync with warehouses',
+              startDate: new Date('2026-03-27'),
+              endDate: new Date('2026-04-02'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Sophia Rodriguez',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et10',
+              title: '🏖️ PTO CONFLICT: Stock Level Alerts',
+              description: 'Low stock notification system - during PTO (Apr 7-11)',
+              startDate: new Date('2026-04-07'),
+              endDate: new Date('2026-04-13'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Oliver Kim',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et11',
+              title: '🚨 SPILLOVER: Inventory Dashboard',
+              description: 'UI for inventory management - EXTENDS INTO SIT',
+              startDate: new Date('2026-04-25'),
+              endDate: new Date('2026-05-01'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Emma Watson',
+              requiredRole: 'Frontend'
+            },
+            {
+              id: 'et35',
+              title: 'Multi-Warehouse Routing',
+              description: 'Smart order routing across warehouses',
+              startDate: new Date('2026-04-10'),
+              endDate: new Date('2026-04-16'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et9'] }
+            },
+            {
+              id: 'et36',
+              title: 'Supplier Management Portal',
+              description: 'Supplier onboarding and inventory updates',
+              startDate: new Date('2026-04-17'),
+              endDate: new Date('2026-04-23'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Emma Watson',
+              requiredRole: 'Frontend'
+            }
+          ]
+        },
+        {
+          id: 'ef4',
+          name: '⭐ Reviews & Ratings',
+          tickets: [
+            {
+              id: 'et12',
+              title: 'Review Database Schema',
+              description: 'Review and rating data models',
+              startDate: new Date('2026-02-23'),
+              endDate: new Date('2026-02-27'),
               status: 'planned',
               storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Lisa Chang',
-              requiredRole: 'Fullstack',
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend'
             },
+            {
+              id: 'et13',
+              title: 'Review Submission API',
+              description: 'REST API for submitting reviews with moderation',
+              startDate: new Date('2026-03-02'),
+              endDate: new Date('2026-03-06'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et12'] }
+            },
+            {
+              id: 'et14',
+              title: 'Review Display Component',
+              description: 'Star ratings and review cards UI',
+              startDate: new Date('2026-03-09'),
+              endDate: new Date('2026-03-13'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Natalie Brooks',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['et13'] }
+            },
+            {
+              id: 'et15',
+              title: 'Image Upload & Gallery',
+              description: 'Customer photo uploads with CDN integration',
+              startDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-20'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Natalie Brooks',
+              requiredRole: 'Frontend'
+            },
+            {
+              id: 'et16',
+              title: 'Review Moderation Dashboard',
+              description: 'Admin tool for reviewing and moderating content',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-27'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Natalie Brooks',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['et13'] }
+            }
           ]
         },
         {
-          id: 'analytics-f3',
-          name: '📈 Dashboard Frontend',
+          id: 'ef5',
+          name: '👔 Seller Dashboard & Tools',
           tickets: [
             {
-              id: 'analytics-t7',
-              title: 'Dashboard Layout',
-              description: 'Responsive grid layout with widget system',
+              id: 'et17',
+              title: 'Seller Onboarding Flow',
+              description: 'Multi-step seller registration and verification',
               startDate: new Date('2026-02-16'),
-              endDate: new Date('2026-02-21'),
-              status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Jake Thompson',
-              requiredRole: 'Frontend',
-            },
-            {
-              id: 'analytics-t8',
-              title: 'Chart Components',
-              description: 'Reusable chart library (line, bar, pie) using D3.js',
-              startDate: new Date('2026-02-27'),
-              endDate: new Date('2026-03-05'),
-              status: 'planned',
+              endDate: new Date('2026-02-20'),
+              status: 'completed',
               storyPoints: 5,
               effortDays: 5,
-              assignedTo: 'Jake Thompson',
-              requiredRole: 'Frontend',
-              dependencies: {
-                blockedBy: ['analytics-t4'],
-              },
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend'
             },
             {
-              id: 'analytics-t9',
-              title: 'Data Table Widget',
-              description: 'Sortable, filterable data table component',
-              startDate: new Date('2026-03-06'),
-              endDate: new Date('2026-03-11'),
-              status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Jake Thompson',
-              requiredRole: 'Frontend',
-              dependencies: {
-                blockedBy: ['analytics-t4'],
-              },
+              id: 'et18',
+              title: 'Product Upload & Management',
+              description: 'Bulk product upload with CSV/API',
+              startDate: new Date('2026-02-23'),
+              endDate: new Date('2026-02-27'),
+              status: 'in-progress',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Oliver Kim',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et17'] }
             },
             {
-              id: 'analytics-t10',
-              title: 'Filters & Date Pickers',
-              description: 'Advanced filtering UI for time-based analytics',
-              startDate: new Date('2026-03-12'),
-              endDate: new Date('2026-03-15'),
+              id: 'et19',
+              title: 'Seller Dashboard UI',
+              description: 'Sales analytics and inventory management interface',
+              startDate: new Date('2026-03-02'),
+              endDate: new Date('2026-03-06'),
               status: 'planned',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Jake Thompson',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Natalie Brooks',
               requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['et18'] }
             },
+            {
+              id: 'et20',
+              title: 'Order Fulfillment System',
+              description: 'Seller order management and shipping integration',
+              startDate: new Date('2026-03-09'),
+              endDate: new Date('2026-03-13'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et18'] }
+            },
+            {
+              id: 'et21',
+              title: 'Seller Payout System',
+              description: 'Commission calculation and automated payouts',
+              startDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-20'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et20'] }
+            }
           ]
         },
         {
-          id: 'analytics-f4',
+          id: 'ef6',
+          name: '🎯 Marketing & Promotions',
+          tickets: [
+            {
+              id: 'et22',
+              title: 'Email Campaign Engine',
+              description: 'SendGrid integration for marketing emails',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-27'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Oliver Kim',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et23',
+              title: 'Promotional Banner System',
+              description: 'Dynamic homepage banners with A/B testing',
+              startDate: new Date('2026-03-30'),
+              endDate: new Date('2026-04-03'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Natalie Brooks',
+              requiredRole: 'Frontend'
+            },
+            {
+              id: 'et24',
+              title: 'Flash Sale System',
+              description: 'Time-limited sales with countdown timers',
+              startDate: new Date('2026-04-06'),
+              endDate: new Date('2026-04-10'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et25',
+              title: 'Loyalty Points & Rewards',
+              description: 'Customer loyalty program with points tracking',
+              startDate: new Date('2026-04-13'),
+              endDate: new Date('2026-04-17'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et26',
+              title: 'Referral Program UI',
+              description: 'Customer referral dashboard and tracking',
+              startDate: new Date('2026-04-20'),
+              endDate: new Date('2026-04-24'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Emma Watson',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['et25'] }
+            }
+          ]
+        },
+        {
+          id: 'ef7',
+          name: '🔐 Security & Fraud Detection',
+          tickets: [
+            {
+              id: 'et27',
+              title: 'Fraud Detection Engine',
+              description: 'ML-based fraud detection for transactions',
+              startDate: new Date('2026-03-30'),
+              endDate: new Date('2026-04-05'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Sophia Rodriguez',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et28',
+              title: 'Account Security Features',
+              description: '2FA, login alerts, and session management',
+              startDate: new Date('2026-04-06'),
+              endDate: new Date('2026-04-10'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Oliver Kim',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et29',
+              title: 'PCI Compliance Implementation',
+              description: 'Payment card security standards compliance',
+              startDate: new Date('2026-04-13'),
+              endDate: new Date('2026-04-19'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Sophia Rodriguez',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et30',
+              title: 'Security Monitoring Dashboard',
+              description: 'Real-time security alerts and monitoring',
+              startDate: new Date('2026-04-20'),
+              endDate: new Date('2026-04-24'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Natalie Brooks',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['et27', 'et29'] }
+            }
+          ]
+        },
+        {
+          id: 'ef8',
+          name: '📱 Mobile App & PWA',
+          tickets: [
+            {
+              id: 'et37',
+              title: 'PWA Service Worker',
+              description: 'Progressive web app with offline support',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-29'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Emma Watson',
+              requiredRole: 'Frontend'
+            },
+            {
+              id: 'et38',
+              title: 'Push Notification Service',
+              description: 'Web push notifications for orders',
+              startDate: new Date('2026-03-30'),
+              endDate: new Date('2026-04-05'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Jake Morrison',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et37'] }
+            },
+            {
+              id: 'et39',
+              title: 'Mobile-Optimized UI',
+              description: 'Responsive design for mobile web',
+              startDate: new Date('2026-04-06'),
+              endDate: new Date('2026-04-12'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Natalie Brooks',
+              requiredRole: 'Frontend'
+            },
+            {
+              id: 'et40',
+              title: 'Mobile Payment Flow',
+              description: 'Apple Pay and Google Pay integration',
+              startDate: new Date('2026-04-13'),
+              endDate: new Date('2026-04-17'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Oliver Kim',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['et6'] }
+            }
+          ]
+        },
+        {
+          id: 'ef9',
           name: '🧪 Testing & QA',
           tickets: [
             {
-              id: 'analytics-t11',
-              title: 'Data Accuracy Testing',
-              description: 'Validate metric calculations against source data',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-21'),
+              id: 'et41',
+              title: 'E2E Test Automation',
+              description: 'Cypress test suite for critical flows',
+              startDate: new Date('2026-04-06'),
+              endDate: new Date('2026-04-12'),
               status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Nina Patel',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Chris Taylor',
               requiredRole: 'QA',
-              dependencies: {
-                blockedBy: ['analytics-t8', 'analytics-t9'],
-              },
+              dependencies: { blockedBy: ['et8'] }
             },
+            {
+              id: 'et42',
+              title: 'Performance Testing Suite',
+              description: 'Load testing with JMeter for checkout flow',
+              startDate: new Date('2026-04-13'),
+              endDate: new Date('2026-04-17'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Chris Taylor',
+              requiredRole: 'QA'
+            },
+            {
+              id: 'et43',
+              title: 'Payment Gateway Testing',
+              description: 'Test all payment scenarios and edge cases',
+              startDate: new Date('2026-04-20'),
+              endDate: new Date('2026-04-24'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Chris Taylor',
+              requiredRole: 'QA',
+              dependencies: { blockedBy: ['et6', 'et40'] }
+            },
+            {
+              id: 'et44',
+              title: 'Security Penetration Testing',
+              description: 'Third-party security audit and fixes',
+              startDate: new Date('2026-04-20'),
+              endDate: new Date('2026-04-26'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Sophia Rodriguez',
+              requiredRole: 'Backend'
+            },
+            {
+              id: 'et45',
+              title: 'Browser Compatibility Testing',
+              description: 'Cross-browser testing and fixes',
+              startDate: new Date('2026-04-27'),
+              endDate: new Date('2026-05-01'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Chris Taylor',
+              requiredRole: 'QA'
+            }
           ]
-        },
+        }
       ],
       sprints: [
         {
-          id: 'analytics-s1',
-          name: 'Sprint 1',
-          startDate: new Date('2026-02-02'),
-          endDate: new Date('2026-02-15')
-        },
-        {
-          id: 'analytics-s2',
-          name: 'Sprint 2',
+          id: 'es1',
+          name: 'Sprint 1: Catalog Foundation',
           startDate: new Date('2026-02-16'),
-          endDate: new Date('2026-03-01')
+          endDate: new Date('2026-02-27')
         },
         {
-          id: 'analytics-s3',
-          name: 'Sprint 3',
+          id: 'es2',
+          name: 'Sprint 2: Search & Discovery',
           startDate: new Date('2026-03-02'),
-          endDate: new Date('2026-03-15')
+          endDate: new Date('2026-03-13')
         },
         {
-          id: 'analytics-s4',
-          name: 'Sprint 4',
+          id: 'es3',
+          name: 'Sprint 3: Cart & Payments',
           startDate: new Date('2026-03-16'),
-          endDate: new Date('2026-03-31')
+          endDate: new Date('2026-03-27')
         },
-      ],
+        {
+          id: 'es4',
+          name: 'Sprint 4: Inventory',
+          startDate: new Date('2026-03-30'),
+          endDate: new Date('2026-04-10')
+        },
+        {
+          id: 'es5',
+          name: 'Sprint 5: Integration & Polish',
+          startDate: new Date('2026-04-13'),
+          endDate: new Date('2026-04-24')
+        },
+        {
+          id: 'es6',
+          name: 'Sprint 6: Testing & Hardening',
+          startDate: new Date('2026-04-27'),
+          endDate: new Date('2026-05-08')
+        }
+      ]
     }
   ]
 };
 
 // ===========================================
-// PRODUCT 3: Food Delivery App (Mobile)
+// PRODUCT 3: 📱 MOBILEFIT TRACKER (MOBILE)
 // ===========================================
 const product3: Product = {
-  id: 'foodapp01',
-  name: 'QuickBite - Food Delivery App',
+  id: 'mobilefit-01',
+  name: '📱 MobileFit - Fitness Tracker App',
   releases: [
     {
-      id: 'food-r1',
-      name: 'v3.0 - Live Tracking & Multi-Payment',
-      startDate: new Date('2026-01-15'),
-      endDate: new Date('2026-03-31'),
+      id: 'rel-mobile-1',
+      name: 'v3.0 - Health Integration & Social Features',
+      startDate: new Date('2026-04-01'),
+      endDate: new Date('2026-06-26'),
       storyPointMapping: SP_PRESETS.fibonacci,
-      milestones: [],
+      milestones: [
+        {
+          id: 'ms-mobile-1',
+          releaseId: 'rel-mobile-1',
+          name: 'iOS App Store Submission',
+          type: 'Deployment',
+          dateType: 'single',
+          startDate: new Date('2026-06-05'),
+          description: 'Submit to Apple App Store for review',
+          isBlocking: true,
+          order: 1
+        },
+        {
+          id: 'ms-mobile-2',
+          releaseId: 'rel-mobile-1',
+          name: 'Android Play Store Submission',
+          type: 'Deployment',
+          dateType: 'single',
+          startDate: new Date('2026-06-08'),
+          description: 'Submit to Google Play Store',
+          isBlocking: true,
+          order: 2
+        },
+        {
+          id: 'ms-mobile-3',
+          releaseId: 'rel-mobile-1',
+          name: 'Public Launch',
+          type: 'Launch',
+          dateType: 'single',
+          startDate: new Date('2026-06-26'),
+          description: 'Marketing campaign begins',
+          isBlocking: false,
+          order: 3
+        }
+      ],
       features: [
         {
-          id: 'food-f1',
-          name: '📍 Location Services',
+          id: 'mf1',
+          name: '💪 Workout Tracking',
           tickets: [
             {
-              id: 'food-t1',
-              title: 'Real-time Location Service',
-              description: 'WebSocket service for driver location updates',
-              startDate: new Date('2026-01-15'),
-              endDate: new Date('2026-01-23'),
-              status: 'completed',
-              storyPoints: 7,
-              effortDays: 7,
-              assignedTo: 'Ryan Cooper',
-              requiredRole: 'Backend',
-            },
-            {
-              id: 'food-t2',
-              title: 'Delivery Status WebSocket',
-              description: 'Real-time order status push notifications',
-              startDate: new Date('2026-01-24'),
-              endDate: new Date('2026-01-30'),
+              id: 'mt1',
+              title: 'iOS Workout Recording',
+              description: 'HealthKit integration for workout data',
+              startDate: new Date('2026-04-01'),
+              endDate: new Date('2026-04-07'),
               status: 'in-progress',
-              storyPoints: 5,
+              storyPoints: 8,
               effortDays: 5,
-              assignedTo: 'Ryan Cooper',
-              requiredRole: 'Backend',
-              dependencies: {
-                blockedBy: ['food-t1'],
-              },
+              assignedTo: 'Daniel Park',
+              requiredRole: 'iOS'
             },
             {
-              id: 'food-t3',
-              title: 'Multi-Payment Gateway',
-              description: 'Support for credit cards, digital wallets, and cash',
-              startDate: new Date('2026-01-27'),
-              endDate: new Date('2026-02-04'),
+              id: 'mt2',
+              title: 'Android Workout Recording',
+              description: 'Google Fit integration for workout data',
+              startDate: new Date('2026-04-01'),
+              endDate: new Date('2026-04-07'),
               status: 'in-progress',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Sophie Martin',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Nina Patel',
+              requiredRole: 'Android'
+            },
+            {
+              id: 'mt3',
+              title: 'Backend Workout API',
+              description: 'REST API for workout data sync',
+              startDate: new Date('2026-04-08'),
+              endDate: new Date('2026-04-14'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Thomas Lin',
               requiredRole: 'Backend',
+              dependencies: { blockedBy: ['mt1', 'mt2'] }
             },
             {
-              id: 'food-t4',
-              title: 'Promo Code Engine',
-              description: '  Backend service for discount codes and promotions',
-              startDate: new Date('2026-02-05'),
-              endDate: new Date('2026-02-10'),
+              id: 'mt4',
+              title: '🏖️ PTO CONFLICT: Workout Analytics',
+              description: 'Exercise pattern analysis - during PTO (Apr 21-25)',
+              startDate: new Date('2026-04-21'),
+              endDate: new Date('2026-04-28'),
               status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Sophie Martin',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Thomas Lin',
               requiredRole: 'Backend',
-            },
+              dependencies: { blockedBy: ['mt3'] }
+            }
           ]
         },
         {
-          id: 'food-f2',
-          name: '📱 iOS App',
+          id: 'mf2',
+          name: '👥 Social Features',
           tickets: [
             {
-              id: 'food-t5',
-              title: 'Map View Integration (iOS)',
-              description: 'MapKit integration with driver marker animation',
-              startDate: new Date('2026-02-02'),
-              endDate: new Date('2026-02-08'),
+              id: 'mt5',
+              title: 'User Profile & Feed (iOS)',
+              description: 'Social profile and activity feed',
+              startDate: new Date('2026-04-29'),
+              endDate: new Date('2026-05-05'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Daniel Park',
+              requiredRole: 'iOS'
+            },
+            {
+              id: 'mt6',
+              title: 'User Profile & Feed (Android)',
+              description: 'Social profile and activity feed',
+              startDate: new Date('2026-04-29'),
+              endDate: new Date('2026-05-05'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Nina Patel',
+              requiredRole: 'Android'
+            },
+            {
+              id: 'mt7',
+              title: 'Social Backend Service',
+              description: 'Follow/friend system with notifications',
+              startDate: new Date('2026-05-06'),
+              endDate: new Date('2026-05-12'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Thomas Lin',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['mt5', 'mt6'] }
+            },
+            {
+              id: 'mt8',
+              title: 'App UI/UX Polish',
+              description: 'Design refinements and animations',
+              startDate: new Date('2026-05-13'),
+              endDate: new Date('2026-05-19'),
               status: 'planned',
               storyPoints: 5,
               effortDays: 5,
-              assignedTo: 'Michael Chen',
-              requiredRole: 'iOS',
-              dependencies: {
-                blockedBy: ['food-t1'],
-              },
-            },
-            {
-              id: 'food-t6',
-              title: 'Live Tracking UI (iOS)',
-              description: 'Real-time order tracking screen with ETA',
-              startDate: new Date('2026-02-09'),
-              endDate: new Date('2026-02-14'),
-              status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Michael Chen',
-              requiredRole: 'iOS',
-              dependencies: {
-                blockedBy: ['food-t2'],
-              },
-            },
-            {
-              id: 'food-t7',
-              title: 'Payment Sheet (iOS)',
-              description: 'Native payment UI with Apple Pay support',
-              startDate: new Date('2026-02-16'),
-              endDate: new Date('2026-02-22'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Michael Chen',
-              requiredRole: 'iOS',
-              dependencies: {
-                blockedBy: ['food-t3'],
-              },
-            },
-            {
-              id: 'food-t8',
-              title: 'Order History Redesign (iOS)',
-              description: 'Swipeable order cards with reorder functionality',
-              startDate: new Date('2026-02-23'),
-              endDate: new Date('2026-02-27'),
-              status: 'planned',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Michael Chen',
-              requiredRole: 'iOS',
-            },
+              assignedTo: 'Isabella Chen',
+              requiredRole: 'Designer'
+            }
           ]
         },
         {
-          id: 'food-f3',
-          name: '🤖 Android App',
+          id: 'mf3',
+          name: '🧪 Testing & QA',
           tickets: [
             {
-              id: 'food-t9',
-              title: 'Map View Integration (Android)',
-              description: 'Google Maps integration with driver marker animation',
-              startDate: new Date('2026-02-02'),
-              endDate: new Date('2026-02-08'),
+              id: 'mt9',
+              title: 'Automated Testing Suite',
+              description: 'E2E tests for iOS and Android',
+              startDate: new Date('2026-05-20'),
+              endDate: new Date('2026-05-26'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Ryan Adams',
+              requiredRole: 'QA',
+              dependencies: { blockedBy: ['mt5', 'mt6'] }
+            },
+            {
+              id: 'mt10',
+              title: 'Performance Testing',
+              description: 'Load testing and optimization',
+              startDate: new Date('2026-05-27'),
+              endDate: new Date('2026-06-02'),
               status: 'planned',
               storyPoints: 5,
               effortDays: 5,
-              assignedTo: 'Amit Singh',
-              requiredRole: 'Android',
-              dependencies: {
-                blockedBy: ['food-t1'],
-              },
-            },
-            {
-              id: 'food-t10',
-              title: 'Live Tracking UI (Android)',
-              description: 'Real-time order tracking screen with ETA',
-              startDate: new Date('2026-02-09'),
-              endDate: new Date('2026-02-14'),
-              status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Amit Singh',
-              requiredRole: 'Android',
-              dependencies: {
-                blockedBy: ['food-t2'],
-              },
-            },
-            {
-              id: 'food-t11',
-              title: 'Payment Sheet (Android)',
-              description: 'Native payment UI with Google Pay support',
-              startDate: new Date('2026-02-16'),
-              endDate: new Date('2026-02-22'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Amit Singh',
-              requiredRole: 'Android',
-              dependencies: {
-                blockedBy: ['food-t3'],
-              },
-            },
-            {
-              id: 'food-t12',
-              title: 'Push Notification Handler (Android)',
-              description: 'FCM integration for order status updates',
-              startDate: new Date('2026-02-23'),
-              endDate: new Date('2026-02-27'),
-              status: 'planned',
-              storyPoints: 3,
-              effortDays: 3,
-              assignedTo: 'Amit Singh',
-              requiredRole: 'Android',
-            },
+              assignedTo: 'Ryan Adams',
+              requiredRole: 'QA'
+            }
           ]
-        },
-        {
-          id: 'food-f4',
-          name: '🎨 Design & QA',
-          tickets: [
-            {
-              id: 'food-t13',
-              title: 'Tracking UI Mockups',
-              description: 'Mobile-first design for live tracking experience',
-              startDate: new Date('2026-01-15'),
-              endDate: new Date('2026-01-17'),
-              status: 'completed',
-              storyPoints: 2,
-              effortDays: 2,
-              assignedTo: 'Olivia White',
-              requiredRole: 'Designer',
-            },
-            {
-              id: 'food-t14',
-              title: 'Payment Flow Designs',
-              description: 'Multi-payment UI screens and flows',
-              startDate: new Date('2026-01-20'),
-              endDate: new Date('2026-01-22'),
-              status: 'completed',
-              storyPoints: 2,
-              effortDays: 2,
-              assignedTo: 'Olivia White',
-              requiredRole: 'Designer',
-            },
-            {
-              id: 'food-t15',
-              title: 'Live Tracking E2E Test',
-              description: 'End-to-end testing of real-time tracking on both platforms',
-              startDate: new Date('2026-03-02'),
-              endDate: new Date('2026-03-08'),
-              status: 'planned',
-              storyPoints: 5,
-              effortDays: 5,
-              assignedTo: 'Grace Kim',
-              requiredRole: 'QA',
-              dependencies: {
-                blockedBy: ['food-t6', 'food-t10'],
-              },
-            },
-            {
-              id: 'food-t16',
-              title: 'Payment Flow Testing',
-              description: 'Cross-platform payment integration testing',
-              startDate: new Date('2026-03-09'),
-              endDate: new Date('2026-03-14'),
-              status: 'planned',
-              storyPoints: 4,
-              effortDays: 4,
-              assignedTo: 'Grace Kim',
-              requiredRole: 'QA',
-              dependencies: {
-                blockedBy: ['food-t7', 'food-t11'],
-              },
-            },
-            {
-              id: 'food-t17',
-              title: 'Regression Suite',
-              description: 'Automated regression tests for critical flows',
-              startDate: new Date('2026-03-16'),
-              endDate: new Date('2026-03-23'),
-              status: 'planned',
-              storyPoints: 6,
-              effortDays: 6,
-              assignedTo: 'Grace Kim',
-              requiredRole: 'QA',
-            },
-          ]
-        },
+        }
       ],
       sprints: [
         {
-          id: 'food-s1',
-          name: 'Sprint 1',
-          startDate: new Date('2026-01-15'),
-          endDate: new Date('2026-01-28')
+          id: 'ms1',
+          name: 'Sprint 1: Catalog Launch',
+          startDate: new Date('2026-02-16'),
+          endDate: new Date('2026-02-27')
         },
         {
-          id: 'food-s2',
-          name: 'Sprint 2',
-          startDate: new Date('2026-01-29'),
-          endDate: new Date('2026-02-11')
+          id: 'ms2',
+          name: 'Sprint 2: Search & Discovery',
+          startDate: new Date('2026-03-02'),
+          endDate: new Date('2026-03-13')
         },
         {
-          id: 'food-s3',
-          name: 'Sprint 3',
-          startDate: new Date('2026-02-12'),
-          endDate: new Date('2026-02-25')
+          id: 'ms3',
+          name: 'Sprint 3: Workout Tracking',
+          startDate: new Date('2026-04-01'),
+          endDate: new Date('2026-04-14')
         },
         {
-          id: 'food-s4',
-          name: 'Sprint 4',
-          startDate: new Date('2026-02-26'),
-          endDate: new Date('2026-03-11')
+          id: 'ms4',
+          name: 'Sprint 4: Analytics',
+          startDate: new Date('2026-04-15'),
+          endDate: new Date('2026-04-28')
         },
         {
-          id: 'food-s5',
-          name: 'Sprint 5',
-          startDate: new Date('2026-03-12'),
-          endDate: new Date('2026-03-25')
+          id: 'ms5',
+          name: 'Sprint 5: Social Features',
+          startDate: new Date('2026-04-29'),
+          endDate: new Date('2026-05-12')
         },
+        {
+          id: 'ms6',
+          name: 'Sprint 6: Polish & Testing',
+          startDate: new Date('2026-05-13'),
+          endDate: new Date('2026-05-26')
+        },
+        {
+          id: 'ms7',
+          name: 'Sprint 7: Store Prep',
+          startDate: new Date('2026-05-27'),
+          endDate: new Date('2026-06-09')
+        }
+      ]
+    }
+  ]
+};
+
+// ===========================================
+// PRODUCT 4: 📊 DATAHUB ANALYTICS (COMPREHENSIVE)
+// ===========================================
+const product4: Product = {
+  id: 'datahub-01',
+  name: '📊 DataHub - Enterprise Analytics Platform',
+  releases: [
+    {
+      id: 'rel-data-1',
+      name: 'v5.0 - Real-time Data Pipelines',
+      startDate: new Date('2026-03-16'),
+      endDate: new Date('2026-06-12'),
+      storyPointMapping: SP_PRESETS.linear,
+      milestones: [
+        {
+          id: 'ms-data-1',
+          releaseId: 'rel-data-1',
+          name: 'Data Migration Complete',
+          type: 'Other',
+          dateType: 'single',
+          startDate: new Date('2026-04-24'),
+          description: 'Legacy data migration finished',
+          isBlocking: true,
+          order: 1
+        },
+        {
+          id: 'ms-data-2',
+          releaseId: 'rel-data-1',
+          name: 'Performance Testing',
+          type: 'Testing',
+          dateType: 'range',
+          startDate: new Date('2026-05-18'),
+          endDate: new Date('2026-05-22'),
+          description: 'Load testing with production data volumes',
+          isBlocking: true,
+          order: 2
+        },
+        {
+          id: 'ms-data-3',
+          releaseId: 'rel-data-1',
+          name: 'Stakeholder Demo',
+          type: 'Approval',
+          dateType: 'single',
+          startDate: new Date('2026-05-29'),
+          description: 'Executive review and approval',
+          isBlocking: true,
+          order: 3
+        },
+        {
+          id: 'ms-data-4',
+          releaseId: 'rel-data-1',
+          name: 'Production Cutover',
+          type: 'Deployment',
+          dateType: 'single',
+          startDate: new Date('2026-06-12'),
+          description: 'Production deployment',
+          isBlocking: false,
+          order: 4
+        }
       ],
+      features: [
+        {
+          id: 'df1',
+          name: '🔄 Data Pipeline Infrastructure',
+          tickets: [
+            {
+              id: 'dt1',
+              title: 'Kafka Cluster Setup',
+              description: 'Multi-node Kafka cluster configuration',
+              startDate: new Date('2026-03-16'),
+              endDate: new Date('2026-03-20'),
+              status: 'completed',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Raj Malhotra',
+              requiredRole: 'DataEngineer'
+            },
+            {
+              id: 'dt2',
+              title: 'Stream Processing Engine',
+              description: 'Flink/Spark streaming jobs',
+              startDate: new Date('2026-03-23'),
+              endDate: new Date('2026-03-31'),
+              status: 'in-progress',
+              storyPoints: 13,
+              effortDays: 8,
+              assignedTo: 'Raj Malhotra',
+              requiredRole: 'DataEngineer',
+              dependencies: { blockedBy: ['dt1'] }
+            },
+            {
+              id: 'dt3',
+              title: 'Data Lake Storage Layer',
+              description: 'S3/Delta Lake integration with partitioning',
+              startDate: new Date('2026-04-01'),
+              endDate: new Date('2026-04-07'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Yuki Nakamura',
+              requiredRole: 'DataEngineer',
+              dependencies: { blockedBy: ['dt1'] }
+            },
+            {
+              id: 'dt4',
+              title: 'Schema Registry & Governance',
+              description: 'Centralized schema management with versioning',
+              startDate: new Date('2026-04-08'),
+              endDate: new Date('2026-04-14'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Yuki Nakamura',
+              requiredRole: 'DataEngineer',
+              dependencies: { blockedBy: ['dt3'] }
+            }
+          ]
+        },
+        {
+          id: 'df2',
+          name: '📈 Visualization & Dashboards',
+          tickets: [
+            {
+              id: 'dt5',
+              title: 'Dashboard Design System',
+              description: 'UI component library for analytics',
+              startDate: new Date('2026-04-15'),
+              endDate: new Date('2026-04-21'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Maya Singh',
+              requiredRole: 'Designer'
+            },
+            {
+              id: 'dt6',
+              title: 'Real-time Chart Components',
+              description: 'D3.js interactive charts with WebSocket updates',
+              startDate: new Date('2026-04-22'),
+              endDate: new Date('2026-04-28'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Carlos Mendez',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['dt5'] }
+            },
+            {
+              id: 'dt7',
+              title: '🏖️ PTO CONFLICT: Dashboard Builder',
+              description: 'Drag-drop dashboard creation - during PTO (May 4-8)',
+              startDate: new Date('2026-05-04'),
+              endDate: new Date('2026-05-12'),
+              status: 'planned',
+              storyPoints: 13,
+              effortDays: 8,
+              assignedTo: 'Carlos Mendez',
+              requiredRole: 'Frontend',
+              dependencies: { blockedBy: ['dt6'] }
+            },
+            {
+              id: 'dt8',
+              title: 'Export & Scheduling',
+              description: 'PDF/Excel export and scheduled reports',
+              startDate: new Date('2026-05-13'),
+              endDate: new Date('2026-05-19'),
+              status: 'planned',
+              storyPoints: 5,
+              effortDays: 5,
+              assignedTo: 'Liam Foster',
+              requiredRole: 'Backend',
+              dependencies: { blockedBy: ['dt7'] }
+            }
+          ]
+        },
+        {
+          id: 'df3',
+          name: '🔍 Data Quality & Testing',
+          tickets: [
+            {
+              id: 'dt9',
+              title: 'Data Quality Framework',
+              description: 'Automated data validation and alerts',
+              startDate: new Date('2026-05-20'),
+              endDate: new Date('2026-05-26'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Raj Malhotra',
+              requiredRole: 'DataEngineer'
+            },
+            {
+              id: 'dt10',
+              title: 'Integration Testing Suite',
+              description: 'End-to-end pipeline testing',
+              startDate: new Date('2026-05-27'),
+              endDate: new Date('2026-06-02'),
+              status: 'planned',
+              storyPoints: 8,
+              effortDays: 5,
+              assignedTo: 'Sophie Martinez',
+              requiredRole: 'QA',
+              dependencies: { blockedBy: ['dt2', 'dt4', 'dt8'] }
+            }
+          ]
+        }
+      ],
+      sprints: [
+        {
+          id: 'ds1',
+          name: 'Sprint 1: Infrastructure',
+          startDate: new Date('2026-03-16'),
+          endDate: new Date('2026-03-27')
+        },
+        {
+          id: 'ds2',
+          name: 'Sprint 2: Streaming',
+          startDate: new Date('2026-03-30'),
+          endDate: new Date('2026-04-10')
+        },
+        {
+          id: 'ds3',
+          name: 'Sprint 3: Storage',
+          startDate: new Date('2026-04-13'),
+          endDate: new Date('2026-04-24')
+        },
+        {
+          id: 'ds4',
+          name: 'Sprint 4: Visualization',
+          startDate: new Date('2026-04-27'),
+          endDate: new Date('2026-05-08')
+        },
+        {
+          id: 'ds5',
+          name: 'Sprint 5: Dashboard Builder',
+          startDate: new Date('2026-05-11'),
+          endDate: new Date('2026-05-22')
+        },
+        {
+          id: 'ds6',
+          name: 'Sprint 6: Testing & Launch',
+          startDate: new Date('2026-05-25'),
+          endDate: new Date('2026-06-05')
+        }
+      ]
     }
   ]
 };
 
 export const mockTeamMembers: TeamMember[] = [
-  // ═══════════════════════════════════════════
-  // E-COMMERCE PLATFORM TEAM (ecom01)
-  // ═══════════════════════════════════════════
+  // ===========================================
+  // PRODUCT 1: PERFECT PIPELINE TEAM
+  // ===========================================
   {
-    id: 'tm-ecom-1',
-    name: 'Sarah Chen',
+    id: 'tm-perfect-1',
+    name: 'Jennifer Wu',
+    role: 'Backend',
+    experienceLevel: 'Senior',
+    productId: 'perfect-pipeline-01',
+    velocityMultiplier: 1.2,
+    notes: 'Backend lead, database expert',
+    pto: [
+      // PTO scheduled AFTER dev window to avoid conflicts
+      { id: 'pto-p1', name: 'Vacation', startDate: new Date('2026-05-18'), endDate: new Date('2026-05-22') }
+    ]
+  },
+  {
+    id: 'tm-perfect-2',
+    name: 'Lucas Brown',
     role: 'Frontend',
     experienceLevel: 'Senior',
-    productId: 'ecom01',
-    velocityMultiplier: 1.3,
-    notes: 'React specialist, TypeScript expert',
+    productId: 'perfect-pipeline-01',
+    velocityMultiplier: 1.2,
+    notes: 'Frontend specialist, React expert',
     pto: [
-      {
-        id: 'pto-ecom-1',
-        name: 'Vacation',
-        startDate: new Date('2026-02-16'),
-        endDate: new Date('2026-02-20')
-      }
+      // PTO scheduled AFTER dev window to avoid conflicts
+      { id: 'pto-p2', name: 'Conference', startDate: new Date('2026-05-25'), endDate: new Date('2026-05-27') }
+    ]
+  },
+  {
+    id: 'tm-perfect-3',
+    name: 'Marcus Johnson',
+    role: 'Backend',
+    experienceLevel: 'Mid',
+    productId: 'perfect-pipeline-01',
+    velocityMultiplier: 1.0,
+    notes: 'Integration specialist',
+    pto: []
+  },
+
+  // ===========================================
+  // PRODUCT 2: E-COMMERCE TEAM
+  // ===========================================
+  {
+    id: 'tm-ecom-1',
+    name: 'Sophia Rodriguez',
+    role: 'Backend',
+    experienceLevel: 'Lead',
+    productId: 'ecommerce-01',
+    velocityMultiplier: 1.3,
+    notes: 'Backend architect, microservices expert',
+    pto: [
+      { id: 'pto-e1', name: 'Spring Break', startDate: new Date('2026-03-10'), endDate: new Date('2026-03-14') },
+      { id: 'pto-e2', name: 'Wedding', startDate: new Date('2026-04-27'), endDate: new Date('2026-05-01') }
     ]
   },
   {
     id: 'tm-ecom-2',
-    name: 'Alex Kumar',
+    name: 'Oliver Kim',
     role: 'Backend',
-    experienceLevel: 'Lead',
-    productId: 'ecom01',
-    velocityMultiplier: 1.5,
-    notes: 'Payment systems architect, Node.js expert',
-    pto: []
+    experienceLevel: 'Senior',
+    productId: 'ecommerce-01',
+    velocityMultiplier: 1.2,
+    notes: 'Payment systems specialist',
+    pto: [
+      { id: 'pto-e3', name: 'Family Trip', startDate: new Date('2026-04-07'), endDate: new Date('2026-04-11') }
+    ]
   },
   {
     id: 'tm-ecom-3',
-    name: 'Tom Wilson',
+    name: 'Emma Watson',
     role: 'Frontend',
-    experienceLevel: 'Mid',
-    productId: 'ecom01',
-    velocityMultiplier: 1.0,
-    notes: 'UI developer, CSS specialist',
+    experienceLevel: 'Senior',
+    productId: 'ecommerce-01',
+    velocityMultiplier: 1.2,
+    notes: 'E-commerce UI expert',
     pto: [
-      {
-        id: 'pto-ecom-3',
-        name: 'Conference',
-        startDate: new Date('2026-03-09'),
-        endDate: new Date('2026-03-13')
-      }
+      { id: 'pto-e4', name: 'Medical', startDate: new Date('2026-03-30'), endDate: new Date('2026-04-03') }
     ]
   },
   {
     id: 'tm-ecom-4',
-    name: 'Maria Lopez',
+    name: 'Jake Morrison',
     role: 'Backend',
-    experienceLevel: 'Senior',
-    productId: 'ecom01',
-    velocityMultiplier: 1.3,
-    notes: 'Microservices expert, API design',
-    pto: []
+    experienceLevel: 'Mid',
+    productId: 'ecommerce-01',
+    velocityMultiplier: 1.0,
+    notes: 'Backend developer, API specialist',
+    pto: [
+      { id: 'pto-e5', name: 'Vacation', startDate: new Date('2026-02-23'), endDate: new Date('2026-02-27') }
+    ]
   },
   {
     id: 'tm-ecom-5',
-    name: 'Emma Davis',
-    role: 'Designer',
-    experienceLevel: 'Senior',
-    productId: 'ecom01',
-    velocityMultiplier: 1.3,
-    notes: 'UI/UX designer, Figma lead',
+    name: 'Natalie Brooks',
+    role: 'Frontend',
+    experienceLevel: 'Mid',
+    productId: 'ecommerce-01',
+    velocityMultiplier: 1.0,
+    notes: 'UI developer, responsive design',
     pto: []
   },
   {
     id: 'tm-ecom-6',
-    name: 'David Lee',
+    name: 'Chris Taylor',
     role: 'QA',
     experienceLevel: 'Senior',
-    productId: 'ecom01',
-    velocityMultiplier: 1.3,
-    notes: 'Test automation, Cypress specialist',
+    productId: 'ecommerce-01',
+    velocityMultiplier: 1.2,
+    notes: 'Test automation specialist',
     pto: [
-      {
-        id: 'pto-ecom-6',
-        name: 'Medical Leave',
-        startDate: new Date('2026-03-02'),
-        endDate: new Date('2026-03-06')
-      }
+      { id: 'pto-e6', name: 'Personal', startDate: new Date('2026-04-13'), endDate: new Date('2026-04-17') }
     ]
   },
 
-  // ═══════════════════════════════════════════
-  // ANALYTICS DASHBOARD TEAM (analytics01)
-  // ═══════════════════════════════════════════
+  // ===========================================
+  // PRODUCT 3: MOBILEFIT TEAM
+  // ===========================================
   {
-    id: 'tm-analytics-1',
-    name: 'Priya Sharma',
-    role: 'DataEngineer',
-    experienceLevel: 'Lead',
-    productId: 'analytics01',
-    velocityMultiplier: 1.5,
-    notes: 'Big data architect, Kafka expert',
-    pto: []
-  },
-  {
-    id: 'tm-analytics-2',
-    name: 'Carlos Rodriguez',
-    role: 'Backend',
-    experienceLevel: 'Senior',
-    productId: 'analytics01',
-    velocityMultiplier: 1.3,
-    notes: 'API developer, Python/FastAPI',
-    pto: [
-      {
-        id: 'pto-analytics-2',
-        name: 'Family Event',
-        startDate: new Date('2026-03-16'),
-        endDate: new Date('2026-03-20')
-      }
-    ]
-  },
-  {
-    id: 'tm-analytics-3',
-    name: 'Jake Thompson',
-    role: 'Frontend',
-    experienceLevel: 'Senior',
-    productId: 'analytics01',
-    velocityMultiplier: 1.3,
-    notes: 'Data visualization, D3.js expert',
-    pto: []
-  },
-  {
-    id: 'tm-analytics-4',
-    name: 'Lisa Chang',
-    role: 'Fullstack',
-    experienceLevel: 'Mid',
-    productId: 'analytics01',
-    velocityMultiplier: 1.0,
-    notes: 'Full-stack developer, versatile',
-    pto: []
-  },
-  {
-    id: 'tm-analytics-5',
-    name: 'Nina Patel',
-    role: 'QA',
-    experienceLevel: 'Mid',
-    productId: 'analytics01',
-    velocityMultiplier: 1.0,
-    notes: 'Data testing specialist',
-    pto: []
-  },
-
-  // ═══════════════════════════════════════════
-  // FOOD DELIVERY APP TEAM (foodapp01)
-  // ═══════════════════════════════════════════
-  {
-    id: 'tm-food-1',
-    name: 'Michael Chen',
+    id: 'tm-mobile-1',
+    name: 'Daniel Park',
     role: 'iOS',
     experienceLevel: 'Lead',
-    productId: 'foodapp01',
-    velocityMultiplier: 1.5,
-    notes: 'iOS architect, Swift expert',
-    pto: []
+    productId: 'mobilefit-01',
+    velocityMultiplier: 1.4,
+    notes: 'iOS architect, Swift/SwiftUI expert',
+    pto: [
+      { id: 'pto-m1', name: 'Conference', startDate: new Date('2026-05-11'), endDate: new Date('2026-05-15') }
+    ]
   },
   {
-    id: 'tm-food-2',
-    name: 'Amit Singh',
+    id: 'tm-mobile-2',
+    name: 'Nina Patel',
     role: 'Android',
     experienceLevel: 'Senior',
-    productId: 'foodapp01',
+    productId: 'mobilefit-01',
     velocityMultiplier: 1.3,
-    notes: 'Android lead, Kotlin specialist',
+    notes: 'Android lead, Kotlin/Jetpack Compose',
     pto: [
-      {
-        id: 'pto-food-2',
-        name: 'Wedding',
-        startDate: new Date('2026-03-02'),
-        endDate: new Date('2026-03-06')
-      }
+      { id: 'pto-m2', name: 'Personal', startDate: new Date('2026-06-08'), endDate: new Date('2026-06-12') }
     ]
   },
   {
-    id: 'tm-food-3',
-    name: 'Ryan Cooper',
-    role: 'Backend',
-    experienceLevel: 'Lead',
-    productId: 'foodapp01',
-    velocityMultiplier: 1.5,
-    notes: 'Real-time systems, WebSocket expert',
-    pto: []
-  },
-  {
-    id: 'tm-food-4',
-    name: 'Sophie Martin',
+    id: 'tm-mobile-3',
+    name: 'Thomas Lin',
     role: 'Backend',
     experienceLevel: 'Senior',
-    productId: 'foodapp01',
-    velocityMultiplier: 1.3,
-    notes: 'Payment integration specialist',
-    pto: []
+    productId: 'mobilefit-01',
+    velocityMultiplier: 1.2,
+    notes: 'Mobile backend, Node.js specialist',
+    pto: [
+      { id: 'pto-m3', name: 'Vacation', startDate: new Date('2026-04-21'), endDate: new Date('2026-04-25') }
+    ]
   },
   {
-    id: 'tm-food-5',
-    name: 'Olivia White',
+    id: 'tm-mobile-4',
+    name: 'Isabella Chen',
     role: 'Designer',
     experienceLevel: 'Senior',
-    productId: 'foodapp01',
-    velocityMultiplier: 1.3,
-    notes: 'Mobile UI/UX designer',
+    productId: 'mobilefit-01',
+    velocityMultiplier: 1.1,
+    notes: 'Mobile UX/UI designer',
     pto: []
   },
   {
-    id: 'tm-food-6',
-    name: 'Grace Kim',
+    id: 'tm-mobile-5',
+    name: 'Ryan Adams',
     role: 'QA',
-    experienceLevel: 'Senior',
-    productId: 'foodapp01',
-    velocityMultiplier: 1.3,
-    notes: 'Mobile testing, Appium specialist',
+    experienceLevel: 'Mid',
+    productId: 'mobilefit-01',
+    velocityMultiplier: 1.0,
+    notes: 'Mobile testing specialist',
+    pto: []
+  },
+
+  // ===========================================
+  // PRODUCT 4: DATAHUB TEAM
+  // ===========================================
+  {
+    id: 'tm-data-1',
+    name: 'Raj Malhotra',
+    role: 'DataEngineer',
+    experienceLevel: 'Lead',
+    productId: 'datahub-01',
+    velocityMultiplier: 1.4,
+    notes: 'Data platform architect, Spark expert',
     pto: [
-      {
-        id: 'pto-food-6',
-        name: 'Training',
-        startDate: new Date('2026-02-23'),
-        endDate: new Date('2026-02-27')
-      }
+      { id: 'pto-d1', name: 'Conference', startDate: new Date('2026-04-13'), endDate: new Date('2026-04-17') }
     ]
   },
+  {
+    id: 'tm-data-2',
+    name: 'Yuki Nakamura',
+    role: 'DataEngineer',
+    experienceLevel: 'Senior',
+    productId: 'datahub-01',
+    velocityMultiplier: 1.3,
+    notes: 'ETL pipeline specialist',
+    pto: []
+  },
+  {
+    id: 'tm-data-3',
+    name: 'Carlos Mendez',
+    role: 'Frontend',
+    experienceLevel: 'Senior',
+    productId: 'datahub-01',
+    velocityMultiplier: 1.2,
+    notes: 'Data visualization expert, D3.js',
+    pto: [
+      { id: 'pto-d2', name: 'Family Vacation', startDate: new Date('2026-05-04'), endDate: new Date('2026-05-08') }
+    ]
+  },
+  {
+    id: 'tm-data-4',
+    name: 'Liam Foster',
+    role: 'Backend',
+    experienceLevel: 'Mid',
+    productId: 'datahub-01',
+    velocityMultiplier: 1.0,
+    notes: 'API development',
+    pto: []
+  },
+  {
+    id: 'tm-data-5',
+    name: 'Maya Singh',
+    role: 'Designer',
+    experienceLevel: 'Senior',
+    productId: 'datahub-01',
+    velocityMultiplier: 1.1,
+    notes: 'Data dashboard UX specialist',
+    pto: []
+  },
+  {
+    id: 'tm-data-6',
+    name: 'Sophie Martinez',
+    role: 'QA',
+    experienceLevel: 'Senior',
+    productId: 'datahub-01',
+    velocityMultiplier: 1.2,
+    notes: 'Data quality & testing lead',
+    pto: [
+      { id: 'pto-d3', name: 'Moving', startDate: new Date('2026-05-18'), endDate: new Date('2026-05-22') }
+    ]
+  }
 ];
 
 export const mockHolidays: Holiday[] = [
@@ -1251,16 +1920,28 @@ export const mockHolidays: Holiday[] = [
   },
   {
     id: 'hol-4',
+    name: 'Good Friday',
+    startDate: new Date('2026-04-03'),
+    endDate: new Date('2026-04-03')
+  },
+  {
+    id: 'hol-5',
     name: 'Memorial Day',
     startDate: new Date('2026-05-25'),
     endDate: new Date('2026-05-25')
   },
   {
-    id: 'hol-5',
+    id: 'hol-6',
     name: 'Independence Day',
     startDate: new Date('2026-07-04'),
     endDate: new Date('2026-07-04')
   },
+  {
+    id: 'hol-7',
+    name: 'Company Offsite',
+    startDate: new Date('2026-03-19'),
+    endDate: new Date('2026-03-20')
+  }
 ];
 
 
@@ -1268,7 +1949,7 @@ export const mockHolidays: Holiday[] = [
 // ===========================================
 // EXPORTS AND HELPER FUNCTIONS
 // ===========================================
-export const mockProducts: Product[] = [product1, product2, product3];
+export const mockProducts: Product[] = [product1, product2, product3, product4];
 
 export function findReleaseById(releaseId: string): { product: Product; release: Release } | null {
   for (const product of mockProducts) {

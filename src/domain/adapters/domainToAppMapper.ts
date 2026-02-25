@@ -97,36 +97,53 @@ export function mapReleasePlanToAppRelease(
   const epicMap = new Map<string, Feature>();
 
   plan.sprints.forEach(sprint => {
+    // Group tickets by developer for sequential positioning
+    const ticketsByDev = new Map<string, typeof sprint.tickets>();
     sprint.tickets.forEach(ticket => {
-
-      if (!epicMap.has(ticket.epic)) {
-        epicMap.set(ticket.epic, {
-          id: generateId(),
-          name: ticket.epic,
-          tickets: []
-        });
+      const devName = ticket.assignedToRaw || 'Unassigned';
+      if (!ticketsByDev.has(devName)) {
+        ticketsByDev.set(devName, []);
       }
-
-      // Calculate ticket end date based on effort days (skipping weekends)
-      const ticketEndDate = calculateTicketEndDate(
-        sprint.startDate,
-        ticket.effortDays,
-        sprint.endDate
-      );
-
-      const mappedTicket: Ticket = {
-        id: ticket.id,
-        title: ticket.title,
-        description: "",
-        startDate: sprint.startDate,
-        endDate: ticketEndDate,
-        status: "planned",
-        storyPoints: ticket.effortDays, // 1 day = 1 SP
-        assignedTo: validateAssignment(ticket.assignedToRaw)
-      };
-
-      epicMap.get(ticket.epic)!.tickets.push(mappedTicket);
+      ticketsByDev.get(devName)!.push(ticket);
     });
+    
+    // Position each developer's tickets sequentially
+    for (const [devName, devTickets] of ticketsByDev) {
+      let currentStartDate = sprint.startDate;
+      
+      for (const ticket of devTickets) {
+        if (!epicMap.has(ticket.epic)) {
+          epicMap.set(ticket.epic, {
+            id: generateId(),
+            name: ticket.epic,
+            tickets: []
+          });
+        }
+
+        // Calculate ticket end date based on effort days (skipping weekends)
+        const ticketEndDate = calculateTicketEndDate(
+          currentStartDate,
+          ticket.effortDays,
+          sprint.endDate
+        );
+
+        const mappedTicket: Ticket = {
+          id: ticket.id,
+          title: ticket.title,
+          description: "",
+          startDate: currentStartDate, // Sequential per developer
+          endDate: ticketEndDate,
+          status: "planned",
+          storyPoints: ticket.effortDays, // 1 day = 1 SP
+          assignedTo: validateAssignment(ticket.assignedToRaw)
+        };
+
+        epicMap.get(ticket.epic)!.tickets.push(mappedTicket);
+        
+        // Next ticket for this developer starts after this one ends
+        currentStartDate = ticketEndDate;
+      }
+    }
   });
 
   const features: Feature[] = Array.from(epicMap.values());

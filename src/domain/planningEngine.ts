@@ -151,6 +151,7 @@ export function buildReleasePlan(
   // Strategy: Fill each sprint to 85%+ utilization before moving to next sprint
   // This reduces gaps and improves overall utilization
   const TARGET_UTILIZATION = 0.85; // Minimum 85% utilization before moving to next sprint
+  const MAX_SAFE_UTILIZATION = 0.95; // Maximum 95% cap for auto-allocation (bulk creation only)
   const overflowTickets: TicketInput[] = [];
   const unallocatedTickets = [...sortedTickets]; // Working copy
   
@@ -166,8 +167,13 @@ export function buildReleasePlan(
         const ticket = unallocatedTickets[i];
         const remainingCapacity = sprint.capacityDays - sprint.allocatedDays;
         
-        // Place ticket if it fits (no splitting)
-        if (ticket.effortDays <= remainingCapacity) {
+        // Calculate utilization after placement to enforce 95% cap
+        const utilizationAfterPlacement = 
+          (sprint.allocatedDays + ticket.effortDays) / sprint.capacityDays;
+        
+        // Place ticket if it fits AND won't exceed 95% utilization cap
+        // Note: Manual operations (drag/drop/resize) are unrestricted - this only affects auto-allocation
+        if (ticket.effortDays <= remainingCapacity && utilizationAfterPlacement <= MAX_SAFE_UTILIZATION) {
           sprint.tickets.push(ticket);
           sprint.allocatedDays += ticket.effortDays;
           unallocatedTickets.splice(i, 1); // Remove from unallocated

@@ -1895,11 +1895,9 @@ function PhasesStep({
                       {phase.startDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="py-3 px-2">
-                      <input
-                        type="date"
+                      <DatePicker
                         value={toLocalDateString(phase.endDate)}
-                        onChange={(e) => handlePhaseEndDateChange(index, parseLocalDate(e.target.value))}
-                        className="px-2 py-1 border border-gray-200 dark:border-gray-800 rounded text-xs bg-transparent"
+                        onChange={(isoDate) => handlePhaseEndDateChange(index, parseLocalDate(isoDate))}
                       />
                     </td>
                     <td className="py-3 px-2 text-muted-foreground text-xs">

@@ -138,32 +138,53 @@ export function PlanningDashboard({
           // Step 2: Anchor tickets to their sprint's startDate (matching main branch pattern)
           const updatedTickets: Ticket[] = [];
           
-          // Process tickets by sprint - all tickets in a sprint start at that sprint's startDate
+          // Process tickets by sprint - position sequentially per developer
           for (const domainSprint of releasePlan.sprints) {
-            for (const ticketInput of domainSprint.tickets) {
-              // Find original ticket by matching ID or title
+            // Group tickets by developer for sequential positioning
+            const ticketsByDev = new Map<string, typeof domainSprint.tickets>();
+            domainSprint.tickets.forEach(ticketInput => {
               const originalTicket = data.tickets.find(t => 
                 (t.id && t.id === ticketInput.id) || t.title === ticketInput.title
               );
+              const devName = originalTicket?.assignedTo || 'Unassigned';
+              if (!ticketsByDev.has(devName)) {
+                ticketsByDev.set(devName, []);
+              }
+              ticketsByDev.get(devName)!.push(ticketInput);
+            });
+            
+            // Position each developer's tickets sequentially
+            for (const [devName, devTickets] of ticketsByDev) {
+              let currentStartDate = new Date(domainSprint.startDate);
               
-              if (originalTicket) {
-                // Calculate end date with velocity adjustment
-                const effortDays = originalTicket.effortDays || 1;
-                const assignedDev = productTeam.find(m => m.name === originalTicket.assignedTo);
-                const velocity = assignedDev?.velocityMultiplier ?? 1;
-                const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
-                const ticketEndDate = calculateEndDateFromEffort(
-                  domainSprint.startDate,
-                  adjustedDuration,
-                  holidays
+              for (const ticketInput of devTickets) {
+                // Find original ticket by matching ID or title
+                const originalTicket = data.tickets.find(t => 
+                  (t.id && t.id === ticketInput.id) || t.title === ticketInput.title
                 );
                 
-                updatedTickets.push({
-                  ...originalTicket,
-                  id: ticketInput.id,
-                  startDate: new Date(domainSprint.startDate), // Anchored to sprint start
-                  endDate: ticketEndDate,
-                });
+                if (originalTicket) {
+                  // Calculate end date with velocity adjustment
+                  const effortDays = originalTicket.effortDays || 1;
+                  const assignedDev = productTeam.find(m => m.name === originalTicket.assignedTo);
+                  const velocity = assignedDev?.velocityMultiplier ?? 1;
+                  const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
+                  const ticketEndDate = calculateEndDateFromEffort(
+                    currentStartDate,
+                    adjustedDuration,
+                    holidays
+                  );
+                  
+                  updatedTickets.push({
+                    ...originalTicket,
+                    id: ticketInput.id,
+                    startDate: currentStartDate, // Sequential per developer
+                    endDate: ticketEndDate,
+                  });
+                  
+                  // Next ticket for this developer starts after this one ends
+                  currentStartDate = ticketEndDate;
+                }
               }
             }
           }

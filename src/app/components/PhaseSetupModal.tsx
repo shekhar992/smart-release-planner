@@ -4,6 +4,7 @@ import { Sparkles, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Calendar, C
 import { cn } from './ui/utils';
 import type { Phase } from '../data/mockData';
 import { toLocalDateString, parseLocalDate } from '../lib/dateUtils';
+import { DatePicker } from './DatePicker';
 import { 
   PHASE_TEMPLATES, 
   calculatePhaseDates, 
@@ -461,13 +462,12 @@ export function PhaseSetupModal({
                       
                       {/* Editable End Date */}
                       <td className="py-4 px-3">
-                        <input
-                          type="date"
+                        <DatePicker
                           value={toLocalDateString(phase.endDate)}
-                          onChange={(e) => handlePhaseEndDateChange(index, parseLocalDate(e.target.value))}
-                          min={toLocalDateString(phase.startDate)}
-                          max={toLocalDateString(releaseEndDate)}
-                          className="px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white dark:bg-slate-800 dark:border-slate-600 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                          onChange={(isoDate) => handlePhaseEndDateChange(index, parseLocalDate(isoDate))}
+                          minDate={toLocalDateString(phase.startDate)}
+                          maxDate={toLocalDateString(releaseEndDate)}
+                          className="w-full"
                         />
                       </td>
                       

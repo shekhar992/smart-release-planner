@@ -6,6 +6,7 @@ import { suggestEffortDays } from '../lib/effortSuggestion';
 import { calculateEndDateFromEffort, calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
 import { loadHolidays } from '../lib/localStorage';
 import { type TeamRole } from '../lib/roleColors';
+import { DatePicker } from './DatePicker';
 
 interface TicketCreationModalProps {
   release: Release;
@@ -551,41 +552,33 @@ export function TicketCreationModal({
 
               {/* Dates */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Start Date</label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value);
-                      // Get velocity and calculate adjusted duration
-                      const assignedDev = teamMembers.find(m => m.name === assignedTo);
-                      const velocity = assignedDev?.velocityMultiplier ?? 1;
-                      const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
-                      // Recalculate endDate to maintain velocity-adjusted duration (working days)
-                      const newEndDate = calculateEndDateFromEffort(new Date(e.target.value), adjustedDuration, holidays);
-                      setEndDate(toLocalDateString(newEndDate));
-                    }}
-                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">End Date</label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value);
-                      // Calculate working days and reverse to effort with velocity
-                      const workingDays = calculateEffortFromDates(new Date(startDate), new Date(e.target.value), holidays);
-                      const assignedDev = teamMembers.find(m => m.name === assignedTo);
-                      const velocity = assignedDev?.velocityMultiplier ?? 1;
-                      const newEffort = Math.max(0.5, Math.round(workingDays * velocity * 2) / 2); // Round to nearest 0.5
-                      setEffortDays(newEffort);
-                    }}
-                    className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white backdrop-blur-sm transition-all duration-200"
-                  />
-                </div>
+                <DatePicker
+                  label="Start Date"
+                  value={startDate}
+                  onChange={(isoDate) => {
+                    setStartDate(isoDate);
+                    // Get velocity and calculate adjusted duration
+                    const assignedDev = teamMembers.find(m => m.name === assignedTo);
+                    const velocity = assignedDev?.velocityMultiplier ?? 1;
+                    const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
+                    // Recalculate endDate to maintain velocity-adjusted duration (working days)
+                    const newEndDate = calculateEndDateFromEffort(new Date(isoDate), adjustedDuration, holidays);
+                    setEndDate(toLocalDateString(newEndDate));
+                  }}
+                />
+                <DatePicker
+                  label="End Date"
+                  value={endDate}
+                  onChange={(isoDate) => {
+                    setEndDate(isoDate);
+                    // Calculate working days and reverse to effort with velocity
+                    const workingDays = calculateEffortFromDates(new Date(startDate), new Date(isoDate), holidays);
+                    const assignedDev = teamMembers.find(m => m.name === assignedTo);
+                    const velocity = assignedDev?.velocityMultiplier ?? 1;
+                    const newEffort = Math.max(0.5, Math.round(workingDays * velocity * 2) / 2); // Round to nearest 0.5
+                    setEffortDays(newEffort);
+                  }}
+                />
               </div>
             </div>
           )}

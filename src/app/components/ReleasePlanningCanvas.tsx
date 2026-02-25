@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, AlertTriangle, Wand2 } from 'lucide-react';
+import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, AlertTriangle } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { ZoomControls, ZoomLevel } from './ZoomControls';
@@ -12,16 +12,19 @@ import { ConflictResolutionPanel } from './ConflictResolutionPanel';
 import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct, storyPointsToDays, Phase } from '../data/mockData';
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
-import { loadProducts, saveProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
+import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
 import { calculateEffortFromDates, toLocalDateString, calculateEndDateFromEffort } from '../lib/dateUtils';
 import { calculateDurationDays } from '../lib/durationCalculator';
 import { addDays } from 'date-fns';
 import { exportReleaseTimelinePptx } from '../lib/exporters/exportReleaseTimelinePptx';
-import { autoAllocateRelease } from '../lib/planningBridge';
-import { toastSuccess, toastError, toastPromise, toastInfo } from '../lib/toastHelpers';
+// COMMENTED OUT: Auto-allocation removed per user request
+// import { autoAllocateRelease } from '../lib/planningBridge';
+// COMMENTED OUT: Toast notifications - Removed per user request
+// import { toastSuccess, toastError, toastPromise, toastInfo } from '../lib/toastHelpers';
 // COMMENTED OUT: Release Health Header - Removed to free up UI real estate
 // import { ReleaseHealthHeader } from './ReleaseHealthHeader';
-import { SmartAssistantPanel } from './SmartAssistantPanel';
+// COMMENTED OUT: Smart Assistant Panel - Removed per user request
+// import { SmartAssistantPanel } from './SmartAssistantPanel';
 // COMMENTED OUT: Release Health metrics calculations
 // import { calculateCapacityUtilization, calculateTimelineStatus, calculateTeamVelocity, calculateConflictMetrics } from '../lib/capacityMetrics';
 // import { generateInsights } from '../lib/insightEngine';
@@ -253,16 +256,16 @@ export function ReleasePlanningCanvas() {
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
 
-  // Phase 3: Smart Assistant Panel state
-  const [assistantPanelOpen, setAssistantPanelOpen] = useState(() => {
-    const stored = localStorage.getItem('assistantPanelOpen');
-    return stored === 'true';
-  });
+  // COMMENTED OUT: Smart Assistant Panel state - Removed per user request
+  // const [assistantPanelOpen, setAssistantPanelOpen] = useState(() => {
+  //   const stored = localStorage.getItem('assistantPanelOpen');
+  //   return stored === 'true';
+  // });
 
-  // Persist assistant panel state
-  useEffect(() => {
-    localStorage.setItem('assistantPanelOpen', String(assistantPanelOpen));
-  }, [assistantPanelOpen]);
+  // COMMENTED OUT: Persist assistant panel state
+  // useEffect(() => {
+  //   localStorage.setItem('assistantPanelOpen', String(assistantPanelOpen));
+  // }, [assistantPanelOpen]);
 
   // SCENARIO SIMULATION STATE (Phase 1)
   // Feature flag: disabled per user request
@@ -447,106 +450,106 @@ export function ReleasePlanningCanvas() {
     }
   };
 
-  // Handle auto-allocation using planning engine
-  const handleAutoAllocate = async () => {
-    if (!release || !selectedProduct) return;
+  // COMMENTED OUT: Auto-allocation handler - Removed per user request (toast dependencies)
+  // const handleAutoAllocate = async () => {
+  //   if (!release || !selectedProduct) return;
+  //
+  //   // Check preconditions
+  //   if (!release.sprints || release.sprints.length === 0) {
+  //     toastError('No sprints defined', 'Create sprints before auto-allocating tickets.');
+  //     return;
+  //   }
+  //
+  //   if (teamMembers.length === 0) {
+  //     toastError('No team members', 'Add team members before auto-allocating tickets.');
+  //     return;
+  //   }
+  //
+  //   const developers = teamMembers.filter(tm => tm.role === 'Developer');
+  //   if (developers.length === 0) {
+  //     toastError('No developers', 'At least one team member must have the Developer role.');
+  //     return;
+  //   }
+  //
+  //   // Get sprint length from first sprint
+  //   const sprintLengthDays = release.sprints.length > 0
+  //     ? Math.round((release.sprints[0].endDate.getTime() - release.sprints[0].startDate.getTime()) / (1000 * 60 * 60 * 24))
+  //     : 14;
+  //
+  //   // Call planning engine with toast feedback
+  //   const result = await toastPromise(
+  //     Promise.resolve(autoAllocateRelease(release, teamMembers, holidays, sprintLengthDays)),
+  //     {
+  //       loading: 'Analyzing capacity and allocating tickets...',
+  //       success: (res) => {
+  //         if (res.success) {
+  //           const feasible = Math.round(res.plan.feasiblePercentage);
+  //           const overflow = res.plan.overflowTickets.length;
+  //           if (overflow === 0) {
+  //             return `All tickets allocated! (${feasible}% feasible)`;
+  //           } else {
+  //             return `Allocated ${feasible}% of backlog (${overflow} tickets deferred)`;
+  //           }
+  //         }
+  //         return 'Allocation complete';
+  //       },
+  //       error: 'Auto-allocation failed'
+  //     }
+  //   );
+  //
+  //   if (result.success) {
+  //     // Replace the current release with the allocated one
+  //     const updatedProducts = products.map(p => 
+  //       p.id === selectedProduct.id
+  //         ? { ...p, releases: p.releases.map(r => 
+  //             r.id === release.id ? result.release : r
+  //           )}
+  //         : p
+  //     );
+  //
+  //     // Save to localStorage using proper API
+  //     saveProducts(updatedProducts);
+  //     
+  //     // Trigger refresh by navigating
+  //     window.location.reload();
+  //   } else {
+  //     toastError('Auto-allocation failed', result.error);
+  //   }
+  // };
 
-    // Check preconditions
-    if (!release.sprints || release.sprints.length === 0) {
-      toastError('No sprints defined', 'Create sprints before auto-allocating tickets.');
-      return;
-    }
-
-    if (teamMembers.length === 0) {
-      toastError('No team members', 'Add team members before auto-allocating tickets.');
-      return;
-    }
-
-    const developers = teamMembers.filter(tm => tm.role === 'Developer');
-    if (developers.length === 0) {
-      toastError('No developers', 'At least one team member must have the Developer role.');
-      return;
-    }
-
-    // Get sprint length from first sprint
-    const sprintLengthDays = release.sprints.length > 0
-      ? Math.round((release.sprints[0].endDate.getTime() - release.sprints[0].startDate.getTime()) / (1000 * 60 * 60 * 24))
-      : 14;
-
-    // Call planning engine with toast feedback
-    const result = await toastPromise(
-      Promise.resolve(autoAllocateRelease(release, teamMembers, holidays, sprintLengthDays)),
-      {
-        loading: 'Analyzing capacity and allocating tickets...',
-        success: (res) => {
-          if (res.success) {
-            const feasible = Math.round(res.plan.feasiblePercentage);
-            const overflow = res.plan.overflowTickets.length;
-            if (overflow === 0) {
-              return `All tickets allocated! (${feasible}% feasible)`;
-            } else {
-              return `Allocated ${feasible}% of backlog (${overflow} tickets deferred)`;
-            }
-          }
-          return 'Allocation complete';
-        },
-        error: 'Auto-allocation failed'
-      }
-    );
-
-    if (result.success) {
-      // Replace the current release with the allocated one
-      const updatedProducts = products.map(p => 
-        p.id === selectedProduct.id
-          ? { ...p, releases: p.releases.map(r => 
-              r.id === release.id ? result.release : r
-            )}
-          : p
-      );
-
-      // Save to localStorage using proper API
-      saveProducts(updatedProducts);
-      
-      // Trigger refresh by navigating
-      window.location.reload();
-    } else {
-      toastError('Auto-allocation failed', result.error);
-    }
-  };
-
-  // Handle insight action clicks
-  const handleInsightAction = (actionType: string) => {
-    switch (actionType) {
-      case 'auto-allocate':
-        handleAutoAllocate();
-        break;
-      case 'resolve-conflicts':
-        setShowConflictResolution(true);
-        break;
-      case 'add-sprint':
-        setShowSprintCreation(true);
-        break;
-      case 'add-team-member':
-        if (selectedProduct) {
-          navigate(`/product/${selectedProduct.id}/team`);
-        }
-        break;
-      case 'import-tickets':
-        setShowBulkImport({});
-        break;
-      case 'view-capacity':
-        // Future: Open capacity panel
-        toastPromise(
-          Promise.resolve({ success: true }),
-          {
-            loading: 'Loading capacity details...',
-            success: 'Capacity analysis complete',
-            error: 'Failed to load capacity'
-          }
-        );
-        break;
-    }
-  };
+  // COMMENTED OUT: Insight action handler - Removed per user request
+  // const handleInsightAction = (actionType: string) => {
+  //   switch (actionType) {
+  //     case 'auto-allocate':
+  //       handleAutoAllocate();
+  //       break;
+  //     case 'resolve-conflicts':
+  //       setShowConflictResolution(true);
+  //       break;
+  //     case 'add-sprint':
+  //       setShowSprintCreation(true);
+  //       break;
+  //     case 'add-team-member':
+  //       if (selectedProduct) {
+  //         navigate(`/product/${selectedProduct.id}/team`);
+  //       }
+  //       break;
+  //     case 'import-tickets':
+  //       setShowBulkImport({});
+  //       break;
+  //     case 'view-capacity':
+  //       // Future: Open capacity panel
+  //       toastPromise(
+  //         Promise.resolve({ success: true }),
+  //         {
+  //           loading: 'Loading capacity details...',
+  //           success: 'Capacity analysis complete',
+  //           error: 'Failed to load capacity'
+  //         }
+  //       );
+  //       break;
+  //   }
+  // };
 
   // Detect conflicts whenever release data changes
   const allTickets = useMemo(() => {
@@ -639,10 +642,10 @@ export function ReleasePlanningCanvas() {
   //   );
   // }, [allTickets, release, derivedTeamMembers, capacityUtilization, timelineStatus, teamVelocity, conflictMetrics, enhancedConflicts]);
 
-  // Provide default values for SmartAssistantPanel (since Release Health is commented out)
-  const capacityUtilization = { percentage: 0, allocatedDays: 0, availableCapacityDays: 0, status: 'under' as const };
-  const conflictMetrics = { total: 0, blocking: 0, warning: 0, info: 0 };
-  const insights: any[] = [];
+  // COMMENTED OUT: Default values for SmartAssistantPanel (no longer needed)
+  // const capacityUtilization = { percentage: 0, allocatedDays: 0, availableCapacityDays: 0, status: 'under' as const };
+  // const conflictMetrics = { total: 0, blocking: 0, warning: 0, info: 0 };
+  // const insights: any[] = [];
 
   // SCENARIO SIMULATION: Derive tickets for capacity calculations
   const derivedTickets = useMemo(() => {
@@ -785,10 +788,6 @@ export function ReleasePlanningCanvas() {
     setRelease(prev => {
       if (!prev) return prev;
       
-      // Find the ticket to get its name for toast
-      const feature = prev.features.find(f => f.id === featureId);
-      const ticket = feature?.tickets.find(t => t.id === ticketId);
-      
       const updated = {
       ...prev,
       features: prev.features.map(f => {
@@ -808,11 +807,8 @@ export function ReleasePlanningCanvas() {
                 const newEndDate = calculateEndDateFromEffort(newStartDate, adjustedDuration, holidays);
                 console.log(`[Move Ticket] ${t.title}: ${effortDays} effort → ${adjustedDuration} working days (${velocity}x velocity) → ${newEndDate.toDateString()}`);
                 
-                // Phase 2: Toast feedback for ticket move
-                toastSuccess(
-                  `Ticket moved to ${newStartDate.toLocaleDateString()}`,
-                  `Ends ${newEndDate.toLocaleDateString()} (${adjustedDuration} working days)`
-                );
+                // Ticket moved - using console log instead of toast
+                console.log(`[Ticket Moved] ${t.title} moved to ${newStartDate.toLocaleDateString()}, ends ${newEndDate.toLocaleDateString()} (${adjustedDuration} working days)`);
                 
                 return { ...t, startDate: newStartDate, endDate: newEndDate };
               }
@@ -842,11 +838,8 @@ export function ReleasePlanningCanvas() {
                 // Recalculate effortDays from new duration (working days, not calendar days)
                 const newEffort = calculateEffortFromDates(t.startDate, newEndDate, holidays);
                 
-                // Phase 2: Toast feedback for ticket resize
-                toastSuccess(
-                  `Ticket duration changed to ${newEffort} days`,
-                  `${t.startDate.toLocaleDateString()} – ${newEndDate.toLocaleDateString()}`
-                );
+                // Ticket resized - using console log instead of toast
+                console.log(`[Ticket Resized] ${t.title} duration changed to ${newEffort} days: ${t.startDate.toLocaleDateString()} – ${newEndDate.toLocaleDateString()}`);
                 
                 return {
                   ...t,
@@ -939,120 +932,120 @@ export function ReleasePlanningCanvas() {
     });
   };
 
-  // Phase 3: Smart Assistant Panel handlers
-  const handleApplyInsight = (insightId: string) => {
-    const insight = insights.find(i => i.id === insightId);
-    if (!insight) return;
-    
-    // Find the Apply action
-    const applyAction = insight.actions.find(a => a.type === 'apply');
-    if (!applyAction) {
-      toastInfo('No Action', 'This insight has no actionable items.');
-      return;
-    }
-    
-    // Dispatch action based on handler type
-    switch (applyAction.handler) {
-      case 'auto-allocate':
-        handleAutoAllocate();
-        break;
-      case 'resolve-conflicts':
-        setShowConflictResolution(true);
-        toastInfo('Conflicts Panel', 'Opening conflict resolution panel');
-        break;
-      case 'import-tickets':
-        setShowBulkImport({});
-        toastInfo('Import Tickets', 'Opening CSV import modal');
-        break;
-      case 'add-sprint':
-        // Navigate to timeline and suggest sprint creation
-        toastInfo('Add Sprint', 'Scroll down to the timeline and click "Add Sprint" button');
-        break;
-      case 'add-team-member':
-        // Navigate to product page where team is managed
-        toastInfo('Add Team Member', 'Go to Planning Dashboard to manage team members');
-        break;
-      case 'view-capacity':
-        // Scroll to capacity metrics or show capacity panel
-        toastInfo('Capacity View', 'Check the timeline and sprint capacity bars for capacity details');
-        break;
-      default:
-        toastInfo('Action Not Implemented', `Handler "${applyAction.handler}" is not yet implemented`);
-    }
-  };
+  // COMMENTED OUT: Smart Assistant Panel handlers - Removed per user request
+  // const handleApplyInsight = (insightId: string) => {
+  //   const insight = insights.find(i => i.id === insightId);
+  //   if (!insight) return;
+  //   
+  //   // Find the Apply action
+  //   const applyAction = insight.actions.find(a => a.type === 'apply');
+  //   if (!applyAction) {
+  //     toastInfo('No Action', 'This insight has no actionable items.');
+  //     return;
+  //   }
+  //   
+  //   // Dispatch action based on handler type
+  //   switch (applyAction.handler) {
+  //     case 'auto-allocate':
+  //       handleAutoAllocate();
+  //       break;
+  //     case 'resolve-conflicts':
+  //       setShowConflictResolution(true);
+  //       toastInfo('Conflicts Panel', 'Opening conflict resolution panel');
+  //       break;
+  //     case 'import-tickets':
+  //       setShowBulkImport({});
+  //       toastInfo('Import Tickets', 'Opening CSV import modal');
+  //       break;
+  //     case 'add-sprint':
+  //       // Navigate to timeline and suggest sprint creation
+  //       toastInfo('Add Sprint', 'Scroll down to the timeline and click "Add Sprint" button');
+  //       break;
+  //     case 'add-team-member':
+  //       // Navigate to product page where team is managed
+  //       toastInfo('Add Team Member', 'Go to Planning Dashboard to manage team members');
+  //       break;
+  //     case 'view-capacity':
+  //       // Scroll to capacity metrics or show capacity panel
+  //       toastInfo('Capacity View', 'Check the timeline and sprint capacity bars for capacity details');
+  //       break;
+  //     default:
+  //       toastInfo('Action Not Implemented', `Handler "${applyAction.handler}" is not yet implemented`);
+  //   }
+  // };
 
-  const handleDismissInsight = (insightId: string) => {
-    // Already handled in component via localStorage
-    toastInfo('Insight Dismissed', 'You can clear dismissed insights from your browser settings.');
-  };
+  // const handleDismissInsight = (insightId: string) => {
+  //   // Already handled in component via localStorage
+  //   toastInfo('Insight Dismissed', 'You can clear dismissed insights from your browser settings.');
+  // };
 
-  const handleViewInsight = (insightId: string) => {
-    const insight = insights.find(i => i.id === insightId);
-    if (!insight) return;
-    
-    // If there's specific context, navigate to it
-    if (insight.context) {
-      if (insight.context.ticketId && insight.context.featureId) {
-        setSelectedTicket({ 
-          featureId: insight.context.featureId, 
-          ticketId: insight.context.ticketId 
-        });
-        toastInfo('Viewing Ticket', 'Ticket details panel opened');
-        return;
-      }
-    }
-    
-    // Otherwise, dispatch view action based on insight type
-    const viewAction = insight.actions.find(a => a.type === 'view');
-    if (viewAction) {
-      switch (viewAction.handler) {
-        case 'resolve-conflicts':
-          setShowConflictResolution(true);
-          break;
-        case 'auto-allocate':
-        case 'view-capacity':
-          // Can view timeline details
-          toastInfo('View Details', 'Check the timeline for ticket allocation details');
-          break;
-        default:
-          toastInfo('View', `Viewing details for: ${insight.title}`);
-      }
-    } else {
-      toastInfo('View', `Viewing: ${insight.title}`);
-    }
-  };
+  // const handleViewInsight = (insightId: string) => {
+  //   const insight = insights.find(i => i.id === insightId);
+  //   if (!insight) return;
+  //   
+  //   // If there's specific context, navigate to it
+  //   if (insight.context) {
+  //     if (insight.context.ticketId && insight.context.featureId) {
+  //       setSelectedTicket({ 
+  //         featureId: insight.context.featureId, 
+  //         ticketId: insight.context.ticketId 
+  //       });
+  //       toastInfo('Viewing Ticket', 'Ticket details panel opened');
+  //       return;
+  //     }
+  //   }
+  //   
+  //   // Otherwise, dispatch view action based on insight type
+  //   const viewAction = insight.actions.find(a => a.type === 'view');
+  //   if (viewAction) {
+  //     switch (viewAction.handler) {
+  //       case 'resolve-conflicts':
+  //         setShowConflictResolution(true);
+  //         break;
+  //       case 'auto-allocate':
+  //       case 'view-capacity':
+  //         // Can view timeline details
+  //         toastInfo('View Details', 'Check the timeline for ticket allocation details');
+  //         break;
+  //       default:
+  //         toastInfo('View', `Viewing details for: ${insight.title}`);
+  //     }
+  //   } else {
+  //     toastInfo('View', `Viewing: ${insight.title}`);
+  //   }
+  // };
 
-  // Phase 3: What-If Scenario handlers
-  const handleAddHoliday = () => {
-    toastInfo('Add Holiday', 'Holiday management coming soon. This will let you add custom holidays and see impact on sprint capacity.');
-    // TODO: Implement holiday management modal
-    // This would:
-    // 1. Show a modal to pick date and name
-    // 2. Update holidays in localStorage
-    // 3. Recalculate all sprint capacities
-    // 4. Show before/after impact
-  };
+  // // Phase 3: What-If Scenario handlers
+  // const handleAddHoliday = () => {
+  //   toastInfo('Add Holiday', 'Holiday management coming soon. This will let you add custom holidays and see impact on sprint capacity.');
+  //   // TODO: Implement holiday management modal
+  //   // This would:
+  //   // 1. Show a modal to pick date and name
+  //   // 2. Update holidays in localStorage
+  //   // 3. Recalculate all sprint capacities
+  //   // 4. Show before/after impact
+  // };
 
-  const handleAddPTO = () => {
-    toastInfo('Add PTO', 'PTO management coming soon. This will let you add developer time-off and see impact on assignments.');
-    // TODO: Implement PTO management modal
-    // This would:
-    // 1. Show a modal to pick developer, dates
-    // 2. Update team member PTO in localStorage
-    // 3. Recalculate affected sprint capacities
-    // 4. Show conflicts that arise from reduced capacity
-  };
+  // const handleAddPTO = () => {
+  //   toastInfo('Add PTO', 'PTO management coming soon. This will let you add developer time-off and see impact on assignments.');
+  //   // TODO: Implement PTO management modal
+  //   // This would:
+  //   // 1. Show a modal to pick developer, dates
+  //   // 2. Update team member PTO in localStorage
+  //   // 3. Recalculate affected sprint capacities
+  //   // 4. Show conflicts that arise from reduced capacity
+  // };
 
-  const handleSimulateReallocation = () => {
-    toastInfo('Simulate Reallocation', 'Running auto-allocation preview. Check the timeline to see proposed changes.');
-    // TODO: Implement simulation mode
-    // This would:
-    // 1. Run auto-allocation without saving
-    // 2. Show diff view of current vs proposed
-    // 3. Let user accept/reject changes
-    // 4. Show capacity improvements
-    handleAutoAllocate(); // For now, just run the actual allocation
-  };
+  // const handleSimulateReallocation = () => {
+  //   toastInfo('Simulate Reallocation', 'Running auto-allocation preview. Check the timeline to see proposed changes.');
+  //   // TODO: Implement simulation mode
+  //   // This would:
+  //   // 1. Run auto-allocation without saving
+  //   // 2. Show diff view of current vs proposed
+  //   // 3. Let user accept/reject changes
+  //   // 4. Show capacity improvements
+  //   handleAutoAllocate(); // For now, just run the actual allocation
+  // };
 
   const handleUpdateSprint = (sprintId: string, name: string, startDate: Date, endDate: Date) => {
     setRelease(prev => {
@@ -1633,8 +1626,8 @@ export function ReleasePlanningCanvas() {
         </div>
       )}
 
-      {/* Phase 3: Smart Assistant Panel */}
-      <SmartAssistantPanel
+      {/* COMMENTED OUT: Smart Assistant Panel - Removed per user request */}
+      {/* <SmartAssistantPanel
         isOpen={assistantPanelOpen}
         onClose={() => setAssistantPanelOpen(false)}
         totalTickets={allTickets.length}
@@ -1654,10 +1647,10 @@ export function ReleasePlanningCanvas() {
         onAddHoliday={handleAddHoliday}
         onAddPTO={handleAddPTO}
         onSimulateReallocation={handleSimulateReallocation}
-      />
+      /> */}
 
-      {/* Phase 3: Floating Assistant Toggle Button */}
-      {!assistantPanelOpen && (
+      {/* COMMENTED OUT: Floating Assistant Toggle Button */}
+      {/* {!assistantPanelOpen && (
         <button
           onClick={() => setAssistantPanelOpen(true)}
           className="fixed bottom-6 right-6 z-50 p-4 rounded-full shadow-2xl transition-all hover:scale-110 active:scale-95 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white"
@@ -1670,14 +1663,13 @@ export function ReleasePlanningCanvas() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
           </svg>
           
-          {/* Badge for unread insights */}
           {insights.length > 0 && (
             <span className="absolute -top-1 -right-1 flex items-center justify-center w-6 h-6 text-xs font-bold text-white bg-red-500 rounded-full shadow-lg">
               {insights.length}
             </span>
           )}
         </button>
-      )}
+      )} */}
 
       <style>{`
         @keyframes float {

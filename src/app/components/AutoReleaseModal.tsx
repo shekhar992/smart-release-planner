@@ -12,7 +12,8 @@ import { DatePicker } from './DatePicker';
 import { toLocalDateString, parseLocalDate } from '../lib/dateUtils';
 import { FeasibilityMeter } from './FeasibilityMeter';
 import { ReviewStatsGrid } from './ReviewStatsGrid';
-import { DataInsightsPanel } from './DataInsightsPanel';
+// COMMENTED OUT: DataInsightsPanel - Feature removed per user request
+// import { DataInsightsPanel } from './DataInsightsPanel';
 import { CsvPreviewTable } from './CsvPreviewTable';
 import { PhaseSetupModal } from './PhaseSetupModal';
 import { generatePlanningInsights } from '../lib/planningAdvisor';
@@ -727,14 +728,14 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                   </div>
                 </div>
 
-                {/* Data Insights Panel */}
-                {parsedTickets && (
+                {/* COMMENTED OUT: Data Insights Panel - Feature removed per user request */}
+                {/* {parsedTickets && (
                   <DataInsightsPanel
                     tickets={parsedTickets}
                     sprints={plannerPreview.sprints}
                     overflowTickets={plannerPreview.overflowTickets}
                   />
-                )}
+                )} */}
               </div>
             );
           })()}
