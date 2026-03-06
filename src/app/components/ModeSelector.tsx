@@ -1,5 +1,4 @@
-import { Rocket, Database, Sparkles } from 'lucide-react';
-import { cn } from './ui/utils';
+import { Rocket, Database, Sparkles, CheckCircle2 } from 'lucide-react';
 
 export function ModeSelector() {
   const handleDemoMode = () => {
@@ -12,6 +11,13 @@ export function ModeSelector() {
     window.location.reload();
   };
 
+  const highlights = [
+    'AI ticket generation from PDF / Word PRDs',
+    'Capacity-aware sprint planning with PTO',
+    'Conflict auto-resolver with reasoning',
+    'Live Gantt timeline + AI risk brief',
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background decoration */}
@@ -20,93 +26,82 @@ export function ModeSelector() {
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-400/20 rounded-full blur-3xl" />
       </div>
 
-      <div className="max-w-2xl w-full relative z-10">
+      <div className="max-w-lg w-full relative z-10">
         {/* Header */}
-        <div className="text-center mb-12 animate-fade-in">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-2xl shadow-blue-500/40 mb-6">
-            <Sparkles className="w-10 h-10 text-white" />
+        <div className="text-center mb-8 animate-fade-in">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-2xl shadow-blue-500/40 mb-5">
+            <Sparkles className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-4xl font-bold text-slate-900 dark:text-white mb-3 tracking-tight">
-            AI Release Planning
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">
+            AI Release Planner
           </h1>
-          <p className="text-lg text-slate-600 dark:text-slate-400">
-            Choose how you want to explore the platform.
+          <p className="text-base text-slate-500 dark:text-slate-400">
+            Build and ship releases with AI-assisted planning.
           </p>
         </div>
 
-        {/* Mode Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Demo Mode */}
-          <button
-            onClick={handleDemoMode}
-            className={cn(
-              'group relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl',
-              'border-2 border-slate-200 dark:border-slate-700',
-              'hover:border-blue-400 dark:hover:border-blue-600',
-              'rounded-2xl p-8 text-left transition-all duration-200',
-              'hover:shadow-2xl hover:shadow-blue-500/20 hover:-translate-y-1'
-            )}
-          >
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/30 flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
-                <Database className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-                  Explore Demo Data
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Start with pre-populated products, releases, and team members. Perfect for exploring features instantly.
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 font-semibold">
-                <span>Get started with examples</span>
-                <span className="group-hover:translate-x-1 transition-transform duration-200">→</span>
-              </div>
-            </div>
-          </button>
-
-          {/* Fresh Mode */}
-          <button
-            onClick={handleFreshMode}
-            className={cn(
-              'group relative bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl',
-              'border-2 border-slate-200 dark:border-slate-700',
-              'hover:border-green-400 dark:hover:border-green-600',
-              'rounded-2xl p-8 text-left transition-all duration-200',
-              'hover:shadow-2xl hover:shadow-green-500/20 hover:-translate-y-1'
-            )}
-          >
-            <div className="flex items-start gap-4 mb-4">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/30 flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
-                <Rocket className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-                  Start Fresh
-                </h3>
-                <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                  Begin with a clean slate. Create your own products, add team members, and plan releases from scratch.
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400 font-semibold">
-                <span>Build your first release</span>
-                <span className="group-hover:translate-x-1 transition-transform duration-200">→</span>
-              </div>
-            </div>
-          </button>
+        {/* Capability pills */}
+        <div className="flex flex-wrap justify-center gap-2 mb-8">
+          {highlights.map(h => (
+            <span
+              key={h}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 shadow-sm"
+            >
+              <CheckCircle2 className="w-3 h-3 text-emerald-500 flex-shrink-0" />
+              {h}
+            </span>
+          ))}
         </div>
 
-        {/* Footer Note */}
-        <div className="mt-8 text-center">
-          <p className="text-xs text-slate-500 dark:text-slate-500">
-            You can switch modes anytime by clearing your browser's local storage.
-          </p>
-        </div>
+        {/* Primary CTA — Start Fresh */}
+        <button
+          onClick={handleFreshMode}
+          className="group w-full bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-2xl p-6 text-left transition-all duration-200 shadow-xl shadow-blue-500/30 hover:shadow-2xl hover:shadow-blue-500/40 hover:-translate-y-0.5 mb-3"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform duration-200">
+              <Rocket className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-0.5">
+                <h3 className="text-lg font-semibold text-white">Try It Yourself</h3>
+                <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-white/20 rounded-full text-white/90">Recommended</span>
+              </div>
+              <p className="text-sm text-blue-100 leading-snug">
+                Guided 6-step tour — create a product, build a team, import a PRD, and let AI plan your first release.
+              </p>
+            </div>
+            <span className="text-white/60 group-hover:translate-x-1 transition-transform duration-200 text-lg">→</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-4 text-xs text-blue-100">
+            <span>⏱ ~10 minutes</span>
+            <span>·</span>
+            <span>No account needed</span>
+            <span>·</span>
+            <span>Your own data</span>
+          </div>
+        </button>
+
+        {/* Secondary — Demo data (low-key) */}
+        <button
+          onClick={handleDemoMode}
+          className="group w-full bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 rounded-xl px-5 py-3.5 text-left transition-all duration-200 hover:shadow-md"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
+              <Database className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+            </div>
+            <div className="flex-1">
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Browse pre-built demo data instead</span>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">3 products, 6 releases, sample team — ready to explore. No setup required.</p>
+            </div>
+            <span className="text-slate-400 group-hover:translate-x-0.5 transition-transform duration-200 text-sm">→</span>
+          </div>
+        </button>
+
+        <p className="mt-5 text-center text-xs text-slate-400 dark:text-slate-600">
+          You can switch between modes anytime from the dashboard.
+        </p>
       </div>
     </div>
   );

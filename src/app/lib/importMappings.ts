@@ -50,24 +50,23 @@ export const ticketImportMapping: ColumnMapping[] = [
   },
   {
     csvColumn: 'effortDays',
-    dataField: 'effortDays',
-    required: false, // Optional - can use storyPoints as fallback
+    dataField: 'storyPoints', // Both effortDays and storyPoints columns → storyPoints field
+    required: false,
     transformer: transformers.toNumber,
     validator: validators.isPositive
   },
   {
     csvColumn: 'storyPoints',
     dataField: 'storyPoints',
-    required: false, // Optional - backward compatibility
+    required: false,
     transformer: transformers.toNumber,
     validator: validators.isPositive
   },
   {
     csvColumn: 'assignedTo',
     dataField: 'assignedTo',
-    required: true,
+    required: false, // Optional - auto-assigned by role if empty
     transformer: transformers.toString,
-    validator: validators.isNotEmpty
   },
   {
     csvColumn: 'priority',
