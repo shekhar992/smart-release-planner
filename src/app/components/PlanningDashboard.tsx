@@ -152,7 +152,7 @@ export function PlanningDashboard({
             // Group tickets by developer for sequential positioning
             const ticketsByDev = new Map<string, typeof domainSprint.tickets>();
             domainSprint.tickets.forEach(ticketInput => {
-              const originalTicket = data.tickets.find(t => 
+              const originalTicket = data.tickets!.find(t => 
                 (t.id && t.id === ticketInput.id) || t.title === ticketInput.title
               );
               const devName = originalTicket?.assignedTo || 'Unassigned';
@@ -163,7 +163,7 @@ export function PlanningDashboard({
             });
             
             // Position each developer's tickets sequentially
-            for (const [devName, devTickets] of ticketsByDev) {
+            for (const [_devName, devTickets] of ticketsByDev) {
               let currentStartDate = new Date(domainSprint.startDate);
               
               for (const ticketInput of devTickets) {

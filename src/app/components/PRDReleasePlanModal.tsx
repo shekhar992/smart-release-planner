@@ -375,9 +375,10 @@ function buildTempRelease(
 
 // ── Sub-component: Agent Status Card ─────────────────────────────────────
 
-function AgentCard({ icon, name, description, status }: {
+function AgentCard({ icon, name, description, status, completedMessage }: {
   icon: string; name: string; description: string;
   status: 'pending' | 'processing' | 'complete' | 'error';
+  completedMessage?: string;
 }) {
   return (
     <div className={cn(
@@ -390,7 +391,11 @@ function AgentCard({ icon, name, description, status }: {
       <span className="text-xl">{icon}</span>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">{name}</p>
-        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{description}</p>
+        {status === 'complete' && completedMessage ? (
+          <p className="text-xs text-emerald-600 dark:text-emerald-400 truncate font-medium">{completedMessage}</p>
+        ) : (
+          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{description}</p>
+        )}
       </div>
       <div className="flex-shrink-0">
         {status === 'complete'   && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
@@ -422,6 +427,8 @@ export function PRDReleasePlanModal({
 
   // ── Processing ──
   const [progress, setProgress] = useState<PipelineProgress>({ agentIndex: 0, status: 'pending', overallPercent: 0, message: '' });
+  // Stores the completed result message for each agent (e.g. "Found 8 sections") so it persists after the agent finishes
+  const [agentResults, setAgentResults] = useState<Record<number, string>>({});
   const [pipelineResult, setPipelineResult] = useState<PipelineResult | null>(null);
   const [pipelineError, setPipelineError] = useState('');
   const processingStartTime = useRef<number | null>(null);
@@ -569,6 +576,7 @@ export function PRDReleasePlanModal({
     if (!prdText.trim()) return;
     setStep('processing');
     setPipelineError('');
+    setAgentResults({});
 
     try {
       // Fire LLM auto-name in parallel with pipeline — doesn't block
@@ -578,7 +586,13 @@ export function PRDReleasePlanModal({
         setReleaseNameLoading(false);
       });
 
-      const result = await runPRDPipeline(prdText, teamMembers, p => setProgress(p));
+      const result = await runPRDPipeline(prdText, teamMembers, p => {
+        setProgress(p);
+        // Capture the result message when an agent completes
+        if (p.status === 'complete') {
+          setAgentResults(prev => ({ ...prev, [p.agentIndex]: p.message }));
+        }
+      });
       setPipelineResult(result);
 
       // Auto-compute dates from effort now that we have tickets
@@ -1113,7 +1127,7 @@ export function PRDReleasePlanModal({
                   if (i < progress.agentIndex) status = 'complete';
                   else if (i === progress.agentIndex) status = progress.status === 'error' ? 'error' : 'processing';
                   return (
-                    <AgentCard key={i} {...agent} status={status} />
+                    <AgentCard key={i} {...agent} status={status} completedMessage={agentResults[i]} />
                   );
                 })}
               </div>
