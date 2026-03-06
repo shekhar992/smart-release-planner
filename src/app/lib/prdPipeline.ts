@@ -118,7 +118,7 @@ async function callLLM(systemPrompt: string, userContent: string): Promise<strin
           { role: 'user',   content: userContent  },
         ],
         stream: false,
-        options: { temperature: 0.1, top_p: 0.9, num_predict: 4096, num_ctx: 8192 },
+        options: { temperature: 0, top_p: 0.9, num_predict: 4096, num_ctx: 8192 },
       }),
     });
     if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${res.statusText}`);
@@ -142,7 +142,7 @@ async function callLLM(systemPrompt: string, userContent: string): Promise<strin
           { role: 'user',   content: userContent  },
         ],
         stream: false,
-        options: { temperature: 0.1, num_predict: 1500 },
+        options: { temperature: 0, num_predict: 1500 },
       }),
     });
 
@@ -434,7 +434,7 @@ Output:
 
   const USER = `Break down these requirements into atomic testable items. Split any compound requirements.
 
-${hierarchyText.substring(0, 7000)}
+${hierarchyText.substring(0, 4000)}
 
 Return JSON array only:`;
 
@@ -488,8 +488,16 @@ TICKET RULES:
 - title: short imperative sentence ("Implement JWT auth endpoint")
 - description: 2-3 sentences + "Acceptance criteria:" bullet list (2-3 bullets)
 - requiredRole: EXACTLY one of: Frontend, Backend, Fullstack, QA, Designer, DataEngineer, iOS, Android
-  - Choose based on work type: API = Backend, UI component = Frontend, both = Fullstack
-  - Testing, test plans = QA. Visual design = Designer.
+  ROLE ASSIGNMENT — first match wins, no exceptions:
+  1. Database schema / migration / SQL query / ORM model only → Backend
+  2. React/Vue/Angular component with NO API work → Frontend
+  3. Requires BOTH API endpoint AND UI component → Fullstack
+  4. Test suite / test plan / QA automation / regression / end-to-end testing → QA
+  5. Figma file / wireframe / visual design spec / style guide → Designer
+  6. iOS / Swift / SwiftUI screen or native iOS feature → iOS
+  7. Android / Kotlin / Jetpack Compose screen or native Android feature → Android
+  8. Data pipeline / ETL / analytics dashboard / ML model / feature store → DataEngineer
+  9. When genuinely ambiguous between two roles → Fullstack
 - effortDays: person-days of focused work
   - Trivial (config, copy change): 0.5-1
   - Simple (CRUD endpoint, basic UI): 2-3
@@ -785,6 +793,12 @@ Definition of Done:
 Edge Cases:
   - [edge case to handle]
   - [edge case to handle]
+
+CONCRETE EXAMPLE (copy this format exactly):
+{
+  "tempId": "prd-0",
+  "acceptanceCriteria": "Given the user has valid credentials\nWhen they POST to /api/auth/login with email + password\nThen the server returns HTTP 200 with { accessToken, refreshToken, expiresIn }\n\nGiven the user has invalid credentials\nWhen they POST to /api/auth/login\nThen the server returns HTTP 401 with { error: 'Invalid credentials' }\n\nGiven a valid session\nWhen the user POSTs to /api/auth/logout\nThen both tokens are invalidated and a 200 is returned\n\nDefinition of Done:\n  - Returns 200 + token pair on valid credentials\n  - Returns 401 on invalid credentials (no stack trace exposed)\n  - Refresh token stored as httpOnly cookie, access token in response body\n  - Rate-limited to 10 requests/min per IP (429 returned on breach)\n  - Unit tests cover success, failure, and rate-limit paths\n\nEdge Cases:\n  - Handles email+alias format (user+tag@company.com) correctly\n  - Concurrent login from two devices both receive valid tokens\n  - Expired refresh token returns 401, not 500"
+}
 
 RULES:
 - Be specific and testable — no vague words like "works correctly" or "is intuitive"
