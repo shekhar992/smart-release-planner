@@ -100,7 +100,8 @@ export const PIPELINE_AGENTS: PipelineAgent[] = [
 const IS_DEV     = import.meta.env.DEV;
 const OLLAMA_URL = 'http://localhost:11434/api/chat';
 const GROQ_URL   = '/api/ai';
-const MODEL      = IS_DEV ? 'llama3.2:3b' : 'llama-3.3-70b-versatile';
+// llama-3.1-8b-instant: free tier = 20k TPM (vs 12k for 70b) + much faster
+const MODEL      = IS_DEV ? 'llama3.2:3b' : 'llama-3.1-8b-instant';
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -141,7 +142,7 @@ async function callLLM(systemPrompt: string, userContent: string): Promise<strin
           { role: 'user',   content: userContent  },
         ],
         stream: false,
-        options: { temperature: 0.1, num_predict: 4096 },
+        options: { temperature: 0.1, num_predict: 1500 },
       }),
     });
 
@@ -872,22 +873,26 @@ export async function runPRDPipeline(
   progress(0, 'complete', 18, `Found ${sections.length} section${sections.length !== 1 ? 's' : ''}`);
 
   // ── Agent 2: Structure Analyzer ──────────────────────────────────────
+  await sleep(IS_DEV ? 0 : 2000); // 2s cooldown between agents on prod
   progress(1, 'processing', 20, 'Grouping into engineering epics...');
   const hierarchy = await agent2_structureAnalyzer(sections);
   progress(1, 'complete', 38, `Identified ${hierarchy.length} epic${hierarchy.length !== 1 ? 's' : ''}`);
 
   // ── Agent 3: Requirements Extractor ──────────────────────────────────
+  await sleep(IS_DEV ? 0 : 2000);
   progress(2, 'processing', 40, 'Extracting atomic requirements...');
   const requirements = await agent3_requirementsExtractor(hierarchy);
   progress(2, 'complete', 56, `Extracted ${requirements.length} requirement${requirements.length !== 1 ? 's' : ''}`);
 
   // ── Agent 4: Ticket Generator ─────────────────────────────────────────
+  await sleep(IS_DEV ? 0 : 2000);
   const batchCount = Math.ceil(requirements.length / 15);
   progress(3, 'processing', 58, `Generating tickets${batchCount > 1 ? ` (${batchCount} batches)` : ''}...`);
   const rawTickets = await agent4_ticketGenerator(requirements, teamContext);
   progress(3, 'complete', 78, `Created ${rawTickets.length} ticket${rawTickets.length !== 1 ? 's' : ''}`);
 
   // ── Agent 5: Dependency Mapper ────────────────────────────────────────
+  await sleep(IS_DEV ? 0 : 2000);
   progress(4, 'processing', 80, 'Detecting blockers and dependencies...');
   const depMap = await agent5_dependencyMapper(rawTickets);
   progress(4, 'complete', 86, `Found ${depMap.dependencies.length} dependenc${depMap.dependencies.length !== 1 ? 'ies' : 'y'}`);
@@ -916,6 +921,7 @@ export async function runPRDPipeline(
   }));
 
   // ── Agent 6: Acceptance Criteria Writer ──────────────────────────────
+  await sleep(IS_DEV ? 0 : 2000);
   progress(5, 'processing', 88, `Writing acceptance criteria for ${tickets.length} ticket${tickets.length !== 1 ? 's' : ''}...`);
   const acMap = await agent6_acceptanceCriteriaWriter(tickets);
   // Stamp AC onto each ticket
