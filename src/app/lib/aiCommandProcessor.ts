@@ -12,13 +12,16 @@
 
 import type { Release, TeamMember } from '../data/mockData';
 
-// ── LLM adapter ────────────────────────────────────────────────────────────
+// ── LLM adapter — env-aware: Ollama locally, Groq edge fn on Vercel ──────
 
+const IS_DEV     = import.meta.env.DEV;
 const OLLAMA_URL = 'http://localhost:11434/api/chat';
-const MODEL      = 'llama3.2:3b';
+const GROQ_URL   = '/api/ai';
+const MODEL      = IS_DEV ? 'llama3.2:3b' : 'llama-3.1-8b-instant';
 
 async function callLLM(systemPrompt: string, userContent: string): Promise<string> {
-  const res = await fetch(OLLAMA_URL, {
+  const url = IS_DEV ? OLLAMA_URL : GROQ_URL;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -28,7 +31,7 @@ async function callLLM(systemPrompt: string, userContent: string): Promise<strin
         { role: 'user',   content: userContent  },
       ],
       stream: false,
-      options: { temperature: 0.2, top_p: 0.9, num_predict: 512, num_ctx: 3000 },
+      options: { temperature: 0, top_p: 0.9, num_predict: 512, num_ctx: 3000 },
     }),
   });
   if (!res.ok) throw new Error(`LLM HTTP ${res.status}: ${res.statusText}`);

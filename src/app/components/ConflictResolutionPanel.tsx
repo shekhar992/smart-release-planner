@@ -59,7 +59,7 @@ export function ConflictResolutionPanel({
       setAiExplanation(result);
     } catch {
       setAiExplanation({
-        plainEnglish: 'Could not reach AI. Is Ollama running?',
+        plainEnglish: import.meta.env.DEV ? 'Could not reach AI. Is Ollama running?' : 'Could not reach AI. Please try again.',
         rootCause: '',
         suggestion: '',
       });

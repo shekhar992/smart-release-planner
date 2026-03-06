@@ -71,7 +71,7 @@ export function AICommandBar({ release, teamMembers }: AICommandBarProps) {
       const res = await processCommand(text.trim(), release, teamMembers);
       setResult(res);
     } catch {
-      setError('Could not reach AI. Is Ollama running?');
+      setError(import.meta.env.DEV ? 'Could not reach AI. Is Ollama running?' : 'Could not reach AI. Please try again.');
     } finally {
       setLoading(false);
     }
