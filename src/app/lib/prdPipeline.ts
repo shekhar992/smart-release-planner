@@ -95,38 +95,51 @@ export const PIPELINE_AGENTS: PipelineAgent[] = [
   { icon: '✅', name: 'Acceptance Criteria',    description: 'Writing BDD Given/When/Then + DoD per ticket' },
 ];
 
-// ── LLM Adapter — swap here for cloud deployment ──────────────────────────
+// ── LLM Adapter — env-aware: Ollama locally, Groq edge fn on Vercel ──────
 
+const IS_DEV     = import.meta.env.DEV;
 const OLLAMA_URL = 'http://localhost:11434/api/chat';
-const MODEL      = 'llama3.2:3b';
+const GROQ_URL   = '/api/ai';
+const MODEL      = IS_DEV ? 'llama3.2:3b' : 'llama-3.3-70b-versatile';
 
-/**
- * Single call surface for the entire pipeline.
- * Local:       direct to Ollama
- * Production:  change this one function to call /api/llm instead
- */
 async function callLLM(systemPrompt: string, userContent: string): Promise<string> {
-  const res = await fetch(OLLAMA_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user',   content: userContent  },
-      ],
-      stream: false,
-      options: {
-        temperature: 0.1,
-        top_p: 0.9,
-        num_predict: 4096,
-        num_ctx: 8192,   // override default 2048 — critical for long PRDs
-      },
-    }),
-  });
-  if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${res.statusText}`);
-  const data = await res.json();
-  return data.message?.content ?? '';
+  if (IS_DEV) {
+    // Local Ollama
+    const res = await fetch(OLLAMA_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userContent  },
+        ],
+        stream: false,
+        options: { temperature: 0.1, top_p: 0.9, num_predict: 4096, num_ctx: 8192 },
+      }),
+    });
+    if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${res.statusText}`);
+    const data = await res.json();
+    return data.message?.content ?? '';
+  } else {
+    // Production — Vercel edge fn → Groq
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userContent  },
+        ],
+        stream: false,
+        options: { temperature: 0.1, num_predict: 4096 },
+      }),
+    });
+    if (!res.ok) throw new Error(`Groq HTTP ${res.status}: ${res.statusText}`);
+    const data = await res.json();
+    return data.message?.content ?? '';
+  }
 }
 
 // ── JSON Extraction — handles markdown fences the model adds ──────────────

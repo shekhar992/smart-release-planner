@@ -1166,7 +1166,9 @@ export function PRDReleasePlanModal({
                   <div>
                     <p className="text-xs font-semibold text-red-700 dark:text-red-300">Pipeline failed</p>
                     <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{pipelineError}</p>
-                    <p className="text-xs text-red-500 mt-1">Make sure Ollama is running: <code className="font-mono">ollama serve</code></p>
+                    {import.meta.env.DEV && (
+                      <p className="text-xs text-red-500 mt-1">Make sure Ollama is running: <code className="font-mono">ollama serve</code></p>
+                    )}
                   </div>
                 </div>
               )}
