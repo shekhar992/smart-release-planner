@@ -9,7 +9,7 @@
 import { buildReleasePlan } from '../../domain/planningEngine';
 import { mapReleasePlanToAppRelease } from '../../domain/adapters/domainToAppMapper';
 import { TicketInput, ReleaseConfig, ReleasePlan } from '../../domain/types';
-import { Release, TeamMember, Holiday, storyPointsToDays } from '../data/mockData';
+import { Release, TeamMember, Holiday, storyPointsToDays, Phase } from '../data/mockData';
 
 /**
  * Convert app Release → list of TicketInput for planning engine
@@ -63,8 +63,16 @@ function buildReleaseConfig(
   sprintLengthDays: number = 14
 ): ReleaseConfig {
   
-  // Count active developers (filter to only Developers, not Designers/QA)
-  const developers = teamMembers.filter(tm => tm.role === 'Developer');
+  // Count active developers (anyone who can code: Frontend, Backend, Fullstack, Developer, iOS, Android, DataEngineer)
+  const developers = teamMembers.filter(tm => 
+    tm.role === 'Developer' || 
+    tm.role === 'Frontend' || 
+    tm.role === 'Backend' || 
+    tm.role === 'Fullstack' ||
+    tm.role === 'iOS' ||
+    tm.role === 'Android' ||
+    tm.role === 'DataEngineer'
+  );
   const numberOfDevelopers = developers.length;
   
   // Convert holidays to Date array
@@ -124,7 +132,8 @@ export function autoAllocateRelease(
   release: Release,
   teamMembers: TeamMember[],
   holidays: Holiday[],
-  sprintLengthDays: number = 14
+  sprintLengthDays: number = 14,
+  phases?: Phase[]
 ): { success: true; release: Release; plan: ReleasePlan } | { success: false; error: string } {
   
   try {
@@ -138,8 +147,21 @@ export function autoAllocateRelease(
       };
     }
     
-    // Step 2: Build release configuration
-    const config = buildReleaseConfig(release, teamMembers, holidays, sprintLengthDays);
+    // Step 2: Build release configuration.
+    // When phases are provided, constrain sprint generation to the dev window
+    // (union of all allowsWork phases) so tickets are never placed in Discovery
+    // or Release/Deploy phases.  The outer release dates are still preserved on
+    // the returned release object so the timeline can render all phase bands.
+    const devPhases = (phases ?? []).filter(p => p.allowsWork);
+    let planningRelease = release;
+    if (devPhases.length > 0) {
+      const allMs = devPhases.flatMap(p => [new Date(p.startDate).getTime(), new Date(p.endDate).getTime()]);
+      const devStart = new Date(Math.min(...allMs));
+      const devEnd   = new Date(Math.max(...allMs));
+      planningRelease = { ...release, startDate: devStart, endDate: devEnd };
+    }
+    
+    const config = buildReleaseConfig(planningRelease, teamMembers, holidays, sprintLengthDays);
     
     if (config.numberOfDevelopers === 0) {
       return {
@@ -151,7 +173,9 @@ export function autoAllocateRelease(
     // Step 3: Call planning engine
     const plan = buildReleasePlan(ticketInputs, config);
     
-    // Step 4: Convert domain output → app Release
+    // Step 4: Convert domain output → app Release.
+    // Pass the OUTER release dates so the committed release spans the full window
+    // (Discovery → Go-Live) for correct timeline rendering.
     const allocatedRelease = mapReleasePlanToAppRelease(
       plan,
       release.name,
@@ -179,4 +203,20 @@ export function autoAllocateRelease(
       error: error instanceof Error ? error.message : 'Unknown planning error'
     };
   }
+}
+
+/**
+ * Dry-run sprint planning — identical to autoAllocateRelease but signals
+ * intent: the caller will display the result without persisting it.
+ *
+ * Used by PRDReleasePlanModal for the sprint preview step.
+ */
+export function dryRunRelease(
+  release: Release,
+  teamMembers: TeamMember[],
+  holidays: Holiday[],
+  sprintLengthDays: number = 14,
+  phases?: Phase[]
+): ReturnType<typeof autoAllocateRelease> {
+  return autoAllocateRelease(release, teamMembers, holidays, sprintLengthDays, phases);
 }

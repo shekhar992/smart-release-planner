@@ -1,4 +1,4 @@
-import { Package, Users, BarChart3, ArrowRight } from 'lucide-react';
+import { Package, Users, FileText, Sparkles, GitBranch, LayoutTemplate } from 'lucide-react';
 
 interface FreshLandingProps {
   openCreateProduct: () => void;
@@ -6,9 +6,7 @@ interface FreshLandingProps {
 
 export function FreshLanding({ openCreateProduct: _openCreateProduct }: FreshLandingProps) {
   const handleCreateProduct = () => {
-    // Mark that we want to open product modal after mode switch
     sessionStorage.setItem('openProductModalOnLoad', 'true');
-    // Switch to demo mode to access full dashboard functionality
     localStorage.setItem('appMode', 'demo');
     window.location.reload();
   };
@@ -16,92 +14,102 @@ export function FreshLanding({ openCreateProduct: _openCreateProduct }: FreshLan
   const steps = [
     {
       icon: Package,
+      step: '01',
       title: 'Create a Product',
-      description: 'Set up your first product workspace to organize releases and teams.',
-      color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/30',
+      action: 'New Product → name it → pick type (Web, Mobile, API)',
+      description: 'Top-level workspace — releases, sprints, and team all live under a product.',
+      iconBg: 'bg-gradient-to-br from-blue-500 to-blue-600',
+      border: 'border-blue-200 dark:border-blue-900',
     },
     {
       icon: Users,
-      title: 'Add Team Members',
-      description: 'Define your team roster with roles and PTO schedules for accurate capacity planning.',
-      color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/30',
+      step: '02',
+      title: 'Build Your Team',
+      action: 'Team → add members with roles + availability + PTO blocks',
+      description: 'The planner uses real working-day capacity per sprint — no over-allocation.',
+      iconBg: 'bg-gradient-to-br from-purple-500 to-violet-600',
+      border: 'border-purple-200 dark:border-purple-900',
     },
     {
-      icon: BarChart3,
-      title: 'Use Auto Release Planner',
-      description: 'Import your backlog via CSV and let AI generate capacity-aware sprint plans instantly.',
-      color: 'text-green-600 bg-green-50 dark:bg-green-950/30',
+      icon: FileText,
+      step: '03',
+      title: 'Import a PRD',
+      action: 'Import PRD → upload PDF / Word doc / paste markdown',
+      description: 'AI extracts features and generates role-tagged JIRA-style tickets in ~15 sec.',
+      iconBg: 'bg-gradient-to-br from-amber-500 to-orange-500',
+      border: 'border-amber-200 dark:border-amber-900',
+    },
+    {
+      icon: Sparkles,
+      step: '04',
+      title: 'Auto-Plan the Release',
+      action: 'Open release → Auto-Resolve Conflicts',
+      description: 'One pass assigns, schedules, and flags every conflict with a specific reason.',
+      iconBg: 'bg-gradient-to-br from-emerald-500 to-teal-500',
+      border: 'border-emerald-200 dark:border-emerald-900',
+    },
+    {
+      icon: GitBranch,
+      step: '05',
+      title: 'Resolve Conflicts',
+      action: 'Resolve Conflicts → step through each card, apply or skip',
+      description: 'Each card shows the root cause, an AI fix with confidence %, and manual options.',
+      iconBg: 'bg-gradient-to-br from-rose-500 to-pink-500',
+      border: 'border-rose-200 dark:border-rose-900',
+    },
+    {
+      icon: LayoutTemplate,
+      step: '06',
+      title: 'Timeline & Risk Brief',
+      action: 'Timeline view → Risk Brief for AI analyst summary',
+      description: 'Gantt with dev swimlanes, PTO markers, and a streamed 3-bullet risk summary.',
+      iconBg: 'bg-gradient-to-br from-sky-500 to-blue-500',
+      border: 'border-sky-200 dark:border-sky-900',
     },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-4xl mx-auto px-4 py-16">
-        {/* Header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-primary/10 mb-6">
-            <BarChart3 className="w-10 h-10 text-primary" />
-          </div>
-          <h1 className="text-4xl font-bold text-foreground mb-4 tracking-tight">
-            Start Planning Your First Release
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Create a product, add your team, and generate a capacity-aware release plan.
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center py-8">
+      <div className="max-w-2xl w-full mx-auto px-4">
 
-          {/* Quick Switch to Demo */}
-          <div className="mt-8 pt-6 border-t border-border/50 max-w-md mx-auto">
-            <p className="text-sm text-muted-foreground mb-3">
-              Want to explore with sample data first?
-            </p>
-            <button
-              onClick={() => {
-                localStorage.setItem('appMode', 'demo');
-                window.location.reload();
-              }}
-              className="text-sm font-medium text-primary hover:underline hover:text-primary-hover transition-colors"
-            >
-              Switch to Demo Mode →
-            </button>
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 text-[11px] font-semibold mb-3 tracking-wide uppercase">
+            <Sparkles className="w-2.5 h-2.5" /> AI-Powered Release Planning
           </div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-1 tracking-tight">
+            Your 6-step platform tour
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Follow in order · ~10 minutes · each step reveals a new capability
+          </p>
+          <button
+            onClick={() => { localStorage.setItem('appMode', 'demo'); window.location.reload(); }}
+            className="mt-1.5 text-xs font-medium text-blue-500 dark:text-blue-400 hover:underline transition-colors"
+          >
+            Skip — load Demo Mode instead →
+          </button>
         </div>
 
-        {/* Steps */}
-        <div className="space-y-6 mb-12">
+        {/* Steps grid */}
+        <div className="grid grid-cols-2 gap-2.5 mb-5">
           {steps.map((step, idx) => (
             <div
               key={idx}
-              className="bg-card border border-border rounded-xl p-6 hover:shadow-md transition-shadow"
+              className={`bg-white dark:bg-slate-900 border ${step.border} rounded-xl px-3.5 py-3 hover:shadow-sm transition-shadow`}
             >
-              <div className="flex items-start gap-5">
-                {/* Step Number */}
-                <div className="flex-shrink-0">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-lg font-bold text-primary">{idx + 1}</span>
+              <div className="flex items-start gap-3">
+                <div className={`flex-shrink-0 w-8 h-8 rounded-lg ${step.iconBg} flex items-center justify-center shadow-sm mt-0.5`}>
+                  <step.icon className="w-4 h-4 text-white" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-[10px] font-bold tracking-widest text-slate-400 dark:text-slate-500 uppercase mb-0.5">Step {step.step}</div>
+                  <div className="text-sm font-semibold text-slate-900 dark:text-white leading-tight mb-1">{step.title}</div>
+                  <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded px-1.5 py-0.5 leading-snug mb-1.5">
+                    → {step.action}
                   </div>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug">{step.description}</p>
                 </div>
-
-                {/* Icon */}
-                <div className={`flex-shrink-0 w-14 h-14 rounded-lg ${step.color} flex items-center justify-center`}>
-                  <step.icon className="w-7 h-7" />
-                </div>
-
-                {/* Content */}
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    {step.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {step.description}
-                  </p>
-                </div>
-
-                {/* Arrow */}
-                {idx < steps.length - 1 && (
-                  <div className="flex-shrink-0 hidden md:block">
-                    <ArrowRight className="w-5 h-5 text-muted-foreground" />
-                  </div>
-                )}
               </div>
             </div>
           ))}
@@ -111,15 +119,16 @@ export function FreshLanding({ openCreateProduct: _openCreateProduct }: FreshLan
         <div className="text-center">
           <button
             onClick={handleCreateProduct}
-            className="inline-flex items-center gap-3 px-8 py-4 bg-primary text-primary-foreground text-lg font-semibold rounded-xl hover:bg-primary-hover transition-all shadow-lg hover:shadow-xl hover:scale-[1.02]"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-blue-500/25 hover:shadow-xl hover:scale-[1.02]"
           >
-            <Package className="w-5 h-5" />
-            Create Product
+            <Package className="w-4 h-4" />
+            Start with Step 1 &mdash; Create a Product
           </button>
-          <p className="text-sm text-muted-foreground mt-4">
-            This will take you to the dashboard where you can start building.
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
+            No account required · takes you straight to the dashboard
           </p>
         </div>
+
       </div>
     </div>
   );

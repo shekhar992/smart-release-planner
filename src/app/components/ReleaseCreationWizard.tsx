@@ -592,8 +592,16 @@ function DetailsStep({
             value={name}
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="e.g., Q1 2026 Release"
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 font-medium shadow-sm transition-all"
+            className={[
+              'w-full px-3 py-2 border rounded-xl bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 font-medium shadow-sm transition-all',
+              errors?.some(e => e.toLowerCase().includes('name'))
+                ? 'border-red-400 dark:border-red-500 ring-1 ring-red-400/40 focus:ring-red-400/50 focus:border-red-400'
+                : 'border-slate-300 dark:border-slate-600 focus:ring-blue-400/50 focus:border-blue-400',
+            ].join(' ')}
           />
+          {errors?.some(e => e.toLowerCase().includes('name')) && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">Release name is required</p>
+          )}
         </div>
 
         {/* Date Range */}
@@ -603,7 +611,8 @@ function DetailsStep({
             value={startDate}
             onChange={(date) => onChange({ startDate: date })}
             required
-            helperText="Defines the overall release period for phase planning"
+            error={errors?.some(e => e.toLowerCase().includes('start')) ? 'Start date is required' : undefined}
+            helperText={!errors?.some(e => e.toLowerCase().includes('start')) ? 'Defines the overall release period for phase planning' : undefined}
           />
           <DatePicker
             label="End Date"
@@ -611,8 +620,8 @@ function DetailsStep({
             onChange={(date) => onChange({ endDate: date })}
             minDate={startDate}
             required
-            error={datesInvalid ? 'End date must be after start date' : undefined}
-            helperText={!datesInvalid ? 'All release phases must fit within this period' : undefined}
+            error={datesInvalid ? 'End date must be after start date' : errors?.some(e => e.toLowerCase().includes('end')) ? 'End date is required' : undefined}
+            helperText={!datesInvalid && !errors?.some(e => e.toLowerCase().includes('end')) ? 'All release phases must fit within this period' : undefined}
           />
         </div>
       </div>

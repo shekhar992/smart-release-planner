@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
-import { X, AlertTriangle, ArrowRight, CalendarClock, Users as UsersIcon, CheckCircle2, Sparkles, ChevronRight, ChevronLeft, Skip } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, AlertTriangle, ArrowRight, CalendarClock, Users as UsersIcon, CheckCircle2, Sparkles, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
 import { cn } from './ui/utils';
 import { Conflict, getBestResolution } from '../lib/conflictDetection';
 import { Ticket, TeamMember } from '../data/mockData';
+import { explainConflict, type ConflictExplanation } from '../lib/aiCommandProcessor';
 
 interface ConflictResolutionPanelProps {
   conflicts: Conflict[];
@@ -25,12 +26,57 @@ export function ConflictResolutionPanel({
   onShiftTicket,
   onIgnoreConflict
 }: ConflictResolutionPanelProps) {
-  const [currentIndex, setCurrentIndex] = useState(0);
+  // ID-based tracking instead of index: immune to conflicts array re-ordering/shrinking.
+  const [currentConflictId, setCurrentConflictId] = useState<string | null>(
+    conflicts[0]?.ticketId ?? null
+  );
   const [resolvedConflicts, setResolvedConflicts] = useState<Set<string>>(new Set());
+  // justResolvedId drives the transient "Conflict Resolved!" animation overlay.
+  const [justResolvedId, setJustResolvedId] = useState<string | null>(null);
   const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
 
-  const currentConflict = conflicts[currentIndex];
+  // AI explainer state — keyed by conflictId so it resets when moving between conflicts
+  const [aiExplanation, setAiExplanation] = useState<ConflictExplanation | null>(null);
+  const [aiExplaining, setAiExplaining] = useState(false);
+
+  // Reset explainer when navigating to a different conflict
+  useEffect(() => {
+    setAiExplanation(null);
+    setAiExplaining(false);
+  }, [currentConflictId]);
+
+  const handleExplainWithAI = async () => {
+    if (!currentConflict || !ticket || aiExplaining) return;
+    setAiExplaining(true);
+    setAiExplanation(null);
+    try {
+      const result = await explainConflict(
+        currentConflict.message,
+        ticket.title,
+        currentConflict.developer,
+      );
+      setAiExplanation(result);
+    } catch {
+      setAiExplanation({
+        plainEnglish: 'Could not reach AI. Is Ollama running?',
+        rootCause: '',
+        suggestion: '',
+      });
+    } finally {
+      setAiExplaining(false);
+    }
+  };
+
+  // Stable refs so timer callbacks always read the latest values without restarting the timer.
+  const conflictsRef = useRef(conflicts);
+  const resolvedRef = useRef(resolvedConflicts);
+  useEffect(() => { conflictsRef.current = conflicts; }, [conflicts]);
+  useEffect(() => { resolvedRef.current = resolvedConflicts; }, [resolvedConflicts]);
+
+  // Derive current conflict by ID — never goes out-of-bounds.
+  const currentConflict = conflicts.find(c => c.ticketId === currentConflictId) ?? null;
+  const currentIndex = currentConflict ? conflicts.indexOf(currentConflict) : 0;
   const totalConflicts = conflicts.length;
   const resolvedCount = resolvedConflicts.size;
 
@@ -40,22 +86,40 @@ export function ConflictResolutionPanel({
     ? getBestResolution(currentConflict, ticket, tickets, teamMembers || [])
     : null;
 
-  // Auto-advance when conflict is resolved
+  // After "Resolved!" animation finishes (1200ms), advance to the next unresolved conflict.
+  // Reads from refs so the timer always uses the live conflicts/resolved state.
   useEffect(() => {
-    if (resolvedConflicts.has(currentConflict?.ticketId)) {
-      // Already resolved, auto-advance after short delay
-      const timer = setTimeout(() => {
-        if (currentIndex < totalConflicts - 1) {
-          setCurrentIndex(currentIndex + 1);
-          setShowMoreOptions(false);
-        } else {
-          // All done, close panel
-          onClose();
-        }
-      }, 1500);
-      return () => clearTimeout(timer);
+    if (!justResolvedId) return;
+    const timer = setTimeout(() => {
+      const live = conflictsRef.current;
+      const resolved = resolvedRef.current;
+      const next = live.find(c => c.ticketId !== justResolvedId && !resolved.has(c.ticketId));
+      if (next) {
+        setCurrentConflictId(next.ticketId);
+      } else {
+        onClose();
+      }
+      setJustResolvedId(null);
+      setShowMoreOptions(false);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [justResolvedId, onClose]);
+
+  // When the parent re-computes the conflicts array (e.g., after a ticket is shifted),
+  // if our tracked ID vanished from the list sync to the first unresolved item.
+  useEffect(() => {
+    if (justResolvedId) return; // animation in flight — don't interfere
+    if (conflicts.length === 0) { onClose(); return; }
+    const stillPresent = currentConflictId != null &&
+      conflicts.some(c => c.ticketId === currentConflictId);
+    if (!stillPresent) {
+      const next =
+        conflicts.find(c => !resolvedConflicts.has(c.ticketId)) ?? conflicts[0];
+      setCurrentConflictId(next.ticketId);
+      setShowMoreOptions(false);
     }
-  }, [resolvedConflicts, currentConflict?.ticketId, currentIndex, totalConflicts, onClose]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conflicts]);
 
   const handleApplyBestSolution = async () => {
     if (!bestResolution || !currentConflict) return;
@@ -71,16 +135,21 @@ export function ConflictResolutionPanel({
         onMoveTicketToSprint?.(currentConflict.ticketId, bestResolution.value);
       }
 
-      // Mark as resolved
-      setResolvedConflicts(prev => new Set(prev).add(currentConflict.ticketId));
+      // Mark as resolved and kick off the "Resolved!" animation + advance.
+      const resolvedId = currentConflict.ticketId;
+      setResolvedConflicts(prev => new Set(prev).add(resolvedId));
+      setJustResolvedId(resolvedId);
     } finally {
       setTimeout(() => setIsApplying(false), 500);
     }
   };
 
   const handleSkip = () => {
-    if (currentIndex < totalConflicts - 1) {
-      setCurrentIndex(currentIndex + 1);
+    if (!currentConflict) { onClose(); return; }
+    const idx = conflicts.indexOf(currentConflict);
+    const next = conflicts[idx + 1];
+    if (next) {
+      setCurrentConflictId(next.ticketId);
       setShowMoreOptions(false);
     } else {
       onClose();
@@ -88,8 +157,10 @@ export function ConflictResolutionPanel({
   };
 
   const handlePrevious = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(currentIndex - 1);
+    if (!currentConflict) return;
+    const idx = conflicts.indexOf(currentConflict);
+    if (idx > 0) {
+      setCurrentConflictId(conflicts[idx - 1].ticketId);
       setShowMoreOptions(false);
     }
   };
@@ -105,8 +176,10 @@ export function ConflictResolutionPanel({
       onShiftTicket?.(currentConflict.ticketId, value);
     }
 
-    // Mark as resolved
-    setResolvedConflicts(prev => new Set(prev).add(currentConflict.ticketId));
+    // Mark as resolved and kick off animation + advance.
+    const resolvedId = currentConflict.ticketId;
+    setResolvedConflicts(prev => new Set(prev).add(resolvedId));
+    setJustResolvedId(resolvedId);
   };
 
   const getSeverityBadge = (severity: "high" | "medium" | "low") => {
@@ -141,11 +214,12 @@ export function ConflictResolutionPanel({
     return tickets.find(t => t.id === ticketId);
   };
 
-  const isResolved = currentConflict && resolvedConflicts.has(currentConflict.ticketId);
+  // Show the resolved overlay whenever we just applied/handled a conflict (for animation duration).
+  const isResolved = justResolvedId !== null;
 
   if (conflicts.length === 0) {
     return (
-      <div className="w-[480px] h-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-l border-slate-200 dark:border-slate-700 flex flex-col shadow-2xl">
+      <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden">
         <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
           <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-950/50 dark:to-emerald-900/30 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
             <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
@@ -166,278 +240,243 @@ export function ConflictResolutionPanel({
   const typeInfo = currentConflict ? getTypeLabel(currentConflict.type) : null;
 
   return (
-    <div className="w-[480px] h-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-l border-slate-200 dark:border-slate-700 flex flex-col shadow-2xl">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-br from-amber-50/50 to-red-50/50 dark:from-amber-950/30 dark:to-red-950/30">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-500/30">
-              <AlertTriangle className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Conflict Resolution</h2>
-              <p className="text-sm text-slate-600 dark:text-slate-400 mt-0.5">
-                {resolvedCount} of {totalConflicts} resolved
-              </p>
-            </div>
+    <div className="w-full max-w-lg max-h-[88vh] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden">
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-amber-50/60 dark:bg-amber-950/20">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Conflict Resolution</h2>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              · {currentIndex + 1} of {totalConflicts}
+              {resolvedCount > 0 && <span className="text-emerald-600 dark:text-emerald-400"> · {resolvedCount} resolved</span>}
+            </span>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all duration-200"
-            title="Close panel"
+            className="w-6 h-6 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"
           >
-            <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+            <X className="w-4 h-4 text-slate-500" />
           </button>
         </div>
-
-        {/* Progress Bar */}
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 mb-2">
-            <span>Conflict {currentIndex + 1} of {totalConflicts}</span>
-            <span>{Math.round((resolvedCount / totalConflicts) * 100)}% complete</span>
-          </div>
-          <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-amber-500 to-orange-600 transition-all duration-500"
-              style={{ width: `${(resolvedCount / totalConflicts) * 100}%` }}
-            />
-          </div>
+        <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500"
+            style={{ width: `${(resolvedCount / totalConflicts) * 100}%` }}
+          />
         </div>
       </div>
 
-      {/* Content - Single Conflict View */}
-      <div className="flex-1 overflow-y-auto p-5 bg-slate-50/30 dark:bg-slate-800/30">
+      {/* ── Content ────────────────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50/40 dark:bg-slate-800/20">
         {isResolved ? (
-          // Resolved State
-          <div className="flex flex-col items-center justify-center h-full text-center animate-fade-in">
-            <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-950/50 dark:to-emerald-900/30 rounded-2xl flex items-center justify-center mb-4 shadow-lg animate-bounce-once">
-              <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
-            </div>
-            <p className="text-lg font-semibold text-emerald-700 dark:text-emerald-400">Conflict Resolved!</p>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">Moving to next...</p>
+          <div className="flex flex-col items-center justify-center py-10 text-center animate-fade-in">
+            <CheckCircle2 className="w-10 h-10 text-emerald-500 mb-2" />
+            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Conflict Resolved!</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Moving to next…</p>
           </div>
         ) : currentConflict && ticket ? (
-          // Active Conflict View
-          <div className="space-y-4">
-            {/* Conflict Card */}
-            <div className="border border-amber-200 dark:border-amber-800 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-lg">
-              {/* Card Header */}
-              <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-b border-amber-200 dark:border-amber-800">
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">{typeInfo?.icon}</span>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                        {typeInfo?.label}
-                      </h3>
-                      {getSeverityBadge(currentConflict.severity)}
-                    </div>
-                    <p className="text-sm text-slate-700 dark:text-slate-300 font-medium">
-                      {ticket.title}
-                    </p>
-                  </div>
-                </div>
+          <>
+            {/* Conflict summary card */}
+            <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900 overflow-hidden">
+              {/* Type + severity row */}
+              <div className="flex items-center gap-2 px-3 py-2 bg-amber-50/80 dark:bg-amber-950/20 border-b border-amber-100 dark:border-amber-900">
+                <span className="text-base leading-none">{typeInfo?.icon}</span>
+                <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{typeInfo?.label}</span>
+                {getSeverityBadge(currentConflict.severity)}
               </div>
 
-              {/* Problem Description */}
-              <div className="p-4 space-y-3 bg-white dark:bg-slate-900">
-                <div className="text-sm text-slate-700 dark:text-slate-300">
-                  {currentConflict.message}
+              {/* Ticket title + message */}
+              <div className="px-3 py-2.5 space-y-1.5">
+                <p className="text-sm font-medium text-slate-900 dark:text-white leading-snug">{ticket.title}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{currentConflict.message}</p>
+
+                {/* Meta row — assignee · duration · dates */}
+                <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                  <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    <UsersIcon className="w-3 h-3" />{currentConflict.developer}
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {ticket.effortDays || ticket.storyPoints || 1}d
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600">·</span>
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                    {ticket.startDate.toLocaleDateString()} – {ticket.endDate.toLocaleDateString()}
+                  </span>
                 </div>
 
-                {/* Ticket Details */}
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                    <span className="text-slate-500 dark:text-slate-400 block mb-1">Assigned to</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{currentConflict.developer}</span>
-                  </div>
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                    <span className="text-slate-500 dark:text-slate-400 block mb-1">Duration</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{ticket.effortDays || ticket.storyPoints || 1} days</span>
-                  </div>
-                  <div className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg col-span-2">
-                    <span className="text-slate-500 dark:text-slate-400 block mb-1">Scheduled</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">
-                      {ticket.startDate.toLocaleDateString()} - {ticket.endDate.toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Conflicting Tickets */}
-                {currentConflict.conflictingTickets && currentConflict.conflictingTickets.length > 0 && (
-                  <div className="pt-3 border-t border-slate-200 dark:border-slate-700">
-                    <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Conflicts with:</span>
-                    <div className="mt-2 space-y-1">
-                      {currentConflict.conflictingTickets.slice(0, 3).map(cId => {
-                        const cTicket = getTicketById(cId);
-                        return (
-                          <div key={cId} className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                            <span className="text-red-500">•</span>
-                            <span className="truncate">{cTicket?.title || cId}</span>
-                          </div>
-                        );
-                      })}
-                      {currentConflict.conflictingTickets.length > 3 && (
-                        <div className="text-xs text-slate-500 dark:text-slate-400 italic">
-                          +{currentConflict.conflictingTickets.length - 3} more...
-                        </div>
+                {/* AI Explainer */}
+                <div className="pt-0.5">
+                  {!aiExplanation && !aiExplaining && (
+                    <button
+                      onClick={handleExplainWithAI}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      Explain with AI
+                    </button>
+                  )}
+                  {aiExplaining && (
+                    <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                      <Loader2 className="w-3 h-3 animate-spin" />Analyzing…
+                    </div>
+                  )}
+                  {aiExplanation && (
+                    <div className="p-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg space-y-1">
+                      <p className="text-xs text-blue-800 dark:text-blue-300 font-medium">{aiExplanation.plainEnglish}</p>
+                      {aiExplanation.rootCause && (
+                        <p className="text-[11px] text-blue-600 dark:text-blue-400"><span className="font-semibold">Why: </span>{aiExplanation.rootCause}</p>
+                      )}
+                      {aiExplanation.suggestion && (
+                        <p className="text-[11px] text-emerald-700 dark:text-emerald-400"><span className="font-semibold">✓ Tip: </span>{aiExplanation.suggestion}</p>
                       )}
                     </div>
+                  )}
+                </div>
+
+                {/* Conflicting tickets */}
+                {currentConflict.conflictingTickets && currentConflict.conflictingTickets.length > 0 && (
+                  <div className="pt-1.5 border-t border-slate-100 dark:border-slate-800">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Conflicts with: </span>
+                    {currentConflict.conflictingTickets.slice(0, 3).map((cId, i) => {
+                      const cTicket = getTicketById(cId);
+                      return (
+                        <span key={cId} className="text-[11px] text-slate-600 dark:text-slate-400">
+                          {i > 0 && ', '}{cTicket?.title || cId}
+                        </span>
+                      );
+                    })}
+                    {currentConflict.conflictingTickets.length > 3 && (
+                      <span className="text-[11px] text-slate-400 italic"> +{currentConflict.conflictingTickets.length - 3} more</span>
+                    )}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Best Resolution */}
+            {/* ── Best Resolution ─────────────────────────────────────── */}
             {bestResolution ? (
-              <div className="border-2 border-amber-300 dark:border-amber-700 rounded-xl overflow-hidden bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/50 dark:to-yellow-950/50 shadow-lg">
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Recommended Solution</h3>
-                    <span className="ml-auto text-xs font-semibold px-2 py-1 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 rounded-full">
+              <div className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50/60 dark:bg-amber-950/30 overflow-hidden">
+                <div className="px-3 py-2.5">
+                  {/* Title + confidence */}
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-slate-900 dark:text-white">Recommended Fix</span>
+                    <span className="ml-auto text-[11px] font-semibold px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 rounded-full">
                       {bestResolution.confidence}% confidence
                     </span>
                   </div>
 
-                  <p className="text-base font-semibold text-slate-900 dark:text-white mb-3">
-                    {bestResolution.description}
-                  </p>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-100 mb-2">{bestResolution.description}</p>
 
-                  {/* Impact Preview */}
-                  <div className="space-y-2 mb-4 text-sm">
-                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Impact:</p>
+                  {/* Impact chips — inline */}
+                  <div className="flex items-center flex-wrap gap-1.5 mb-2.5">
                     {bestResolution.impact.willResolve && (
-                      <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>Resolves this conflict</span>
-                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400">
+                        <CheckCircle2 className="w-3 h-3" />Resolves conflict
+                      </span>
                     )}
                     {bestResolution.impact.mayCreateNew && bestResolution.impact.newConflictCount > 0 && (
-                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
-                        <AlertTriangle className="w-4 h-4" />
-                        <span>May create {bestResolution.impact.newConflictCount} new conflict{bestResolution.impact.newConflictCount > 1 ? 's' : ''}</span>
-                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400">
+                        <AlertTriangle className="w-3 h-3" />{bestResolution.impact.newConflictCount} new conflict{bestResolution.impact.newConflictCount > 1 ? 's' : ''}
+                      </span>
                     )}
                     {bestResolution.impact.willExtendRelease && bestResolution.impact.extensionDays > 0 && (
-                      <div className="flex items-center gap-2 text-orange-700 dark:text-orange-400">
-                        <CalendarClock className="w-4 h-4" />
-                        <span>May extend release by {bestResolution.impact.extensionDays} day{bestResolution.impact.extensionDays > 1 ? 's' : ''}</span>
-                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400">
+                        <CalendarClock className="w-3 h-3" />+{bestResolution.impact.extensionDays}d release
+                      </span>
                     )}
                     {!bestResolution.impact.mayCreateNew && !bestResolution.impact.willExtendRelease && (
-                      <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                        <CheckCircle2 className="w-4 h-4" />
-                        <span>No negative side effects</span>
-                      </div>
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                        <CheckCircle2 className="w-3 h-3" />No side effects
+                      </span>
                     )}
                   </div>
 
-                  {/* Primary Action Button */}
-                  <button
-                    onClick={handleApplyBestSolution}
-                    disabled={isApplying}
-                    className={cn(
-                      "w-full px-4 py-3 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2",
-                      isApplying
-                        ? "bg-slate-300 dark:bg-slate-700 text-slate-500 cursor-not-allowed"
-                        : "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl"
-                    )}
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    {isApplying ? 'Applying...' : 'Apply & Continue'}
-                  </button>
-
-                  {/* More Options (Collapsed by default) */}
-                  <button
-                    onClick={() => setShowMoreOptions(!showMoreOptions)}
-                    className="w-full mt-2 px-4 py-2 text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-all duration-200 flex items-center justify-center gap-1"
-                  >
-                    {showMoreOptions ? 'Hide' : 'More'} options
-                    <ChevronRight className={cn("w-3 h-3 transition-transform", showMoreOptions && "rotate-90")} />
-                  </button>
+                  {/* Actions row */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleApplyBestSolution}
+                      disabled={isApplying}
+                      className={cn(
+                        "flex-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5",
+                        isApplying
+                          ? "bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed"
+                          : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-sm"
+                      )}
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      {isApplying ? 'Applying…' : 'Apply & Continue'}
+                    </button>
+                    <button
+                      onClick={() => setShowMoreOptions(!showMoreOptions)}
+                      className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white dark:hover:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 transition-colors flex items-center gap-1"
+                    >
+                      {showMoreOptions ? 'Less' : 'More'}
+                      <ChevronRight className={cn("w-3 h-3 transition-transform", showMoreOptions && "rotate-90")} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
-              // No automatic solution available
-              <div className="border border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-lg p-4">
-                <div className="flex items-start gap-2 mb-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Manual Resolution Required</h3>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                      No automatic solution found. Please review options below or skip this conflict.
-                    </p>
-                  </div>
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2.5 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white">Manual resolution needed</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">No automatic fix found — use the options below or skip.</p>
                 </div>
                 <button
                   onClick={() => setShowMoreOptions(true)}
-                  className="w-full px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 rounded-lg text-sm font-medium transition-all"
+                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex-shrink-0"
                 >
-                  Show Manual Options
+                  Options
                 </button>
               </div>
             )}
 
-            {/* Manual Options (Expanded) */}
+            {/* ── Manual Options ───────────────────────────────────────── */}
             {showMoreOptions && currentConflict.suggestions && (
-              <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden bg-white dark:bg-slate-900 shadow-sm">
-                <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                  <h4 className="text-sm font-semibold text-slate-900 dark:text-white">Manual Options</h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">Choose an alternative resolution</p>
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+                <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Manual Options</span>
                 </div>
-                <div className="p-4 space-y-3">
-                  {/* Reassignment Options */}
+                <div className="p-3 space-y-2.5">
                   {currentConflict.suggestions.possibleReassignments && currentConflict.suggestions.possibleReassignments.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Reassign to:</p>
-                      <div className="flex flex-wrap gap-2">
+                    <div>
+                      <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1.5">Reassign to:</p>
+                      <div className="flex flex-wrap gap-1.5">
                         {currentConflict.suggestions.possibleReassignments.map(dev => (
-                          <button
-                            key={dev}
-                            onClick={() => handleManualAction('reassign', dev)}
-                            className="px-3 py-1.5 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg transition-all duration-200 flex items-center gap-1.5 font-medium"
-                          >
-                            <UsersIcon className="w-3.5 h-3.5" />
-                            {dev}
+                          <button key={dev} onClick={() => handleManualAction('reassign', dev)}
+                            className="px-2.5 py-1 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-700 rounded-lg transition-colors flex items-center gap-1 font-medium">
+                            <UsersIcon className="w-3 h-3" />{dev}
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  {/* Shift Options */}
                   {currentConflict.suggestions.possibleShiftDays && currentConflict.suggestions.possibleShiftDays.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Shift schedule:</p>
-                      <div className="flex flex-wrap gap-2">
+                    <div>
+                      <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1.5">Shift schedule:</p>
+                      <div className="flex flex-wrap gap-1.5">
                         {currentConflict.suggestions.possibleShiftDays.slice(0, 3).map(days => (
-                          <button
-                            key={days}
-                            onClick={() => handleManualAction('shift', days)}
-                            className="px-3 py-1.5 text-xs bg-green-50 hover:bg-green-100 dark:bg-green-950/50 dark:hover:bg-green-900/70 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-700 rounded-lg transition-all duration-200 flex items-center gap-1.5 font-medium"
-                          >
-                            <CalendarClock className="w-3.5 h-3.5" />
-                            +{days} day{days > 1 ? 's' : ''}
+                          <button key={days} onClick={() => handleManualAction('shift', days)}
+                            className="px-2.5 py-1 text-xs bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/70 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700 rounded-lg transition-colors flex items-center gap-1 font-medium">
+                            <CalendarClock className="w-3 h-3" />+{days}d
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  {/* Sprint Move Options */}
                   {currentConflict.suggestions.possibleSprintMoves && currentConflict.suggestions.possibleSprintMoves.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-xs text-slate-600 dark:text-slate-400 font-medium">Move to sprint:</p>
-                      <div className="flex flex-wrap gap-2">
+                    <div>
+                      <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1.5">Move to sprint:</p>
+                      <div className="flex flex-wrap gap-1.5">
                         {currentConflict.suggestions.possibleSprintMoves.map(sprintId => (
-                          <button
-                            key={sprintId}
-                            onClick={() => handleManualAction('sprint', sprintId)}
-                            className="px-3 py-1.5 text-xs bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/50 dark:hover:bg-purple-900/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 rounded-lg transition-all duration-200 flex items-center gap-1.5 font-medium"
-                          >
-                            <ArrowRight className="w-3.5 h-3.5" />
-                            Next Sprint
+                          <button key={sprintId} onClick={() => handleManualAction('sprint', sprintId)}
+                            className="px-2.5 py-1 text-xs bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/50 dark:hover:bg-purple-900/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 rounded-lg transition-colors flex items-center gap-1 font-medium">
+                            <ArrowRight className="w-3 h-3" />Next Sprint
                           </button>
                         ))}
                       </div>
@@ -447,45 +486,43 @@ export function ConflictResolutionPanel({
               </div>
             )}
 
-            {/* Ignore Option */}
+            {/* Ignore */}
             <button
               onClick={() => {
-                onIgnoreConflict?.(currentConflict.ticketId);
-                setResolvedConflicts(prev => new Set(prev).add(currentConflict.ticketId));
+                if (!currentConflict) return;
+                const resolvedId = currentConflict.ticketId;
+                onIgnoreConflict?.(resolvedId);
+                setResolvedConflicts(prev => new Set(prev).add(resolvedId));
+                setJustResolvedId(resolvedId);
               }}
-              className="w-full px-4 py-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-all duration-200 font-medium"
+              className="w-full py-1.5 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-white dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors font-medium"
             >
               Ignore This Conflict
             </button>
-          </div>
+          </>
         ) : null}
       </div>
 
-      {/* Footer - Navigation */}
-      <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
-        <div className="flex items-center justify-between gap-3">
-          <button
-            onClick={handlePrevious}
-            disabled={currentIndex === 0}
-            className={cn(
-              "px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2",
-              currentIndex === 0
-                ? "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed"
-                : "bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300"
-            )}
-          >
-            <ChevronLeft className="w-4 h-4" />
-            Previous
-          </button>
-
-          <button
-            onClick={handleSkip}
-            className="px-4 py-2 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2"
-          >
-            Skip
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
+      {/* ── Footer navigation ───────────────────────────────────────────── */}
+      <div className="px-4 py-2.5 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-between">
+        <button
+          onClick={handlePrevious}
+          disabled={currentIndex === 0}
+          className={cn(
+            "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5",
+            currentIndex === 0
+              ? "text-slate-300 dark:text-slate-600 cursor-not-allowed"
+              : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+          )}
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />Previous
+        </button>
+        <button
+          onClick={handleSkip}
+          className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors flex items-center gap-1.5"
+        >
+          Skip<ChevronRight className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

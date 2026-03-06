@@ -5,13 +5,14 @@ import { buildReleasePlanSafe } from '../../domain/planningEngine';
 import type { TicketInput, ReleaseConfig, ReleasePlan } from '../../domain/types';
 import { parseCSV } from '../lib/csvParser';
 import { mapReleasePlanToAppRelease } from '../../domain/adapters/domainToAppMapper';
-import type { Product, Phase } from '../data/mockData';
+import type { Product, Phase, Ticket } from '../data/mockData';
 import { loadProducts, saveProducts, loadTeamMembersByProduct } from '../lib/localStorage';
 import { savePhases } from '../lib/localStorage';
 import { DatePicker } from './DatePicker';
 import { toLocalDateString, parseLocalDate } from '../lib/dateUtils';
 import { FeasibilityMeter } from './FeasibilityMeter';
 import { ReviewStatsGrid } from './ReviewStatsGrid';
+import { autoAssignTickets } from '../lib/autoAssignmentService';
 // COMMENTED OUT: DataInsightsPanel - Feature removed per user request
 // import { DataInsightsPanel } from './DataInsightsPanel';
 import { CsvPreviewTable } from './CsvPreviewTable';
@@ -42,10 +43,6 @@ export function AutoReleaseModal({ product, onClose }: AutoReleaseModalProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [showCsvInput, setShowCsvInput] = useState(false);
   
-  // Assignment analytics (display only, doesn't affect capacity)
-  const [uniqueAssignedDevelopers, setUniqueAssignedDevelopers] = useState<string[]>([]);
-  const [ticketsWithoutAssignment, setTicketsWithoutAssignment] = useState(0);
-
   // Phase setup state
   const [showPhaseSetup, setShowPhaseSetup] = useState(false);
   const [pendingReleaseId, setPendingReleaseId] = useState<string>('');
@@ -105,30 +102,6 @@ export function AutoReleaseModal({ product, onClose }: AutoReleaseModalProps) {
     }
   }, [csvInput]);
 
-  // Auto-update assignment analytics when parsedTickets changes
-  useEffect(() => {
-    if (!parsedTickets) {
-      setUniqueAssignedDevelopers([]);
-      setTicketsWithoutAssignment(0);
-      return;
-    }
-
-    const uniqueAssigned = Array.from(
-      new Set(
-        parsedTickets
-          .map(t => t.assignedToRaw?.trim())
-          .filter(Boolean)
-      )
-    );
-    
-    const unassignedCount = parsedTickets.filter(
-      t => !t.assignedToRaw || !t.assignedToRaw.trim()
-    ).length;
-    
-    setUniqueAssignedDevelopers(uniqueAssigned as string[]);
-    setTicketsWithoutAssignment(unassignedCount);
-  }, [parsedTickets]);
-
   // Keyboard shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -162,7 +135,40 @@ export function AutoReleaseModal({ product, onClose }: AutoReleaseModalProps) {
 
   // Download CSV Template
   const downloadCsvTemplate = () => {
-    const csvContent = `title,epic,effortDays,priority,assignedTo
+    // Template with auto-assignment (assignedTo is empty)
+    const csvContentAutoAssign = `title,epic,effortDays,priority,assignedTo
+Configure AWS hosting services,Infra Setup,15,High,
+Configure AWS GenAI services,Infra Setup,10,High,
+Configure AWS storage services,Infra Setup,5,High,
+Configure Environments and Deployments,Infra Setup,10,High,
+Agents codebase setup,Code Setup,10,High,
+Backend setup (BFF layer),Code Setup,10,High,
+Develop framework to build and orchestrate multiple agents,Agentic AI Foundation,5,High,
+Develop data source connectors,Agentic AI Foundation,10,High,
+Develop tools (or MCP server) for external operations,Agentic AI Foundation,15,High,
+Setup memory layer,Agentic AI Foundation,10,High,
+Setup knowledge bases,Agentic AI Foundation,10,High,
+SSO Login,Authentication,5,High,
+SSO token verification,Authentication,5,High,
+Role Based access control and User groups,Account Management,15,High,
+Brand Library Creation,Brand Library,10,High,
+Document management,Brand Library,10,High,
+Knowledge Base - Ingestion Workflow,Brand Library,25,High,
+Ability to create and manage content collection in brand library,Content Collection,5,High,
+Agents to identify relevant documents from brand library,Content Collection,5,High,
+Agents to generate text content based on context and template,Content Creation,10,High,
+Agentic workflow to draft content with given inputs,Content Creation,10,High,
+Workflows to modify content draft,Content Creation,10,High,
+Fine-tune creation agents for specific channel templates,Content Creation,15,High,
+Dynamic Templates with X dynamic components,Templates,5,High,
+Agentic workflows to localize the content draft (translation + rules),Content Localization,15,High,
+Workflows to modify localized content,Content Localization,5,High,
+Fine-tune localization agents for specific geographies,Content Localization,10,High,
+UI Based Form to collect key pieces of information that will be captured and stored in our DD. This will be used for the master prompt,Master Story,15,High,
+Country roll-out for Global + Germany Italy,Country Roll out,15,High,`;
+
+    // Template with manual assignments
+    const csvContentManual = `title,epic,effortDays,priority,assignedTo
 Configure AWS hosting services,Infra Setup,15,High,AI Tech Lead
 Configure AWS GenAI services,Infra Setup,10,High,AI Tech Lead
 Configure AWS storage services,Infra Setup,5,High,AI Tech Lead
@@ -193,13 +199,22 @@ Fine-tune localization agents for specific geographies,Content Localization,10,H
 UI Based Form to collect key pieces of information that will be captured and stored in our DD. This will be used for the master prompt,Master Story,15,High,AI Tech Backend 3
 Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Backend 3`;
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'release_import_template.csv';
-    link.click();
-    URL.revokeObjectURL(url);
+    // Download helper function
+    const downloadFile = (content: string, filename: string) => {
+      const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
+
+    // Download both templates
+    downloadFile(csvContentAutoAssign, 'release_template_auto_assign.csv');
+    setTimeout(() => {
+      downloadFile(csvContentManual, 'release_template_manual_assign.csv');
+    }, 500);
   };
 
   // Handle file upload
@@ -232,20 +247,30 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
         return;
       }
 
-      // Validate assignments against team roster
-      const teamMemberNames = new Set(teamMembers.map(tm => tm.name));
-      const unknownAssignments = new Set<string>();
-      
-      parsedTickets.forEach(ticket => {
-        if (ticket.assignedToRaw && !teamMemberNames.has(ticket.assignedToRaw)) {
-          unknownAssignments.add(ticket.assignedToRaw);
-        }
-      });
+      // Convert TicketInput to Ticket format for auto-assignment
+      const ticketsForAssignment: Ticket[] = parsedTickets.map(ticket => ({
+        id: ticket.id,
+        title: ticket.title,
+        description: ticket.epic || '',
+        startDate: new Date(),
+        endDate: new Date(),
+        status: 'planned' as const,
+        effortDays: ticket.effortDays,
+        storyPoints: ticket.effortDays,
+        assignedTo: ticket.assignedToRaw || '',
+        dependencies: {},
+      }));
 
-      if (unknownAssignments.size > 0) {
-        const unknownList = Array.from(unknownAssignments);
-        setWarning(`${unknownAssignments.size} unmatched assignment(s): ${unknownList.join(', ')}. These will be set to "Unassigned".`);
-      }
+      // Apply auto-assignment
+      const assignedTickets = autoAssignTickets(ticketsForAssignment, teamMembers);
+
+      // Update parsedTickets with auto-assigned values (mutate in place first so the
+      // planner sees the assignments in this same synchronous call, then flush a new
+      // array reference to re-trigger the assignment-analytics useEffect for the UI)
+      parsedTickets.forEach((ticket, index) => {
+        ticket.assignedToRaw = assignedTickets[index].assignedTo;
+      });
+      setParsedTickets([...parsedTickets]); // new ref → triggers analytics useEffect
 
       // Build release config
       const config: ReleaseConfig = {
@@ -510,12 +535,12 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
               {showCsvInput && (
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                    CSV Input
+                    CSV Input <span className="text-slate-500 font-normal text-xs">(assignedTo is optional - AI will assign if empty)</span>
                   </label>
                   <textarea
                     value={csvInput}
                     onChange={(e) => setCsvInput(e.target.value)}
-                    placeholder="title,epic,effortDays,priority,assignedTo&#10;Feature A,Core,5,High,Sarah Chen&#10;Feature B,Core,3,Medium,Marcus Rivera&#10;Feature C,UI,8,Low,"
+                    placeholder="title,epic,effortDays,priority,assignedTo&#10;Feature A,Core,5,High,&#10;Feature B,Core,3,Medium,Sarah Chen&#10;Feature C,UI,8,Low,"
                     className="w-full h-48 px-3 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-slate-900 dark:text-white placeholder-slate-400"
                   />
                   <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -598,7 +623,18 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
           {step === 3 && plannerPreview && (() => {
             const teamMembers = loadTeamMembersByProduct(product.id) || [];
             const totalTeamSize = teamMembers.length;
-            const assignedDevsCount = uniqueAssignedDevelopers.length;
+            // Derive assignment counts directly from the plan (post-auto-assignment truth)
+            // rather than from the stale parsedTickets useEffect state
+            const allPlanTickets = [
+              ...plannerPreview.sprints.flatMap(s => s.tickets),
+              ...plannerPreview.overflowTickets,
+            ];
+            const assignedDevsCount = new Set(
+              allPlanTickets.map(t => t.assignedToRaw).filter(Boolean)
+            ).size;
+            const unassignedTicketCount = allPlanTickets.filter(
+              t => !t.assignedToRaw || !t.assignedToRaw.trim()
+            ).length;
 
             // Generate AI Planning Insights
             // Only analyze scheduled tickets for conflicts (overflow tickets have no dates yet)
@@ -655,7 +691,7 @@ Country roll-out for Global + Germany Italy,Country Roll out,15,High,AI Tech Bac
                   overflowCount={plannerPreview.overflowTickets.length}
                   teamSize={totalTeamSize}
                   assignedCount={assignedDevsCount}
-                  unassignedCount={ticketsWithoutAssignment}
+                  unassignedCount={unassignedTicketCount}
                 />
 
                 {/* AI Planning Insights Panel */}

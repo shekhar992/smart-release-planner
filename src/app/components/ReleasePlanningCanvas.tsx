@@ -1,5 +1,6 @@
-import { useState, useMemo, useEffect } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, AlertTriangle } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { Users, ArrowLeft, Calendar, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, MoreHorizontal, AlertTriangle, Sparkles, Zap, WifiOff } from 'lucide-react';
+import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { ZoomControls, ZoomLevel } from './ZoomControls';
@@ -8,17 +9,22 @@ import { WorkloadModal } from './WorkloadModal';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
 import { TicketCreationModal } from './TicketCreationModal';
 import { BulkTicketImportModal } from './BulkTicketImportModal';
+import { PRDImportModal } from './PRDImportModal';
 import { ConflictResolutionPanel } from './ConflictResolutionPanel';
 import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct, storyPointsToDays, Phase } from '../data/mockData';
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
-import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
+import { loadProducts, saveRelease, saveProducts, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
+import { useOllamaStatus } from '../lib/useOllamaStatus';
 import { calculateEffortFromDates, toLocalDateString, calculateEndDateFromEffort } from '../lib/dateUtils';
 import { calculateDurationDays } from '../lib/durationCalculator';
 import { addDays } from 'date-fns';
 import { exportReleaseTimelinePptx } from '../lib/exporters/exportReleaseTimelinePptx';
-// COMMENTED OUT: Auto-allocation removed per user request
-// import { autoAllocateRelease } from '../lib/planningBridge';
+import { autoAllocateRelease } from '../lib/planningBridge';
+import { AICommandBar } from './AICommandBar';
+import { generateRiskNarrative, type RiskNarrative } from '../lib/aiCommandProcessor';
+import { AutoResolvePreviewModal } from './AutoResolvePreviewModal';
+import { runAutoResolve, type AutoResolveResult, type TicketResolution } from '../lib/autoResolver';
 // COMMENTED OUT: Toast notifications - Removed per user request
 // import { toastSuccess, toastError, toastPromise, toastInfo } from '../lib/toastHelpers';
 // COMMENTED OUT: Release Health Header - Removed to free up UI real estate
@@ -32,22 +38,23 @@ import { exportReleaseTimelinePptx } from '../lib/exporters/exportReleaseTimelin
 // Helper function to check if ticket is in dev window
 function isTicketInDevWindow(ticket: Ticket, phases: Phase[]): boolean {
   const devPhases = phases.filter(p => p.allowsWork);
-  
   if (devPhases.length === 0) return true;
-  
+
   const ticketStart = new Date(ticket.startDate);
   ticketStart.setHours(0, 0, 0, 0);
   const ticketEnd = new Date(ticket.endDate);
   ticketEnd.setHours(0, 0, 0, 0);
-  
-  return devPhases.some(phase => {
-    const phaseStart = new Date(phase.startDate);
-    phaseStart.setHours(0, 0, 0, 0);
-    const phaseEnd = new Date(phase.endDate);
-    phaseEnd.setHours(0, 0, 0, 0);
-    
-    return ticketStart >= phaseStart && ticketEnd <= phaseEnd;
-  });
+
+  // The planner treats the ENTIRE dev zone as one schedulable range and can
+  // place tickets that span internal phase boundaries (e.g. Development → QA).
+  // Check against the UNION of all allowsWork phases, not a single phase.
+  const allMs = devPhases.flatMap(p => [new Date(p.startDate).getTime(), new Date(p.endDate).getTime()]);
+  const devStart = new Date(Math.min(...allMs));
+  devStart.setHours(0, 0, 0, 0);
+  const devEnd = new Date(Math.max(...allMs));
+  devEnd.setHours(0, 0, 0, 0);
+
+  return ticketStart >= devStart && ticketEnd <= devEnd;
 }
 
 // Header Alerts Panel - Inline component for header bar
@@ -55,12 +62,16 @@ function HeaderAlertsPanel({
   tickets, 
   phases, 
   conflictCount, 
-  onViewConflicts 
+  onViewConflicts,
+  onAutoResolve,
+  autoResolving,
 }: { 
   tickets: Ticket[]; 
   phases: Phase[]; 
   conflictCount: number;
   onViewConflicts: () => void;
+  onAutoResolve?: () => void;
+  autoResolving?: boolean;
 }) {
   const spilloverTickets = tickets.filter(t => !isTicketInDevWindow(t, phases));
   const spilloverCount = spilloverTickets.length;
@@ -131,17 +142,30 @@ function HeaderAlertsPanel({
                     <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
                       Multiple tickets assigned to same developer with overlapping dates.
                     </p>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewConflicts();
-                        setIsExpanded(false);
-                      }}
-                      className="mt-3 w-full px-3 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-amber-600/30 hover:shadow-xl flex items-center justify-center gap-2"
-                    >
-                      <AlertTriangle className="w-3 h-3" />
-                      Resolve Conflicts
-                    </button>
+                    <div className="mt-3 flex flex-col gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAutoResolve?.();
+                          setIsExpanded(false);
+                        }}
+                        disabled={autoResolving}
+                        className="w-full px-3 py-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-violet-600/30 hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Zap className="w-3 h-3" />
+                        {autoResolving ? 'Analyzing…' : 'Auto-Resolve All'}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewConflicts();
+                          setIsExpanded(false);
+                        }}
+                        className="w-full px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors text-center"
+                      >
+                        or review manually
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -160,6 +184,7 @@ export function ReleasePlanningCanvas() {
   // Initialize localStorage with mock data if empty (only once)
   const [initialized, setInitialized] = useState(false);
   const [teamMembersRefreshKey, setTeamMembersRefreshKey] = useState(0);
+  const { isOnline: ollamaOnline } = useOllamaStatus();
   const [holidaysRefreshKey, setHolidaysRefreshKey] = useState(0);
   const [productsRefreshKey, setProductsRefreshKey] = useState(0);
   
@@ -253,8 +278,155 @@ export function ReleasePlanningCanvas() {
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showSprintCreation, setShowSprintCreation] = useState(false);
   const [showAddMilestoneModal, setShowAddMilestoneModal] = useState(false);
+  const [showPRDImport, setShowPRDImport] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
   const [viewMode, setViewMode] = useState<ViewMode>('detailed');
+  const detailedZoomRef = useRef<ZoomLevel>('day');
+
+  // Risk Narrative state
+  const [riskNarrative, setRiskNarrative] = useState<RiskNarrative | null>(null);
+  const [riskLoading, setRiskLoading] = useState(false);
+
+  // ── Auto-Resolver state ──────────────────────────────────────────────────
+  const [autoResolving, setAutoResolving] = useState(false);
+  const [autoResolveResult, setAutoResolveResult] = useState<AutoResolveResult | null>(null);
+  const [showAutoResolveModal, setShowAutoResolveModal] = useState(false);
+
+  const handleAutoResolve = async () => {
+    if (!release || autoResolving) return;
+    setAutoResolving(true);
+    setAutoResolveResult(null);
+    setShowAutoResolveModal(true); // open drawer immediately — shows loading skeleton
+    try {
+      const result = await runAutoResolve(release, derivedTeamMembers, holidays, phases);
+      setAutoResolveResult(result);
+    } catch (e) {
+      console.error('[AutoResolve] Failed:', e);
+      setShowAutoResolveModal(false);
+    } finally {
+      setAutoResolving(false);
+    }
+  };
+
+  const handleApplyResolutions = (resolutions: TicketResolution[]) => {
+    setRelease(prev => {
+      if (!prev) return prev;
+
+      const sortedResolutions = [...resolutions].sort(
+        (a, b) => new Date(a.toStartDate).getTime() - new Date(b.toStartDate).getTime(),
+      );
+      const resMap = new Map(sortedResolutions.map(r => [r.ticketId, r]));
+
+      // ── PASS 1: compute conflict-free start/end per resolved ticket ───────
+      //
+      // Key insight: pre-seed per dev+sprint, NOT globally.
+      // Using a global max end-date caused resolved tickets to be pushed past
+      // ALL of a dev's work (including later sprints), creating new conflicts
+      // in those sprints — which is exactly why 3 runs were needed.
+      //
+      // Approach:
+      //  a) Build a helper that maps a date → which sprint it belongs to.
+      //  b) Pre-seed lastEndByDevSprint (key = "devName::sprintId") from every
+      //     unresolved ticket, bucketed into its sprint.
+      //  c) When computing a resolved ticket's start, only look at the
+      //     target sprint's existing occupancy for that dev.
+
+      // Sprint lookup helper — finds the sprint containing a given date, or
+      // the nearest sprint if the date falls between sprints.
+      const relSprints = (prev.sprints ?? []).slice().sort(
+        (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+      );
+      function findSprintForDate(d: Date): string | null {
+        const day = d.getTime();
+        for (const s of relSprints) {
+          const ss = new Date(s.startDate).getTime();
+          const se = new Date(s.endDate).getTime();
+          if (day >= ss && day <= se) return s.id;
+        }
+        // Nearest sprint fallback
+        let nearest: string | null = null;
+        let nearestDist = Infinity;
+        for (const s of relSprints) {
+          const ss = new Date(s.startDate).getTime();
+          const se = new Date(s.endDate).getTime();
+          const dist = day < ss ? ss - day : day - se;
+          if (dist < nearestDist) { nearestDist = dist; nearest = s.id; }
+        }
+        return nearest;
+      }
+
+      // Pre-seed: unresolved tickets block only their own sprint for that dev.
+      const lastEndByDevSprint = new Map<string, Date>();
+      for (const feature of prev.features) {
+        for (const ticket of feature.tickets) {
+          if (resMap.has(ticket.id)) continue;
+          if (!ticket.assignedTo || ticket.assignedTo.trim() === '') continue;
+          const sprintId = findSprintForDate(new Date(ticket.startDate));
+          if (!sprintId) continue;
+          const key = `${ticket.assignedTo}::${sprintId}`;
+          const te = new Date(ticket.endDate);
+          const existing = lastEndByDevSprint.get(key);
+          if (!existing || te > existing) lastEndByDevSprint.set(key, te);
+        }
+      }
+
+      const finalDates = new Map<string, { start: Date; end: Date }>();
+      for (const res of sortedResolutions) {
+        const dev = derivedTeamMembers.find(m => m.name === res.toAssignee);
+        const velocity = dev?.velocityMultiplier ?? 1;
+        const origTicket = prev.features.flatMap(f => f.tickets).find(t => t.id === res.ticketId);
+        const effort = origTicket?.effortDays ?? 1;
+        const durationDays = calculateDurationDays(effort, velocity);
+
+        const resolverStart = new Date(res.toStartDate);
+        const key = `${res.toAssignee}::${res.toSprintId}`;
+        const prevEnd = lastEndByDevSprint.get(key);
+
+        let start: Date;
+        if (prevEnd) {
+          let next = addDays(prevEnd, 1);
+          while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1);
+          start = next > resolverStart ? next : resolverStart;
+        } else {
+          start = resolverStart;
+        }
+
+        const end = addDays(start, durationDays - 1);
+        lastEndByDevSprint.set(key, end);
+        finalDates.set(res.ticketId, { start, end });
+      }
+
+      // ── PASS 2: apply computed dates in the ticket tree ───────────────────
+      return {
+        ...prev,
+        features: prev.features.map(feature => ({
+          ...feature,
+          tickets: feature.tickets.map(ticket => {
+            const res = resMap.get(ticket.id);
+            if (!res) return ticket;
+            const dates = finalDates.get(ticket.id)!;
+            return { ...ticket, assignedTo: res.toAssignee, startDate: dates.start, endDate: dates.end };
+          }),
+        })),
+      };
+    });
+    setShowAutoResolveModal(false);
+    setAutoResolveResult(null);
+  };
+
+  const handleGenerateRiskBrief = async () => {
+    if (riskLoading) return;
+    setRiskLoading(true);
+    setRiskNarrative(null);
+    try {
+      const result = await generateRiskNarrative(release, teamMembers);
+      setRiskNarrative(result);
+    } catch {
+      // best-effort
+    } finally {
+      setRiskLoading(false);
+    }
+  };
 
   // COMMENTED OUT: Smart Assistant Panel state - Removed per user request
   // const [assistantPanelOpen, setAssistantPanelOpen] = useState(() => {
@@ -336,8 +508,29 @@ export function ReleasePlanningCanvas() {
 
   const handleDeleteRelease = () => {
     if (!releaseData || !release) return;
-    deleteRelease(releaseData.id, release.id);
+    setConfirmDeleteRelease(false);
+    const productId = releaseData.id;
+    const releaseName = release.name;
+    const releaseSnapshot = release;
+    deleteRelease(productId, release.id);
     navigate('/');
+    toast(`"${releaseName}" deleted`, {
+      description: 'All tickets and sprints were removed.',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          const current = loadProducts() || [];
+          const restored = current.map(p =>
+            p.id === productId
+              ? { ...p, releases: [...p.releases, releaseSnapshot] }
+              : p
+          );
+          saveProducts(restored);
+          navigate(`/release/${releaseSnapshot.id}`);
+        },
+      },
+      duration: 5000,
+    });
   };
 
   // Conflict resolution handlers
@@ -398,12 +591,51 @@ export function ReleasePlanningCanvas() {
 
   // View mode handler
   const handleViewModeChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    // When switching to executive mode, lock to week view
     if (mode === 'executive') {
+      // Snapshot current zoom so we can restore it on the way back
+      detailedZoomRef.current = zoomLevel;
       setZoomLevel('week');
+    } else {
+      // Restore the zoom the user had before entering exec mode
+      setZoomLevel(detailedZoomRef.current);
     }
+    setViewMode(mode);
   };
+
+  // D.2 — Keyboard shortcuts
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    const active = document.activeElement;
+    const isEditableActive =
+      active instanceof HTMLInputElement ||
+      active instanceof HTMLTextAreaElement ||
+      active instanceof HTMLSelectElement ||
+      (active as HTMLElement)?.isContentEditable;
+
+    if (isEditableActive) return;
+
+    // n → New Ticket (only when no modal is open)
+    const anyModal = showTicketCreation || showBulkImport || showWorkloadModal ||
+      selectedTicket || showConflictResolution || showAutoResolveModal ||
+      confirmDeleteRelease;
+    if (e.key === 'n' && !anyModal) {
+      e.preventDefault();
+      setShowTicketCreation({});
+      return;
+    }
+
+    // Escape → close floating panels (actions menu, risk brief)
+    if (e.key === 'Escape') {
+      if (showActionsMenu) { setShowActionsMenu(false); return; }
+      if (riskNarrative) { setRiskNarrative(null); return; }
+    }
+  }, [showTicketCreation, showBulkImport, showWorkloadModal, selectedTicket,
+      showConflictResolution, showAutoResolveModal, confirmDeleteRelease,
+      showActionsMenu, riskNarrative]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   // Sync release state when currentRelease changes (e.g., after data loads)
   useEffect(() => {
@@ -745,7 +977,7 @@ export function ReleasePlanningCanvas() {
   };
 
   const handleAddFeatureWithName = (name: string): string => {
-    const id = `f${Date.now()}`;
+    const id = `f${crypto.randomUUID()}`;
     const newFeature: Feature = {
       id,
       name,
@@ -899,7 +1131,7 @@ export function ReleasePlanningCanvas() {
 
   const handleCreateSprint = (name: string, startDate: Date, endDate: Date) => {
     const newSprint: Sprint = {
-      id: `s${Date.now()}`,
+      id: `s${crypto.randomUUID()}`,
       name,
       startDate,
       endDate
@@ -1080,8 +1312,8 @@ export function ReleasePlanningCanvas() {
   return (
     <div className="h-screen flex flex-col bg-[#F7F8FA]">
       {/* Top Navigation Bar */}
-      <div className="sticky top-0 z-[80] flex items-center justify-between px-6 py-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 shadow-sm">
-        <div className="flex items-center gap-4">
+      <div className="sticky top-0 z-[80] flex items-center gap-3 px-6 py-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center gap-4 flex-shrink-0">
           <button
             onClick={() => navigate('/')}
             className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all shadow-sm"
@@ -1096,55 +1328,52 @@ export function ReleasePlanningCanvas() {
           <div className="flex items-center gap-1 ml-1">
             <button
               onClick={openEditRelease}
-              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
+              className="btn-icon hover:text-blue-600 dark:hover:text-blue-400"
               title="Edit release"
             >
               <Pencil className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setConfirmDeleteRelease(true)}
-              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 dark:text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-all"
+              className="btn-icon hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600 dark:hover:text-red-400"
               title="Delete release"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {/* Storage indicator - subtle */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[11px] text-slate-600 dark:text-slate-400 shadow-sm">
-            <Database className="w-3 h-3" />
-            {lastSaved && (
-              <span>
-                {lastSaved.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            )}
-          </div>
-          
+
+        {/* ── AI Command Bar (center) ────────────────────────────────── */}
+        <div className="flex-1 flex justify-center px-2">
+          <AICommandBar release={release} teamMembers={teamMembers} />
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0">
           {/* Primary CTA */}
           <button
             onClick={() => setShowTicketCreation({})}
-            className="flex items-center gap-2 px-3 py-1.5 text-sm text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 font-semibold"
+            className="btn-primary gap-2"
           >
             <Plus className="w-4 h-4" />
             <span>New Ticket</span>
           </button>
 
-          {/* Header Alerts Panel */}
+          {/* Alerts — only mounts when issues exist */}
           <HeaderAlertsPanel
             tickets={allTickets}
             phases={phases}
             conflictCount={conflictSummary.totalConflicts}
             onViewConflicts={() => setShowConflictResolution(true)}
+            onAutoResolve={handleAutoResolve}
+            autoResolving={autoResolving}
           />
 
-          {/* View Mode Selector */}
+          {/* View / Zoom group */}
+          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700" />
           <ViewModeSelector
             currentMode={viewMode}
             onModeChange={handleViewModeChange}
           />
-
-          {/* Zoom Controls (only shown in Detailed mode) */}
           {viewMode === 'detailed' && (
             <ZoomControls
               currentZoom={zoomLevel}
@@ -1153,14 +1382,32 @@ export function ReleasePlanningCanvas() {
             />
           )}
 
-          {/* Actions Menu (overflow) */}
+          {/* AI + overflow group */}
+          <div className="w-px h-5 bg-slate-200 dark:bg-slate-700" />
+          <button
+            onClick={handleGenerateRiskBrief}
+            disabled={riskLoading}
+            className={ollamaOnline === false ? 'btn-secondary opacity-60' : 'btn-ai'}
+            title={ollamaOnline === false ? 'AI offline — Ollama is not reachable' : 'Generate AI release risk summary'}
+          >
+            {riskLoading ? (
+              <span className="w-3.5 h-3.5 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+            ) : ollamaOnline === false ? (
+              <WifiOff className="w-3.5 h-3.5" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5" />
+            )}
+            <span>{ollamaOnline === false ? 'AI Offline' : 'Risk Brief'}</span>
+          </button>
+
+          {/* Actions overflow — icon only */}
           <div className="relative">
             <button
               onClick={() => setShowActionsMenu(!showActionsMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all border border-slate-300 dark:border-slate-600 font-medium shadow-sm"
+              className="btn-icon"
+              title="More actions"
             >
-              <span>Actions</span>
-              <ChevronDown className="w-3.5 h-3.5" />
+              <MoreHorizontal className="w-4 h-4" />
             </button>
             
             {showActionsMenu && (
@@ -1200,6 +1447,16 @@ export function ReleasePlanningCanvas() {
                   >
                     <Upload className="w-4 h-4" />
                     <span>Import Tickets</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPRDImport(true);
+                      setShowActionsMenu(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-purple-700 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/30 transition-all text-left font-medium"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>PRD to Tickets</span>
                   </button>
                   <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
                   <button
@@ -1430,18 +1687,86 @@ export function ReleasePlanningCanvas() {
 
       {/* Main Canvas */}
       <div className="flex-1 overflow-hidden flex flex-col">
+
+        {/* Risk Narrative Banner */}
+        {riskNarrative && (
+          <div className={`flex-shrink-0 border-b px-6 py-3 ${
+            riskNarrative.riskLevel === 'Critical' ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' :
+            riskNarrative.riskLevel === 'High'     ? 'bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800' :
+            riskNarrative.riskLevel === 'Medium'   ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800' :
+                                                     'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800'
+          }`}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 flex-1 min-w-0">
+                <div className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold mt-0.5 ${
+                  riskNarrative.riskLevel === 'Critical' ? 'bg-red-200 dark:bg-red-900 text-red-800 dark:text-red-200' :
+                  riskNarrative.riskLevel === 'High'     ? 'bg-orange-200 dark:bg-orange-900 text-orange-800 dark:text-orange-200' :
+                  riskNarrative.riskLevel === 'Medium'   ? 'bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200' :
+                                                           'bg-emerald-200 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'
+                }`}>{riskNarrative.riskLevel} Risk</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{riskNarrative.headline}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5 leading-relaxed">{riskNarrative.paragraph}</p>
+                  {(riskNarrative.topRisks.length > 0 || riskNarrative.greenFlags.length > 0) && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5">
+                      {riskNarrative.topRisks.map((r, i) => (
+                        <span key={i} className="text-[11px] text-orange-700 dark:text-orange-300 flex items-center gap-1">
+                          <span>⚠</span>{r}
+                        </span>
+                      ))}
+                      {riskNarrative.greenFlags.map((g, i) => (
+                        <span key={i} className="text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                          <span>✓</span>{g}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setRiskNarrative(null)}
+                className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors mt-0.5"
+                title="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* COMMENTED OUT: Release Health Header - Removed to free up UI real estate */}
-        {/* <ReleaseHealthHeader
-          capacityUtil={capacityUtilization}
-          timelineStatus={timelineStatus}
-          teamVelocity={teamVelocity}
-          conflictMetrics={conflictMetrics}
-          insights={insights}
-          onInsightAction={handleInsightAction}
-        /> */}
+        {/* <ReleaseHealthHeader ... /> */}
 
         {/* Timeline */}
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 overflow-hidden relative">
+          {allTickets.length === 0 && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/95 dark:bg-slate-950/90 backdrop-blur-sm animate-in fade-in-0 duration-200">
+              <div className="text-center max-w-xs px-4">
+                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/40 dark:to-blue-900/30 flex items-center justify-center border border-blue-100 dark:border-blue-900/50 shadow-sm">
+                  <Plus className="w-7 h-7 text-blue-500 dark:text-blue-400" />
+                </div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1.5">No tickets yet</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
+                  Add your first ticket to start planning the timeline, or import from CSV or a PRD document.
+                </p>
+                <div className="flex items-center justify-center gap-2">
+                  <button
+                    onClick={() => setShowTicketCreation({})}
+                    className="btn-primary gap-2"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Ticket
+                  </button>
+                  <button
+                    onClick={() => setShowBulkImport({})}
+                    className="btn-secondary"
+                  >
+                    Import CSV
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <TimelinePanel
           release={release}
           holidays={holidays}
@@ -1504,16 +1829,85 @@ export function ReleasePlanningCanvas() {
       {showBulkImport && (
         <BulkTicketImportModal
           release={release}
+          teamMembers={teamMembers}
           onClose={() => setShowBulkImport(null)}
           onAddFeature={handleAddFeatureWithName}
           onAddTicket={handleAddTicketFull}
         />
       )}
 
-      {/* Conflict Resolution Panel */}
+      {/* PRD Import Modal */}
+      {showPRDImport && (
+        <PRDImportModal
+          isOpen={showPRDImport}
+          onClose={() => setShowPRDImport(false)}
+          teamMembers={teamMembers}
+          onImport={(tickets) => {
+            if (tickets.length === 0) return;
+            
+            // Create a new feature for PRD-generated tickets or use first feature
+            let targetFeatureId: string;
+            
+            if (release.features.length === 0) {
+              targetFeatureId = handleAddFeatureWithName('PRD Generated Features');
+            } else {
+              targetFeatureId = release.features[0].id;
+            }
+            
+            // Add all tickets to the release
+            setRelease(prev => {
+              if (!prev) return prev;
+              
+              const newTickets: Ticket[] = tickets.map(ticket => ({
+                ...ticket,
+                id: `t${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+              }));
+              
+              const updatedRelease = {
+                ...prev,
+                features: prev.features.map(f =>
+                  f.id === targetFeatureId
+                    ? { ...f, tickets: [...f.tickets, ...newTickets] }
+                    : f
+                )
+              };
+              
+              // After tickets are added, auto-allocate to sprints
+              // The planning engine will create sprints if they don't exist
+              setTimeout(() => {
+                const sprintLengthDays = updatedRelease.sprints.length > 0
+                  ? Math.round(
+                      (updatedRelease.sprints[0].endDate.getTime() - 
+                       updatedRelease.sprints[0].startDate.getTime()) / 
+                      (1000 * 60 * 60 * 24)
+                    )
+                  : 14; // Default to 2-week sprints
+                
+                const result = autoAllocateRelease(
+                  updatedRelease, 
+                  teamMembers, 
+                  holidays, 
+                  sprintLengthDays,
+                  phases  // constrain sprint generation to dev window phases
+                );
+                
+                if (result.success) {
+                  setRelease(result.release);
+                  saveRelease(releaseData.id, result.release);
+                  setLastSaved(new Date());
+                }
+              }, 100);
+              
+              return updatedRelease;
+            });
+          }}
+        />
+      )}
+
+      {/* Conflict Resolution Modal */}
       {showConflictResolution && (
-        <div 
-          className="fixed inset-0 z-[70] flex justify-end bg-black/20"
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
           onClick={() => setShowConflictResolution(false)}
         >
           <div onClick={(e) => e.stopPropagation()}>
@@ -1528,6 +1922,25 @@ export function ReleasePlanningCanvas() {
             />
           </div>
         </div>
+      )}
+
+      {/* Auto-Resolve Modal */}
+      {showAutoResolveModal && (
+        <AutoResolvePreviewModal
+          result={autoResolveResult}
+          isLoading={autoResolving}
+          onApprove={handleApplyResolutions}
+          onCancel={() => {
+            if (autoResolving) return; // don't allow close while loading
+            setShowAutoResolveModal(false);
+            setAutoResolveResult(null);
+          }}
+          onReviewManually={() => {
+            setShowAutoResolveModal(false);
+            setAutoResolveResult(null);
+            setShowConflictResolution(true);
+          }}
+        />
       )}
 
       {/* Edit Release Dialog */}
@@ -1597,11 +2010,11 @@ export function ReleasePlanningCanvas() {
       {/* Delete Release Confirmation */}
       {confirmDeleteRelease && (
         <div 
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm overlay-fade-in"
           onClick={() => setConfirmDeleteRelease(false)}
         >
           <div 
-            className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-[380px] border border-red-200 dark:border-red-800"
+            className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-2xl p-6 w-[380px] border border-red-200 dark:border-red-800 modal-pop-in"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-sm font-semibold text-red-700 dark:text-red-400 mb-2">Delete Release</h3>
@@ -1611,13 +2024,13 @@ export function ReleasePlanningCanvas() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDeleteRelease(false)}
-                className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all font-medium"
+                className="btn-ghost text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteRelease}
-                className="px-4 py-1.5 text-sm font-semibold text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-xl transition-all shadow-lg shadow-red-500/30 hover:shadow-xl hover:shadow-red-500/40"
+                className="btn-danger text-sm"
               >
                 Delete
               </button>

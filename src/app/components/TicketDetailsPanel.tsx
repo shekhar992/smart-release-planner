@@ -1,11 +1,38 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check, AlertTriangle } from 'lucide-react';
+import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check, AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
 import { Ticket, Release, TeamMember, Milestone, Holiday, mockHolidays } from '../data/mockData';
 import { resolveEffortDays } from '../lib/effortResolver';
 import { calculateEndDateFromEffort, calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
 import { loadHolidays } from '../lib/localStorage';
 import { cn } from './ui/utils';
 import { DatePicker } from './DatePicker';
+import { AI_ENDPOINT } from '../lib/aiEndpoint';
+
+// Minimal inline LLM call for AC regeneration (same Ollama pattern as prdPipeline.ts)
+async function regenerateAcceptanceCriteria(ticketTitle: string, ticketDescription: string): Promise<string> {
+  const res = await fetch(AI_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'llama3.2:3b',
+      messages: [
+        {
+          role: 'system',
+          content: 'You write BDD acceptance criteria for software tickets. Return ONLY the criteria in Given/When/Then format, plus a short Definition of Done checklist. No extra text.',
+        },
+        {
+          role: 'user',
+          content: `Ticket: "${ticketTitle}"\nDescription: ${ticketDescription || '(none)'}\n\nWrite BDD acceptance criteria:`,
+        },
+      ],
+      stream: false,
+      options: { temperature: 0.3, num_predict: 256, num_ctx: 2048 },
+    }),
+  });
+  if (!res.ok) throw new Error(`LLM ${res.status}`);
+  const data = await res.json();
+  return (data.message?.content ?? '').trim();
+}
 
 // Helper: Count working days (Mon-Fri) between two dates
 function countWorkingDays(start: Date, end: Date): number {
@@ -98,6 +125,133 @@ function getBlockingMilestonesForTicket(ticket: Ticket, milestones: Milestone[])
     // Check if ticket overlaps with milestone
     return ticketStart <= milestoneEnd && ticketEnd >= milestoneStart;
   });
+}
+
+// ── Acceptance Criteria sub-component ─────────────────────────────────────
+
+function AcceptanceCriteriaSection({
+  ticket,
+  onUpdate,
+}: {
+  ticket: Ticket;
+  onUpdate: (ac: string) => void;
+}) {
+  const [editing,     setEditing]     = useState(false);
+  const [draft,       setDraft]       = useState('');
+  const [regenerating, setRegenerating] = useState(false);
+
+  const ac = (ticket as any).acceptanceCriteria as string | undefined;
+
+  const handleRegenerate = async () => {
+    if (regenerating) return;
+    setRegenerating(true);
+    try {
+      const result = await regenerateAcceptanceCriteria(ticket.title, ticket.description || '');
+      onUpdate(result);
+    } catch {
+      // best-effort — show a friendly message
+      onUpdate('Could not reach AI. Is Ollama running?');
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  // Parse BDD lines for styled rendering
+  const renderACLines = (text: string) =>
+    text.split('\n').map((line, i) => {
+      const trimmed = line.trim();
+      if (!trimmed) return null;
+      const isGiven   = /^given\b/i.test(trimmed);
+      const isWhen    = /^when\b/i.test(trimmed);
+      const isThen    = /^then\b/i.test(trimmed);
+      const isAndOr   = /^(and|or)\b/i.test(trimmed);
+      const isDodItem = /^[-*•]\s/.test(trimmed);
+
+      if (isGiven || isWhen || isThen || isAndOr) {
+        const color = isGiven ? 'text-blue-700 dark:text-blue-400 font-semibold'
+          : isWhen  ? 'text-purple-700 dark:text-purple-400 font-semibold'
+          : isThen  ? 'text-emerald-700 dark:text-emerald-400 font-semibold'
+          : 'text-slate-600 dark:text-slate-400';
+        return (
+          <p key={i} className={`text-xs leading-relaxed ${color}`}>{trimmed}</p>
+        );
+      }
+      if (isDodItem) {
+        return (
+          <p key={i} className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed ml-2">
+            {trimmed}
+          </p>
+        );
+      }
+      return (
+        <p key={i} className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{trimmed}</p>
+      );
+    });
+
+  if (editing) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Acceptance Criteria</label>
+          <div className="flex gap-2">
+            <button onClick={() => { onUpdate(draft); setEditing(false); }}
+              className="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold hover:underline">Save</button>
+            <button onClick={() => setEditing(false)}
+              className="text-[11px] text-slate-500 hover:underline">Cancel</button>
+          </div>
+        </div>
+        <textarea
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          rows={6}
+          className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400/50 text-xs font-mono resize-y bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Acceptance Criteria</label>
+        <div className="flex items-center gap-2">
+          {ac && (
+            <button onClick={() => { setDraft(ac); setEditing(true); }}
+              className="text-[11px] text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 font-medium hover:underline">
+              Edit
+            </button>
+          )}
+          <button
+            onClick={handleRegenerate}
+            disabled={regenerating}
+            className="flex items-center gap-1 text-[11px] text-violet-700 dark:text-violet-400 font-semibold hover:text-violet-900 dark:hover:text-violet-300 transition-colors disabled:opacity-50"
+          >
+            {regenerating ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Sparkles className="w-3 h-3" />
+            )}
+            {regenerating ? 'Generating…' : ac ? 'Regenerate' : 'Generate with AI'}
+          </button>
+        </div>
+      </div>
+
+      {ac ? (
+        <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl space-y-1">
+          {renderACLines(ac)}
+        </div>
+      ) : (
+        <div className="p-3 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-center">
+          <p className="text-xs text-slate-400 dark:text-slate-500">
+            No acceptance criteria yet.{' '}
+            <button onClick={handleRegenerate} className="text-violet-600 dark:text-violet-400 font-semibold hover:underline">
+              Generate with AI
+            </button>
+          </p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface TicketDetailsPanelProps {
@@ -346,6 +500,12 @@ export function TicketDetailsPanel({
               rows={2}
             />
           </div>
+
+          {/* Acceptance Criteria */}
+          <AcceptanceCriteriaSection
+            ticket={ticket}
+            onUpdate={(ac) => handleUpdate('acceptanceCriteria', ac)}
+          />
 
           {/* Effort Days */}
           <div>

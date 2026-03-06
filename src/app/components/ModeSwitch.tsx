@@ -1,19 +1,19 @@
-import { RefreshCw } from 'lucide-react';
+import { LayoutTemplate } from 'lucide-react';
 
 export function ModeSwitch() {
   const handleSwitch = () => {
-    localStorage.removeItem('appMode');
+    localStorage.setItem('appMode', 'fresh');
     window.location.reload();
   };
 
   return (
     <button
       onClick={handleSwitch}
-      className="fixed bottom-6 right-6 z-50 inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-muted-foreground bg-card border border-border rounded-lg hover:bg-accent hover:text-foreground transition-colors shadow-md hover:shadow-lg"
-      title="Switch between Demo and Fresh modes"
+      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+      title="Return to the guided setup to create a new product"
     >
-      <RefreshCw className="w-3 h-3" />
-      Switch Mode
+      <LayoutTemplate className="w-3.5 h-3.5" />
+      Getting started
     </button>
   );
 }

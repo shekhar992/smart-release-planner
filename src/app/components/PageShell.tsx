@@ -21,9 +21,9 @@ export function PageShell({ children, breadcrumbs, actions, flush = false }: Pag
   const isHome = location.pathname === '/';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 flex flex-col">
+    <div className="min-h-screen bg-[#F8FAFD] dark:bg-[#0d1117] flex flex-col">
       {/* ── Top Bar ── */}
-      <header className="sticky top-0 z-30 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-700 shadow-sm">
+      <header className="sticky top-0 z-30 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700">
         <div className="max-w-[1440px] mx-auto flex items-center justify-between h-14 px-6">
           {/* Left: Logo + breadcrumbs */}
           <div className="flex items-center gap-3 min-w-0">
@@ -32,7 +32,7 @@ export function PageShell({ children, breadcrumbs, actions, flush = false }: Pag
               className="flex items-center gap-2.5 shrink-0 group"
               aria-label="Home"
             >
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/40 group-hover:scale-105 transition-all duration-200">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 dark:bg-blue-500 flex items-center justify-center group-hover:bg-blue-700 dark:group-hover:bg-blue-400 transition-colors duration-200">
                 <Layers className="w-4 h-4 text-white" />
               </div>
               <span className="text-sm font-semibold text-slate-900 dark:text-white tracking-tight hidden sm:inline">

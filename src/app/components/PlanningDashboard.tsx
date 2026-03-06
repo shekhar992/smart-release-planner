@@ -1,10 +1,12 @@
-import { Link } from 'react-router';
-import { Plus, Calendar, Package, FolderPlus, Users, ChevronRight, Layers, MoreVertical, Pencil, Trash2, Sparkles } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
+import { Plus, Calendar, Package, FolderPlus, Users, ChevronRight, Layers, MoreVertical, Pencil, Trash2, Sparkles, FileText } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 import { nanoid } from 'nanoid';
 import { mockProducts, Product, Release, mockHolidays, mockTeamMembers, TeamMember, Phase, SP_PRESETS, Feature, Ticket } from '../data/mockData';
 import { CreateProductModal } from './CreateProductModal';
 import { ReleaseCreationWizard } from './ReleaseCreationWizard';
+import { PRDReleasePlanModal } from './PRDReleasePlanModal';
 import { PageShell } from './PageShell';
 import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers, savePhases, loadHolidays } from '../lib/localStorage';
 import { ModeSwitch } from './ModeSwitch';
@@ -24,6 +26,8 @@ export function PlanningDashboard({
   showCreateProduct, 
   onCloseCreateProduct 
 }: PlanningDashboardProps = {}) {
+  const navigate = useNavigate();
+
   // Local state fallback for when rendered via router (without props)
   const [localShowCreateProduct, setLocalShowCreateProduct] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
@@ -32,6 +36,10 @@ export function PlanningDashboard({
   const [showReleaseWizard, setShowReleaseWizard] = useState(false);
   const [wizardFlow, setWizardFlow] = useState<'manual' | 'smart'>('manual');
   const [wizardProductId, setWizardProductId] = useState<string | null>(null);
+
+  // PRD → Release wizard state
+  const [showPRDWizard, setShowPRDWizard] = useState(false);
+  const [prdWizardProductId, setPrdWizardProductId] = useState<string | null>(null);
 
   // Use props if provided, otherwise use local state
   const effectiveShowCreateProduct = showCreateProduct ?? localShowCreateProduct;
@@ -102,13 +110,14 @@ export function PlanningDashboard({
     if (data.tickets && data.tickets.length > 0 && data.parsedTickets) {
       // Step 1: Use planning engine to calculate sequential dates across sprints
       let ticketsWithSequentialDates = [...data.tickets];
-      
+
+      // Hoist team/holiday data outside all conditionals so every code path can use them
+      const teamMembers_  = loadTeamMembers() || [];
+      const productTeam   = teamMembers_.filter(tm => tm.productId === data.productId);
+      const holidays      = loadHolidays() || [];
+
       if (data.sprintLengthDays) {
         try {
-          // Load team members and holidays for capacity calculation
-          const teamMembers = loadTeamMembers() || [];
-          const productTeam = teamMembers.filter(tm => tm.productId === data.productId);
-          const holidays = loadHolidays() || [];
           
           // Convert tickets to TicketInput format for planning engine
           const ticketInputs: TicketInput[] = data.tickets.map((ticket, index) => {
@@ -327,6 +336,37 @@ export function PlanningDashboard({
     setWizardProductId(null);
   };
 
+  // ── PRD wizard: save the generated release ──
+  const handlePRDGenerate = (release: Release, _parkedFeatureName?: string) => {
+    if (!prdWizardProductId) return;
+
+    // If parkedFeatureName is provided, the engine already separated overflow;
+    // just save the main release (parked feature is informational only for now).
+    const finalRelease: Release = { ...release };
+
+    // Add to the correct product
+    const updatedProducts = products.map(p => {
+      if (p.id === prdWizardProductId) {
+        return { ...p, releases: [...p.releases, finalRelease] };
+      }
+      return p;
+    });
+    setProducts(updatedProducts);
+    saveProducts(updatedProducts);
+
+    // Persist phases so the timeline renders the correct dev-window bands
+    // and never falls back to auto-generating wrong mock phases.
+    if (finalRelease.phases && finalRelease.phases.length > 0) {
+      savePhases(finalRelease.id, finalRelease.phases);
+    }
+
+    setShowPRDWizard(false);
+    setPrdWizardProductId(null);
+
+    // Navigate straight to the canvas
+    navigate(`/release/${finalRelease.id}`);
+  };
+
   // ── Product edit / delete ──
   const handleRenameProduct = (productId: string, newName: string) => {
     const trimmed = newName.trim();
@@ -339,13 +379,31 @@ export function PlanningDashboard({
   };
 
   const handleDeleteProduct = (productId: string) => {
+    const productToDelete = products.find(p => p.id === productId);
+    if (!productToDelete) return;
+
+    const existingTeam = loadTeamMembers() || [];
+    const productTeam = existingTeam.filter(m => m.productId === productId);
     const updatedProducts = products.filter(p => p.id !== productId);
+
     setProducts(updatedProducts);
     saveProducts(updatedProducts);
-
-    // Also remove team members scoped to this product
-    const existingTeam = loadTeamMembers() || [];
     saveTeamMembers(existingTeam.filter(m => m.productId !== productId));
+
+    toast(`"${productToDelete.name}" deleted`, {
+      description: `${productToDelete.releases.length} release${productToDelete.releases.length !== 1 ? 's' : ''} removed.`,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          const restored = [...updatedProducts, productToDelete];
+          setProducts(restored);
+          saveProducts(restored);
+          const currentTeam = loadTeamMembers() || [];
+          saveTeamMembers([...currentTeam, ...productTeam]);
+        },
+      },
+      duration: 5000,
+    });
   };
 
   // ── Derived data ──
@@ -365,7 +423,7 @@ export function PlanningDashboard({
   const hasProducts = products.length > 0;
 
   return (
-    <PageShell>
+    <PageShell actions={<ModeSwitch />}>
       {/* ── Greeting ── */}
       <div className="mb-8 animate-fade-in">
         <h1 className="text-2xl font-semibold text-slate-900 dark:text-white tracking-tight">
@@ -387,7 +445,7 @@ export function PlanningDashboard({
       {/* ── Empty state ── */}
       {!hasProducts && (
         <div className="flex flex-col items-center justify-center py-32 animate-fade-in">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500/10 to-blue-600/5 flex items-center justify-center border border-blue-500/10 mb-6 shadow-lg shadow-blue-500/5">
+          <div className="w-20 h-20 rounded-2xl bg-blue-50 dark:bg-blue-950/20 flex items-center justify-center border border-blue-100 dark:border-blue-900 mb-6">
             <Layers className="w-10 h-10 text-blue-600 dark:text-blue-500" />
           </div>
           <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2 tracking-tight">No products yet</h2>
@@ -396,7 +454,7 @@ export function PlanningDashboard({
           </p>
           <button
             onClick={effectiveOpenCreateProduct}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-medium rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/30 hover:shadow-xl"
+            className="btn-primary gap-2 py-2.5 px-5"
           >
             <FolderPlus className="w-4 h-4" />
             Create Your First Product
@@ -413,15 +471,14 @@ export function PlanningDashboard({
                 key={product.id}
                 product={product}
                 teamCount={teamCounts[product.id] || 0}
-                onNewRelease={() => {
-                  setWizardFlow('manual');
-                  setWizardProductId(product.id);
-                  setShowReleaseWizard(true);
-                }}
                 onAutoGenerate={() => {
                   setWizardFlow('smart');
                   setWizardProductId(product.id);
                   setShowReleaseWizard(true);
+                }}
+                onPRDWizard={() => {
+                  setPrdWizardProductId(product.id);
+                  setShowPRDWizard(true);
                 }}
                 onRename={(name) => handleRenameProduct(product.id, name)}
                 onDelete={() => handleDeleteProduct(product.id)}
@@ -433,7 +490,7 @@ export function PlanningDashboard({
               onClick={effectiveOpenCreateProduct}
               className="group flex flex-col items-center justify-center gap-3 min-h-[260px] rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-600 bg-slate-50/50 dark:bg-slate-800/50 hover:bg-blue-50/50 dark:hover:bg-blue-950/20 transition-all duration-200 cursor-pointer"
             >
-              <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-blue-100 dark:group-hover:from-blue-950/30 dark:group-hover:to-blue-900/20 flex items-center justify-center transition-all duration-200 shadow-sm">
+              <div className="w-11 h-11 rounded-xl bg-slate-100 dark:bg-slate-800 group-hover:bg-blue-50 dark:group-hover:bg-blue-950/20 flex items-center justify-center transition-colors duration-200">
                 <Plus className="w-5 h-5 text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-500 transition-colors" />
               </div>
               <span className="text-sm font-medium text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-500 transition-colors">
@@ -447,7 +504,7 @@ export function PlanningDashboard({
             <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mr-2">Quick&nbsp;Actions</span>
             <Link
               to="/holidays"
-              className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium text-slate-900 dark:text-white bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-900 dark:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200"
             >
               <Calendar className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
               Holidays
@@ -479,8 +536,30 @@ export function PlanningDashboard({
         />
       )}
 
-      {/* Mode Switch - Only visible on product landing page */}
-      <ModeSwitch />
+      {/* PRD → Release Plan Wizard */}
+      {showPRDWizard && prdWizardProductId && (() => {
+        const prdProduct = products.find(p => p.id === prdWizardProductId);
+        if (!prdProduct) return null;
+        const allTeam = loadTeamMembers() || mockTeamMembers;
+        const productTeam = allTeam.filter(m => m.productId === prdWizardProductId);
+        // If this product has no team yet, fall back to ALL team members so auto-assign
+        // has someone to work with instead of producing 100% "Unassigned" tickets.
+        const effectiveTeam = productTeam.length > 0 ? productTeam : allTeam;
+        const productHolidays = loadHolidays() || mockHolidays;
+        return (
+          <PRDReleasePlanModal
+            productId={prdWizardProductId}
+            productName={prdProduct.name}
+            teamMembers={effectiveTeam}
+            holidays={productHolidays}
+            onClose={() => {
+              setShowPRDWizard(false);
+              setPrdWizardProductId(null);
+            }}
+            onGenerate={handlePRDGenerate}
+          />
+        );
+      })()}
 
     </PageShell>
   );
@@ -511,15 +590,15 @@ function completionPct(release: Release) {
 function ProductCard({
   product,
   teamCount,
-  onNewRelease,
   onAutoGenerate,
+  onPRDWizard,
   onRename,
   onDelete,
 }: {
   product: Product;
   teamCount: number;
-  onNewRelease: () => void;
   onAutoGenerate: () => void;
+  onPRDWizard: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
 }) {
@@ -544,7 +623,7 @@ function ProductCard({
     <div className="group flex flex-col bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-blue-300 dark:hover:border-blue-700 shadow-sm hover:shadow-lg transition-all duration-200 overflow-hidden">
       {/* Card header */}
       <div className="flex items-center gap-3 px-5 pt-5 pb-3">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
+        <div className="w-9 h-9 rounded-xl bg-blue-600 dark:bg-blue-500 flex items-center justify-center shrink-0">
           <Package className="w-4 h-4 text-white" />
         </div>
         <div className="min-w-0 flex-1">
@@ -620,13 +699,13 @@ function ProductCard({
           <div className="flex gap-2">
             <button
               onClick={() => { onDelete(); setConfirmDelete(false); }}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 rounded-lg transition-all duration-200 shadow-lg shadow-red-500/30"
+              className="btn-danger text-xs"
             >
               Delete
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="px-3 py-1.5 text-xs font-medium text-slate-900 dark:text-white bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors"
+              className="btn-ghost text-xs"
             >
               Cancel
             </button>
@@ -634,28 +713,9 @@ function ProductCard({
         </div>
       )}
 
-      {/* Releases list */}
-      <div className="flex-1 px-3 pb-2">
-        {product.releases.length === 0 ? (
-          <div className="px-2 py-6 text-center">
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">No releases yet</p>
-            <button
-              onClick={onAutoGenerate}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/30 mb-2"
-            >
-              <Sparkles className="w-3 h-3" />
-              Create Smart Release
-            </button>
-            <div>
-              <button
-                onClick={onNewRelease}
-                className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-500 transition-colors"
-              >
-                or create manually
-              </button>
-            </div>
-          </div>
-        ) : (
+      {/* Releases list — only rendered when releases exist */}
+      {product.releases.length > 0 && (
+        <div className="flex-1 px-3 pb-1">
           <ul className="space-y-0.5">
             {product.releases
               .sort((a, b) => b.startDate.getTime() - a.startDate.getTime())
@@ -669,30 +729,36 @@ function ProductCard({
               </li>
             )}
           </ul>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Card footer */}
-      <div className="flex items-center gap-1.5 px-3 pb-3 pt-1 mt-auto">
+      {/* Action row */}
+      <div className={cn(
+        'flex items-center border-t border-slate-100 dark:border-slate-800',
+        product.releases.length === 0 && 'mt-auto'
+      )}>
+        {/* Primary CTA — brand blue, semibold, visible at rest */}
+        <button
+          onClick={onPRDWizard}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-150"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          Plan from PRD
+        </button>
+        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 shrink-0" />
+        {/* Secondary — medium weight, muted slate, violet on hover */}
         <button
           onClick={onAutoGenerate}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-xl transition-all duration-200 shadow-lg shadow-blue-500/30"
-          title="AI-powered release creation"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50/60 dark:hover:bg-violet-950/20 transition-colors duration-150"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          Create Smart Release
+          Smart Release
         </button>
-        <button
-          onClick={onNewRelease}
-          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
-          title="Manual release creation"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Manual
-        </button>
+        <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 shrink-0" />
+        {/* Tertiary — lightest, normal weight, barely-there at rest */}
         <Link
           to={`/product/${product.id}/team`}
-          className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-900 dark:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all duration-200"
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[11px] font-normal text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors duration-150"
         >
           <Users className="w-3.5 h-3.5" />
           Team
@@ -709,48 +775,64 @@ function ReleaseRow({ release }: { release: Release }) {
   const now = new Date();
   const isActive = release.startDate <= now && release.endDate >= now;
   const isUpcoming = release.startDate > now;
+  const daysLeft = isActive
+    ? Math.round((release.endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    : isUpcoming
+      ? Math.round((release.startDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+      : null;
 
   return (
     <li>
       <Link
         to={`/release/${release.id}`}
-        className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 group/row"
+        className="flex items-center gap-2 px-2 py-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 group/row"
       >
-        {/* Status dot */}
-        <span
-          className={cn(
+        {/* Material 3 tonal status chip */}
+        <span className={cn(
+          "shrink-0 inline-flex items-center gap-1 text-xs font-medium rounded-full px-2 py-0.5 border leading-none",
+          isActive
+            ? 'bg-[#E6F4EA] dark:bg-[#0D3723] text-[#137333] dark:text-[#34A853] border-[#CEEAD6] dark:border-[#1A5E38]'
+            : isUpcoming
+              ? 'bg-[#FEF7E0] dark:bg-[#3C2A00] text-[#B06000] dark:text-[#FDD663] border-[#FEEFC3] dark:border-[#5C3D00]'
+              : 'bg-[#F1F3F4] dark:bg-[#303134] text-[#5F6368] dark:text-[#9AA0A6] border-[#DADCE0] dark:border-[#3C4043]'
+        )}>
+          <span className={cn(
             "w-1.5 h-1.5 rounded-full shrink-0",
-            isActive
-              ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50'
-              : isUpcoming
-                ? 'bg-amber-400 shadow-sm shadow-amber-400/50'
-                : 'bg-slate-300 dark:bg-slate-600'
-          )}
-        />
+            isActive ? 'bg-[#137333] dark:bg-[#34A853]'
+              : isUpcoming ? 'bg-[#B06000] dark:bg-[#FDD663]'
+              : 'bg-[#5F6368] dark:bg-[#9AA0A6]'
+          )} />
+          {isActive ? 'Live' : isUpcoming ? 'Soon' : 'Done'}
+        </span>
 
-        {/* Name + date */}
+        {/* Name + meta */}
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-slate-900 dark:text-white truncate group-hover/row:text-blue-600 dark:group-hover/row:text-blue-500 transition-colors">
             {release.name}
           </p>
-          <p className="text-[10px] text-slate-500 dark:text-slate-400">{fmtRange(release.startDate, release.endDate)}</p>
+          <p className="text-label text-slate-500 dark:text-slate-400">
+            {fmtRange(release.startDate, release.endDate)}
+            {daysLeft !== null && (
+              <span className={cn("ml-1", isActive && daysLeft <= 7 ? "text-red-500 dark:text-red-400 font-semibold" : "")}>
+                · {isActive ? `${daysLeft}d left` : `in ${daysLeft}d`}
+              </span>
+            )}
+          </p>
         </div>
 
-        {/* Inline progress */}
-        {tickets > 0 && (
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="w-16 h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+        {/* Ticket count + progress bar */}
+        {tickets > 0 ? (
+          <div className="shrink-0 flex flex-col items-end gap-1">
+            <span className="text-label tabular-nums text-slate-400 dark:text-slate-500">{pct}%</span>
+            <div className="w-14 h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all shadow-sm"
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <span className="text-[10px] tabular-nums text-slate-500 dark:text-slate-400 w-6 text-right">{pct}%</span>
           </div>
-        )}
-
-        {tickets === 0 && (
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">empty</span>
+        ) : (
+          <span className="text-label text-slate-400 dark:text-slate-500 italic shrink-0">empty</span>
         )}
 
         <ChevronRight className="w-3 h-3 text-slate-400 dark:text-slate-500 group-hover/row:text-blue-600 dark:group-hover/row:text-blue-500 transition-colors shrink-0" />
