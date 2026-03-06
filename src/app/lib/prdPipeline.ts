@@ -102,9 +102,11 @@ const OLLAMA_URL = 'http://localhost:11434/api/chat';
 const GROQ_URL   = '/api/ai';
 const MODEL      = IS_DEV ? 'llama3.2:3b' : 'llama-3.3-70b-versatile';
 
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 async function callLLM(systemPrompt: string, userContent: string): Promise<string> {
   if (IS_DEV) {
-    // Local Ollama
+    // Local Ollama — no rate limits, call directly
     const res = await fetch(OLLAMA_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -121,8 +123,14 @@ async function callLLM(systemPrompt: string, userContent: string): Promise<strin
     if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${res.statusText}`);
     const data = await res.json();
     return data.message?.content ?? '';
-  } else {
-    // Production — Vercel edge fn → Groq
+  }
+
+  // Production — Vercel edge fn → Groq
+  // Retry up to 4× with exponential backoff on 429 rate-limit responses
+  const MAX_RETRIES = 4;
+  let delay = 8000; // start at 8s; Groq resets its per-minute window every 60s
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -136,10 +144,25 @@ async function callLLM(systemPrompt: string, userContent: string): Promise<strin
         options: { temperature: 0.1, num_predict: 4096 },
       }),
     });
+
+    if (res.status === 429) {
+      // Try to honour Groq's Retry-After header, fall back to exponential delay
+      const retryAfter = res.headers.get('retry-after');
+      const waitMs = retryAfter ? parseInt(retryAfter) * 1000 : delay;
+      if (attempt < MAX_RETRIES) {
+        await sleep(waitMs);
+        delay = Math.min(delay * 2, 60000); // cap at 60s
+        continue;
+      }
+      throw new Error(`Groq rate limit exceeded after ${MAX_RETRIES} retries. Try again in a minute.`);
+    }
+
     if (!res.ok) throw new Error(`Groq HTTP ${res.status}: ${res.statusText}`);
     const data = await res.json();
     return data.message?.content ?? '';
   }
+
+  throw new Error('callLLM: exhausted retries');
 }
 
 // ── JSON Extraction — handles markdown fences the model adds ──────────────
