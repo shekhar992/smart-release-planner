@@ -123,10 +123,20 @@ export function PlanningDashboard({
             };
           });
           
+          // Restrict ticket SCHEDULING to dev window phases only
+          // (don't place work during SIT / UAT / launch phases)
+          const devWindowPhases = (data.phases || []).filter((p: Phase) => p.allowsWork);
+          const scheduleStart = devWindowPhases.length > 0
+            ? new Date(Math.min(...devWindowPhases.map((p: Phase) => new Date(p.startDate).getTime())))
+            : data.startDate;
+          const scheduleEnd = devWindowPhases.length > 0
+            ? new Date(Math.max(...devWindowPhases.map((p: Phase) => new Date(p.endDate).getTime())))
+            : data.endDate;
+
           // Build release plan using planning engine
           const config: ReleaseConfig = {
-            releaseStart: data.startDate,
-            releaseEnd: data.endDate,
+            releaseStart: scheduleStart,
+            releaseEnd: scheduleEnd,
             sprintLengthDays: data.sprintLengthDays,
             numberOfDevelopers: productTeam.length || 1,
             holidays: holidays.map(h => new Date(h.startDate)),
@@ -135,57 +145,73 @@ export function PlanningDashboard({
           
           releasePlan = buildReleasePlan(ticketInputs, config);
           
-          // Step 2: Anchor tickets to their sprint's startDate (matching main branch pattern)
+          // Step 2: Place tickets sequentially per developer, respecting sprint order.
+          //
+          // The planning engine allocates by TEAM capacity (N devs × working days), which
+          // means it may place more work into a sprint than any single developer can handle.
+          // Without tracking per-dev progress, a developer's sequential chain bleeds past
+          // the sprint end date, causing the next sprint to double-count straddling tickets
+          // and show utilisation >100 %.
+          //
+          // Fix: maintain a global "current date" per developer across all sprints.
+          //  - When a dev has idle time before a sprint starts, advance to that sprint's start.
+          //  - When a dev's chain runs past a sprint boundary, continue from where they left off.
+          // This guarantees tickets never start before their assigned sprint AND never overlap.
           const updatedTickets: Ticket[] = [];
-          
-          // Process tickets by sprint - position sequentially per developer
-          for (const domainSprint of releasePlan.sprints) {
-            // Group tickets by developer for sequential positioning
+
+          const sprintList = releasePlan.sprints;
+
+          // Global per-developer current-date tracker (carries forward across all sprints).
+          const devCurrentDate = new Map<string, Date>();
+
+          for (let sprintIdx = 0; sprintIdx < sprintList.length; sprintIdx++) {
+            const domainSprint = sprintList[sprintIdx];
+
+            // Group this sprint's allocated tickets by developer.
             const ticketsByDev = new Map<string, typeof domainSprint.tickets>();
             domainSprint.tickets.forEach(ticketInput => {
-              const originalTicket = data.tickets.find(t => 
+              const originalTicket = data.tickets.find(t =>
                 (t.id && t.id === ticketInput.id) || t.title === ticketInput.title
               );
               const devName = originalTicket?.assignedTo || 'Unassigned';
-              if (!ticketsByDev.has(devName)) {
-                ticketsByDev.set(devName, []);
-              }
+              if (!ticketsByDev.has(devName)) ticketsByDev.set(devName, []);
               ticketsByDev.get(devName)!.push(ticketInput);
             });
-            
-            // Position each developer's tickets sequentially
+
             for (const [devName, devTickets] of ticketsByDev) {
-              let currentStartDate = new Date(domainSprint.startDate);
-              
+              // Decide where this developer starts in this sprint.
+              // Rule: no earlier than the sprint's start date (skip idle time between sprints),
+              //       but carry forward if still mid-chain from a previous sprint's overflow.
+              const sprintStart = new Date(domainSprint.startDate);
+              const tracked = devCurrentDate.get(devName);
+              let currentDate = tracked && tracked > sprintStart ? new Date(tracked) : new Date(sprintStart);
+
               for (const ticketInput of devTickets) {
-                // Find original ticket by matching ID or title
-                const originalTicket = data.tickets.find(t => 
+                const originalTicket = data.tickets.find(t =>
                   (t.id && t.id === ticketInput.id) || t.title === ticketInput.title
                 );
-                
-                if (originalTicket) {
-                  // Calculate end date with velocity adjustment
-                  const effortDays = originalTicket.effortDays || 1;
-                  const assignedDev = productTeam.find(m => m.name === originalTicket.assignedTo);
-                  const velocity = assignedDev?.velocityMultiplier ?? 1;
-                  const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
-                  const ticketEndDate = calculateEndDateFromEffort(
-                    currentStartDate,
-                    adjustedDuration,
-                    holidays
-                  );
-                  
-                  updatedTickets.push({
-                    ...originalTicket,
-                    id: ticketInput.id,
-                    startDate: currentStartDate, // Sequential per developer
-                    endDate: ticketEndDate,
-                  });
-                  
-                  // Next ticket for this developer starts after this one ends
-                  currentStartDate = ticketEndDate;
-                }
+                if (!originalTicket) continue;
+
+                const effortDays = originalTicket.effortDays || 1;
+                const assignedDev = productTeam.find(m => m.name === originalTicket.assignedTo);
+                const velocity = assignedDev?.velocityMultiplier ?? 1;
+                const adjustedDuration = Math.max(1, Math.round(effortDays / velocity));
+
+                const ticketEndDate = calculateEndDateFromEffort(currentDate, adjustedDuration, holidays);
+
+                updatedTickets.push({
+                  ...originalTicket,
+                  id: ticketInput.id,
+                  startDate: new Date(currentDate),
+                  endDate: ticketEndDate,
+                });
+
+                // Advance: next ticket starts the day after this one ends.
+                currentDate = new Date(ticketEndDate.getTime() + 24 * 60 * 60 * 1000);
               }
+
+              // Persist this developer's position so subsequent sprints can continue from here.
+              devCurrentDate.set(devName, currentDate);
             }
           }
           
@@ -289,19 +315,37 @@ export function PlanningDashboard({
       }));
     }
     
+    // Generate display sprints for the FULL SDLC range (dev + SIT + UAT)
+    // These populate the timeline canvas — ticket scheduling uses the narrower dev window.
+    const newReleaseId = `r-${Date.now()}`;
+    const fullReleaseSprints: Array<{ id: string; name: string; startDate: Date; endDate: Date }> = [];
+    if (data.sprintLengthDays) {
+      const totalDays = Math.round(
+        (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / (24 * 60 * 60 * 1000),
+      );
+      const count = Math.floor(totalDays / data.sprintLengthDays);
+      for (let i = 0; i < count; i++) {
+        const sprintStart = new Date(
+          new Date(data.startDate).getTime() + i * data.sprintLengthDays * 24 * 60 * 60 * 1000,
+        );
+        const sprintEnd = new Date(sprintStart.getTime() + (data.sprintLengthDays - 1) * 24 * 60 * 60 * 1000);
+        fullReleaseSprints.push({
+          id: `sprint-${newReleaseId}-${i}`,
+          name: `Sprint ${i + 1}`,
+          startDate: sprintStart,
+          endDate: sprintEnd,
+        });
+      }
+    }
+
     // Create the release object
     const newRelease: Release = {
-      id: `r-${Date.now()}`,
+      id: newReleaseId,
       name: data.name,
       startDate: data.startDate,
       endDate: data.endDate,
       features,
-      sprints: releasePlan ? releasePlan.sprints.map(s => ({
-        id: s.id,
-        name: s.name,
-        startDate: s.startDate,
-        endDate: s.endDate,
-      })) : [],
+      sprints: fullReleaseSprints,
       storyPointMapping: SP_PRESETS.linear,
       milestones: [],
       phases: data.phases,

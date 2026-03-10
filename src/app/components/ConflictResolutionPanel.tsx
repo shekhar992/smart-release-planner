@@ -145,7 +145,7 @@ export function ConflictResolutionPanel({
 
   if (conflicts.length === 0) {
     return (
-      <div className="w-[480px] h-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-l border-slate-200 dark:border-slate-700 flex flex-col shadow-2xl">
+      <div className="w-[520px] max-h-[85vh] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col shadow-2xl animate-fade-in">
         <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
           <div className="w-16 h-16 bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-950/50 dark:to-emerald-900/30 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
             <CheckCircle2 className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
@@ -166,7 +166,7 @@ export function ConflictResolutionPanel({
   const typeInfo = currentConflict ? getTypeLabel(currentConflict.type) : null;
 
   return (
-    <div className="w-[480px] h-full bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-l border-slate-200 dark:border-slate-700 flex flex-col shadow-2xl">
+    <div className="w-[520px] max-h-[85vh] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col shadow-2xl animate-fade-in">
       {/* Header */}
       <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 bg-gradient-to-br from-amber-50/50 to-red-50/50 dark:from-amber-950/30 dark:to-red-950/30">
         <div className="flex items-center justify-between">

@@ -174,10 +174,22 @@ function countOverlapWorkingDays(start1: Date, end1: Date, start2: Date, end2: D
 }
 
 /**
- * Check if a ticket falls within a sprint
+ * Check if a ticket belongs to a sprint.
+ *
+ * Uses the ticket's startDate as the assignment anchor — a ticket "belongs" to
+ * the sprint that contains its start date.  This prevents tickets that straddle
+ * two sprint boundaries from being double-counted (i.e. having their full
+ * effortDays added to BOTH Sprint N AND Sprint N+1), which would inflate
+ * utilisation percentages and produce false >100 % readings.
  */
 function isTicketInSprint(ticket: Ticket, sprint: Sprint): boolean {
-  return datesOverlap(ticket.startDate, ticket.endDate, sprint.startDate, sprint.endDate);
+  const ticketStart = new Date(ticket.startDate);
+  ticketStart.setHours(0, 0, 0, 0);
+  const sprintStart = new Date(sprint.startDate);
+  sprintStart.setHours(0, 0, 0, 0);
+  const sprintEnd = new Date(sprint.endDate);
+  sprintEnd.setHours(23, 59, 59, 999);
+  return ticketStart >= sprintStart && ticketStart <= sprintEnd;
 }
 
 /**

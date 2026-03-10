@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, AlertTriangle } from 'lucide-react';
+import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, AlertTriangle, Zap } from 'lucide-react';
+import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
 import { ZoomControls, ZoomLevel } from './ZoomControls';
@@ -9,9 +10,11 @@ import { TicketDetailsPanel } from './TicketDetailsPanel';
 import { TicketCreationModal } from './TicketCreationModal';
 import { BulkTicketImportModal } from './BulkTicketImportModal';
 import { ConflictResolutionPanel } from './ConflictResolutionPanel';
+import { AutoResolvePreviewModal } from './AutoResolvePreviewModal';
+import { runAutoResolve, type AutoResolveResult, type TicketResolution } from '../lib/autoResolver';
 import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct, storyPointsToDays, Phase } from '../data/mockData';
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
-import { calculateAllSprintCapacities } from '../lib/capacityCalculation';
+import { calculateAllSprintCapacities, type SprintCapacity } from '../lib/capacityCalculation';
 import { loadProducts, saveRelease, deleteRelease, initializeStorage, getLastUpdated, loadHolidays, loadTeamMembersByProduct, forceRefreshStorage, loadMilestones, loadPhases } from '../lib/localStorage';
 import { calculateEffortFromDates, toLocalDateString, calculateEndDateFromEffort } from '../lib/dateUtils';
 import { calculateDurationDays } from '../lib/durationCalculator';
@@ -54,17 +57,26 @@ function isTicketInDevWindow(ticket: Ticket, phases: Phase[]): boolean {
 function HeaderAlertsPanel({ 
   tickets, 
   phases, 
-  conflictCount, 
-  onViewConflicts 
+  conflictCount,
+  sprintCapacities,
+  onViewConflicts,
+  onAutoResolve,
+  autoResolving,
 }: { 
   tickets: Ticket[]; 
   phases: Phase[]; 
   conflictCount: number;
+  sprintCapacities: Map<string, SprintCapacity>;
   onViewConflicts: () => void;
+  onAutoResolve?: () => void;
+  autoResolving?: boolean;
 }) {
   const spilloverTickets = tickets.filter(t => !isTicketInDevWindow(t, phases));
   const spilloverCount = spilloverTickets.length;
-  const totalAlerts = spilloverCount + conflictCount;
+  // Collect sprints that are genuinely over capacity (>100 % utilisation).
+  const overCapacitySprints = Array.from(sprintCapacities.values()).filter(sc => sc.overCapacity);
+  const overCapacityCount = overCapacitySprints.length;
+  const totalAlerts = spilloverCount + conflictCount + overCapacityCount;
   const [isExpanded, setIsExpanded] = useState(false);
   
   if (totalAlerts === 0) return null;
@@ -119,7 +131,7 @@ function HeaderAlertsPanel({
             
             {/* Resource Conflicts */}
             {conflictCount > 0 && (
-              <div className="p-3">
+              <div className={`p-3 ${overCapacityCount > 0 ? 'border-b border-amber-100 dark:border-amber-900/50' : ''}`}>
                 <div className="flex items-start gap-2">
                   <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500/10 to-amber-600/5 flex items-center justify-center mt-0.5">
                     <span className="text-base">⚡</span>
@@ -131,17 +143,59 @@ function HeaderAlertsPanel({
                     <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
                       Multiple tickets assigned to same developer with overlapping dates.
                     </p>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onViewConflicts();
-                        setIsExpanded(false);
-                      }}
-                      className="mt-3 w-full px-3 py-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-amber-600/30 hover:shadow-xl flex items-center justify-center gap-2"
-                    >
-                      <AlertTriangle className="w-3 h-3" />
-                      Resolve Conflicts
-                    </button>
+                    <div className="mt-3 flex flex-col gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onAutoResolve?.();
+                          setIsExpanded(false);
+                        }}
+                        disabled={autoResolving}
+                        className="w-full px-3 py-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white text-xs font-semibold rounded-xl transition-all shadow-lg shadow-violet-600/30 hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                      >
+                        <Zap className="w-3 h-3" />
+                        {autoResolving ? 'Analyzing…' : 'Auto-Resolve All'}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onViewConflicts();
+                          setIsExpanded(false);
+                        }}
+                        className="w-full px-3 py-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors text-center"
+                      >
+                        or review manually
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Sprint Over Capacity */}
+            {overCapacityCount > 0 && (
+              <div className="p-3 bg-gradient-to-br from-red-50/50 to-transparent dark:from-red-950/20">
+                <div className="flex items-start gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-red-500/10 to-red-600/5 flex items-center justify-center mt-0.5">
+                    <span className="text-base">🔴</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-red-900 dark:text-red-300">
+                      Sprint Over Capacity ({overCapacityCount})
+                    </p>
+                    <p className="text-xs text-red-700 dark:text-red-400 mt-1">
+                      These sprints have more work than the team can deliver. Reduce scope or move tickets out.
+                    </p>
+                    <div className="mt-2 space-y-1.5">
+                      {overCapacitySprints.map(sc => (
+                        <div key={sc.sprintId} className="flex items-center justify-between gap-2">
+                          <span className="text-xs text-red-800 dark:text-red-300 truncate">{sc.sprintName}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 shrink-0">
+                            {Math.round(sc.utilizationPercent)}%
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -244,6 +298,10 @@ export function ReleasePlanningCanvas() {
   const [showTicketCreation, setShowTicketCreation] = useState<{ featureId?: string } | null>(null);
   const [showBulkImport, setShowBulkImport] = useState<{ featureId?: string } | null>(null);
   const [showConflictResolution, setShowConflictResolution] = useState(false);
+  // ── Auto-Resolver state ──────────────────────────────────────────────────
+  const [autoResolving, setAutoResolving] = useState(false);
+  const [autoResolveResult, setAutoResolveResult] = useState<AutoResolveResult | null>(null);
+  const [showAutoResolveModal, setShowAutoResolveModal] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
   const [editingRelease, setEditingRelease] = useState(false);
   const [confirmDeleteRelease, setConfirmDeleteRelease] = useState(false);
@@ -383,6 +441,126 @@ export function ReleasePlanningCanvas() {
     console.log('Ignoring conflict for ticket:', ticketId);
     // For now, just close the panel
     setShowConflictResolution(false);
+  };
+
+  // ── Auto-Resolve handlers ────────────────────────────────────────────────
+  const handleAutoResolve = async () => {
+    if (!release || autoResolving) return;
+    setAutoResolving(true);
+    setAutoResolveResult(null);
+    setShowAutoResolveModal(true); // open modal immediately — shows loading skeleton
+    try {
+      const result = await runAutoResolve(release, derivedTeamMembers, holidays, phases);
+      setAutoResolveResult(result);
+    } catch (e) {
+      console.error('[AutoResolve] Failed:', e);
+      setShowAutoResolveModal(false);
+      toast.error('Auto-resolve failed', { description: 'An error occurred. Please try again or review conflicts manually.' });
+    } finally {
+      setAutoResolving(false);
+    }
+  };
+
+  const handleApplyResolutions = (resolutions: TicketResolution[]) => {
+    const snapshot = release; // capture for undo
+    setRelease(prev => {
+      if (!prev) return prev;
+
+      const sortedResolutions = [...resolutions].sort(
+        (a, b) => new Date(a.toStartDate).getTime() - new Date(b.toStartDate).getTime(),
+      );
+      const resMap = new Map(sortedResolutions.map(r => [r.ticketId, r]));
+
+      // Sprint lookup helper
+      const relSprints = (prev.sprints ?? []).slice().sort(
+        (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
+      );
+      function findSprintForDate(d: Date): string | null {
+        const day = d.getTime();
+        for (const s of relSprints) {
+          const ss = new Date(s.startDate).getTime();
+          const se = new Date(s.endDate).getTime();
+          if (day >= ss && day <= se) return s.id;
+        }
+        let nearest: string | null = null;
+        let nearestDist = Infinity;
+        for (const s of relSprints) {
+          const ss = new Date(s.startDate).getTime();
+          const se = new Date(s.endDate).getTime();
+          const dist = day < ss ? ss - day : day - se;
+          if (dist < nearestDist) { nearestDist = dist; nearest = s.id; }
+        }
+        return nearest;
+      }
+
+      // Pre-seed: unresolved tickets block only their own sprint for that dev
+      const lastEndByDevSprint = new Map<string, Date>();
+      for (const feature of prev.features) {
+        for (const ticket of feature.tickets) {
+          if (resMap.has(ticket.id)) continue;
+          if (!ticket.assignedTo || ticket.assignedTo.trim() === '') continue;
+          const sprintId = findSprintForDate(new Date(ticket.startDate));
+          if (!sprintId) continue;
+          const key = `${ticket.assignedTo}::${sprintId}`;
+          const te = new Date(ticket.endDate);
+          const existing = lastEndByDevSprint.get(key);
+          if (!existing || te > existing) lastEndByDevSprint.set(key, te);
+        }
+      }
+
+      const finalDates = new Map<string, { start: Date; end: Date }>();
+      for (const res of sortedResolutions) {
+        const dev = derivedTeamMembers.find(m => m.name === res.toAssignee);
+        const velocity = dev?.velocityMultiplier ?? 1;
+        const origTicket = prev.features.flatMap(f => f.tickets).find(t => t.id === res.ticketId);
+        const effort = origTicket?.effortDays ?? 1;
+        const durationDays = calculateDurationDays(effort, velocity);
+
+        const resolverStart = new Date(res.toStartDate);
+        const key = `${res.toAssignee}::${res.toSprintId}`;
+        const prevEnd = lastEndByDevSprint.get(key);
+
+        let start: Date;
+        if (prevEnd) {
+          let next = addDays(prevEnd, 1);
+          while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1);
+          start = next > resolverStart ? next : resolverStart;
+        } else {
+          start = resolverStart;
+        }
+
+        const end = addDays(start, durationDays - 1);
+        lastEndByDevSprint.set(key, end);
+        finalDates.set(res.ticketId, { start, end });
+      }
+
+      return {
+        ...prev,
+        features: prev.features.map(feature => ({
+          ...feature,
+          tickets: feature.tickets.map(ticket => {
+            const res = resMap.get(ticket.id);
+            if (!res) return ticket;
+            const dates = finalDates.get(ticket.id)!;
+            return { ...ticket, assignedTo: res.toAssignee, startDate: dates.start, endDate: dates.end };
+          }),
+        })),
+      };
+    });
+    setShowAutoResolveModal(false);
+    setAutoResolveResult(null);
+    const appliedCount = resolutions.length;
+    toast.success(`${appliedCount} change${appliedCount !== 1 ? 's' : ''} applied to timeline`, {
+      description: 'Review the updated schedule in the canvas.',
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setRelease(snapshot);
+          toast.info('Auto-resolve changes reverted');
+        },
+      },
+      duration: 10000,
+    });
   };
 
   // Zoom control handlers
@@ -1135,7 +1313,10 @@ export function ReleasePlanningCanvas() {
             tickets={allTickets}
             phases={phases}
             conflictCount={conflictSummary.totalConflicts}
+            sprintCapacities={sprintCapacities}
             onViewConflicts={() => setShowConflictResolution(true)}
+            onAutoResolve={handleAutoResolve}
+            autoResolving={autoResolving}
           />
 
           {/* View Mode Selector */}
@@ -1513,7 +1694,7 @@ export function ReleasePlanningCanvas() {
       {/* Conflict Resolution Panel */}
       {showConflictResolution && (
         <div 
-          className="fixed inset-0 z-[70] flex justify-end bg-black/20"
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in"
           onClick={() => setShowConflictResolution(false)}
         >
           <div onClick={(e) => e.stopPropagation()}>
@@ -1528,6 +1709,25 @@ export function ReleasePlanningCanvas() {
             />
           </div>
         </div>
+      )}
+
+      {/* Auto-Resolve Modal */}
+      {showAutoResolveModal && (
+        <AutoResolvePreviewModal
+          result={autoResolveResult}
+          isLoading={autoResolving}
+          onApprove={handleApplyResolutions}
+          onCancel={() => {
+            if (autoResolving) return;
+            setShowAutoResolveModal(false);
+            setAutoResolveResult(null);
+          }}
+          onReviewManually={() => {
+            setShowAutoResolveModal(false);
+            setAutoResolveResult(null);
+            setShowConflictResolution(true);
+          }}
+        />
       )}
 
       {/* Edit Release Dialog */}

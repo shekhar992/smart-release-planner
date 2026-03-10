@@ -395,7 +395,16 @@ export function ReleaseCreationWizard({
             )}
 
             {currentStep === 'review' && (
-              <ReviewStep state={wizardState} products={products} />
+              <ReviewStep
+                state={wizardState}
+                products={products}
+                onSprintChange={(data) => {
+                  setWizardState(prev => ({
+                    ...prev,
+                    sprintData: { ...prev.sprintData, ...data },
+                  }));
+                }}
+              />
             )}
           </div>
         </div>
@@ -2128,14 +2137,32 @@ function PhasesStep({
 function ReviewStep({
   state,
   products,
+  onSprintChange,
 }: {
   state: WizardState;
   products: Product[];
+  onSprintChange?: (data: Partial<WizardState['sprintData']>) => void;
 }) {
   const product = products.find(p => p.id === state.releaseData.productId);
   const { name, startDate, endDate } = state.releaseData;
-  const { enabled: sprintsEnabled, sprints } = state.sprintData;
+  const { enabled: sprintsEnabled, sprints, duration } = state.sprintData;
   const { phases } = state.phaseData;
+
+  // Compute sprint counts from dates + duration (works for both flows)
+  const totalDays = startDate && endDate
+    ? Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (24 * 60 * 60 * 1000))
+    : 0;
+  const totalSprintCount = totalDays > 0 && duration > 0 ? Math.floor(totalDays / duration) : 0;
+
+  const devWindowPhases = phases.filter(p => p.allowsWork);
+  const devWindowDays = devWindowPhases.reduce((sum, p) => {
+    return sum + Math.round((new Date(p.endDate).getTime() - new Date(p.startDate).getTime()) / (24 * 60 * 60 * 1000));
+  }, 0);
+  const devWindowSprintCount = devWindowDays > 0 && duration > 0 ? Math.floor(devWindowDays / duration) : 0;
+  const otherSprintCount = Math.max(0, totalSprintCount - devWindowSprintCount);
+
+  // For manual flow, prefer the user-configured sprint count when available
+  const displaySprintCount = (sprintsEnabled && sprints.length > 0) ? sprints.length : totalSprintCount;
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -2168,15 +2195,62 @@ function ReviewStep({
           </dl>
         </div>
 
-        {/* Sprints */}
-        {sprintsEnabled && sprints.length > 0 && (
+        {/* Sprint Plan — always shown if we can compute a count */}
+        {displaySprintCount > 0 && (
           <div className="p-4 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-            <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">
-              Sprints ({sprints.length})
-            </h4>
-            <div className="text-xs text-slate-600 dark:text-slate-400">
-              {sprints.length} sprint{sprints.length !== 1 ? 's' : ''} configured
+            <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3">Sprint Plan</h4>
+            <div className="flex items-start gap-4">
+              <div>
+                <div className="text-3xl font-bold text-violet-600 dark:text-violet-400">{displaySprintCount}</div>
+                <div className="text-xs text-slate-400 mt-0.5">total sprints</div>
+              </div>
+              <div className="flex-1 space-y-1.5 pt-0.5">
+                {devWindowSprintCount > 0 && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Dev Window
+                    </span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      {devWindowSprintCount} sprint{devWindowSprintCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+                {otherSprintCount > 0 && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" /> SIT / UAT
+                    </span>
+                    <span className="font-semibold text-slate-500">
+                      {otherSprintCount} sprint{otherSprintCount !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+                <div className="pt-1 text-xs text-slate-400">
+                  {duration / 7}-week cadence · work placed within Dev Window only
+                </div>
+              </div>
             </div>
+            {/* Duration picker — smart flow only, lets user adjust before creating */}
+            {state.flow === 'smart' && onSprintChange && (
+              <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-500 font-medium">Sprint duration:</span>
+                  {[7, 14, 21].map(days => (
+                    <button
+                      key={days}
+                      onClick={() => onSprintChange({ duration: days })}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all border ${
+                        duration === days
+                          ? 'bg-violet-100 dark:bg-violet-900/40 border-violet-300 dark:border-violet-700 text-violet-700 dark:text-violet-300'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600 hover:text-slate-700 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      {days / 7}wk
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2210,8 +2284,8 @@ function ReviewStep({
                 Ready to Create
               </p>
               <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                Click "Create Release" to finalize your release with {phases.length} phase{phases.length !== 1 ? 's' : ''} 
-                {sprintsEnabled && sprints.length > 0 && ` and ${sprints.length} sprint${sprints.length !== 1 ? 's' : ''}`}.
+                Click "Create Release" to finalize your release with {phases.length} phase{phases.length !== 1 ? 's' : ''}
+                {displaySprintCount > 0 && ` · ${displaySprintCount} sprint${displaySprintCount !== 1 ? 's' : ''} across the full SDLC`}.
               </p>
             </div>
           </div>
