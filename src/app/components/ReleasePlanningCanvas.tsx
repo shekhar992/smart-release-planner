@@ -12,6 +12,7 @@ import { BulkTicketImportModal } from './BulkTicketImportModal';
 import { PRDImportModal } from './PRDImportModal';
 import { ConflictResolutionPanel } from './ConflictResolutionPanel';
 import { AutoResolvePreviewModal } from './AutoResolvePreviewModal';
+import { PreflightScopeModal, DEFAULT_PREFERENCES, type PreflightPreferences } from './PreflightScopeModal';
 import { runAutoResolve, type AutoResolveResult, type TicketResolution } from '../lib/autoResolver';
 import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct, storyPointsToDays, Phase } from '../data/mockData';
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
@@ -307,6 +308,8 @@ export function ReleasePlanningCanvas() {
   const [autoResolving, setAutoResolving] = useState(false);
   const [autoResolveResult, setAutoResolveResult] = useState<AutoResolveResult | null>(null);
   const [showAutoResolveModal, setShowAutoResolveModal] = useState(false);
+  const [showPreflightModal, setShowPreflightModal] = useState(false);
+  const [preflightPreferences, setPreflightPreferences] = useState<PreflightPreferences>(DEFAULT_PREFERENCES);
   const [_lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
   const [editingRelease, setEditingRelease] = useState(false);
   const [confirmDeleteRelease, setConfirmDeleteRelease] = useState(false);
@@ -490,14 +493,30 @@ export function ReleasePlanningCanvas() {
   };
 
   // ── Auto-Resolve handlers ────────────────────────────────────────────────
-  const handleAutoResolve = async () => {
+
+  /** Step 1: Open the pre-flight scope modal — zero risk, runs BEFORE the algorithm */
+  const handleAutoResolve = () => {
     if (!release || autoResolving) return;
+    setShowPreflightModal(true);
+  };
+
+  /** Step 2: Called when PM confirms in the pre-flight modal — runs the actual resolver */
+  const handlePreflightConfirm = async () => {
+    if (!release || autoResolving) return;
+    setShowPreflightModal(false);
     setAutoResolving(true);
     setAutoResolveResult(null);
-    setShowAutoResolveModal(true); // open modal immediately — shows loading skeleton
+    setShowAutoResolveModal(true); // open preview modal immediately — shows loading skeleton
     try {
       const result = await runAutoResolve(release, derivedTeamMembers, holidays, phases);
       setAutoResolveResult(result);
+      // Surface locked skip count in a subtle toast hint
+      if (result.lockedSkipped > 0) {
+        toast.info(`${result.lockedSkipped} locked ticket${result.lockedSkipped !== 1 ? 's' : ''} skipped`, {
+          description: 'Locked tickets keep their current assignment.',
+          duration: 4000,
+        });
+      }
     } catch (e) {
       console.error('[AutoResolve] Failed:', e);
       setShowAutoResolveModal(false);
@@ -1954,6 +1973,19 @@ export function ReleasePlanningCanvas() {
             />
           </div>
         </div>
+      )}
+
+      {/* Preflight Scope Modal — shown before auto-resolve runs */}
+      {showPreflightModal && release && (
+        <PreflightScopeModal
+          release={release}
+          teamMembers={derivedTeamMembers}
+          phases={phases}
+          preferences={preflightPreferences}
+          onPreferencesChange={setPreflightPreferences}
+          onConfirm={handlePreflightConfirm}
+          onCancel={() => setShowPreflightModal(false)}
+        />
       )}
 
       {/* Auto-Resolve Modal */}

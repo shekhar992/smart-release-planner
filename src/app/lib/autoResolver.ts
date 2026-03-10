@@ -122,6 +122,8 @@ export interface AutoResolveResult {
   sprintSnapshotsAfter: SprintCapacitySummary[];
   devWindowStart: Date;
   devWindowEnd: Date;
+  /** Number of tickets skipped because they were locked by the PM */
+  lockedSkipped: number;
 }
 
 // ───────────────────────────── Internal helpers ────────────────────────────
@@ -347,6 +349,7 @@ export async function runAutoResolve(
       sprintSnapshotsAfter: [],
       devWindowStart,
       devWindowEnd,
+      lockedSkipped: 0,
     };
   }
 
@@ -384,6 +387,10 @@ export async function runAutoResolve(
   const allTickets: TicketWithFeature[] = release.features.flatMap(f =>
     f.tickets.map(t => ({ ...t, featureId: f.id })),
   );
+
+  // ── 3b. Honour locked tickets — PM explicitly pinned these placements ──────
+  const lockedIds = new Set(allTickets.filter(t => t.locked).map(t => t.id));
+  const lockedSkipped = lockedIds.size;
 
   /**
    * Best-fit sprint lookup for a ticket.
@@ -482,7 +489,7 @@ export async function runAutoResolve(
 
   // Category 1: Completely unassigned tickets
   const unassignedTickets = allTickets.filter(
-    t => !t.assignedTo || t.assignedTo.trim() === '',
+    t => !lockedIds.has(t.id) && (!t.assignedTo || t.assignedTo.trim() === ''),
   );
   const unassignedIds = new Set(unassignedTickets.map(t => t.id));
 
@@ -495,7 +502,7 @@ export async function runAutoResolve(
       if (dc.utilizationPct <= 90) continue;
 
       const devSprintTickets = (sprintTicketMap.get(snap.sprintId) ?? [])
-        .filter(t => t.assignedTo === dc.devName && !overloadedIds.has(t.id) && !unassignedIds.has(t.id))
+        .filter(t => !lockedIds.has(t.id) && t.assignedTo === dc.devName && !overloadedIds.has(t.id) && !unassignedIds.has(t.id))
         .sort((a, b) => resolveEffort(a, spMapping) - resolveEffort(b, spMapping));
 
       let excess = dc.assignedDays - dc.capacityDays * UTIL_CEILING;
@@ -512,7 +519,7 @@ export async function runAutoResolve(
 
   // Category 3 (Bug 1 fix): Tickets whose current endDate falls outside the dev window
   const outOfWindowTickets = allTickets.filter(t => {
-    if (unassignedIds.has(t.id) || overloadedIds.has(t.id)) return false;
+    if (lockedIds.has(t.id) || unassignedIds.has(t.id) || overloadedIds.has(t.id)) return false;
     const ticketEnd = startOfDay(new Date(t.endDate));
     const ticketStart = startOfDay(new Date(t.startDate));
     return ticketEnd > devWindowEnd || ticketStart > devWindowEnd;
@@ -521,7 +528,7 @@ export async function runAutoResolve(
 
   // Category 4 (Bug 6 fix): Assigned tickets whose current dev role is incompatible
   const wrongRoleTickets = allTickets.filter(t => {
-    if (unassignedIds.has(t.id) || overloadedIds.has(t.id) || outOfWindowIds.has(t.id)) return false;
+    if (lockedIds.has(t.id) || unassignedIds.has(t.id) || overloadedIds.has(t.id) || outOfWindowIds.has(t.id)) return false;
     if (!t.requiredRole) return false;
     if (!t.assignedTo || t.assignedTo.trim() === '') return false;
     const assignedDev = teamMembers.find(m => m.name === t.assignedTo);
@@ -551,6 +558,7 @@ export async function runAutoResolve(
   const ticketsByDev = new Map<string, TicketWithFeature[]>();
   for (const t of allTickets) {
     if (
+      lockedIds.has(t.id) ||
       !t.assignedTo ||
       t.assignedTo.trim() === '' ||
       unassignedIds.has(t.id) ||
@@ -799,5 +807,6 @@ export async function runAutoResolve(
     sprintSnapshotsAfter,
     devWindowStart,
     devWindowEnd,
+    lockedSkipped,
   };
 }

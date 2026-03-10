@@ -14,6 +14,8 @@ export interface Ticket {
     blockedBy?: string[];  // Ticket IDs that must complete before this
     blocks?: string[];     // Calculated: Tickets waiting on this (auto-populated)
   };
+  /** When true, auto-resolve will skip this ticket — preserves PM's intentional placements */
+  locked?: boolean;
 }
 
 export interface Feature {

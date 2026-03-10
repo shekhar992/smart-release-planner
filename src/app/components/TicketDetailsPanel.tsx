@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check, AlertTriangle, Sparkles, Loader2 } from 'lucide-react';
+import { X, User, Trash2, ArrowRightLeft, ChevronDown, Check, AlertTriangle, Sparkles, Loader2, Lock, Unlock } from 'lucide-react';
 import { Ticket, Release, TeamMember, Milestone, Holiday, mockHolidays } from '../data/mockData';
 import { resolveEffortDays } from '../lib/effortResolver';
 import { calculateEndDateFromEffort, calculateEffortFromDates, toLocalDateString } from '../lib/dateUtils';
@@ -448,6 +448,18 @@ export function TicketDetailsPanel({
             />
           </div>
           <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+            {/* Lock toggle — prevents auto-resolve from touching this ticket */}
+            <button
+              onClick={() => handleUpdate('locked', !ticket.locked)}
+              className={`p-1.5 rounded-xl transition-all duration-200 ${
+                ticket.locked
+                  ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-500 dark:text-amber-400'
+                  : 'text-slate-400 dark:text-slate-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-500 dark:hover:text-amber-400'
+              }`}
+              title={ticket.locked ? 'Locked — auto-resolve will skip this ticket. Click to unlock.' : 'Unlocked — click to lock this placement'}
+            >
+              {ticket.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+            </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-all duration-200 text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400"
@@ -719,6 +731,26 @@ export function TicketDetailsPanel({
               <option value="in-progress">In Progress</option>
               <option value="completed">Completed</option>
             </select>
+          </div>
+
+          {/* Auto-Resolve Lock */}
+          <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-2 leading-relaxed">
+              Auto-Resolve
+            </label>
+            <button
+              onClick={() => handleUpdate('locked', !ticket.locked)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition-all duration-200 ${
+                ticket.locked
+                  ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400'
+                  : 'border-slate-200 dark:border-slate-700 bg-white/90 dark:bg-slate-900/90 text-slate-500 dark:text-slate-400 hover:border-amber-300 dark:hover:border-amber-700 hover:text-amber-600 dark:hover:text-amber-400'
+              }`}
+            >
+              {ticket.locked
+                ? <Lock className="w-3.5 h-3.5 flex-shrink-0" />
+                : <Unlock className="w-3.5 h-3.5 flex-shrink-0" />}
+              <span>{ticket.locked ? 'Locked — resolver will skip' : 'Unlocked — resolver can modify'}</span>
+            </button>
           </div>
 
           {/* Constraints & Risks - PTO Overlap Warning */}
