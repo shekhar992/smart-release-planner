@@ -123,23 +123,23 @@ function getMilestoneColorForType(type: MilestoneType): string {
 // Helper: Check if a ticket falls within Dev Window phases
 function isTicketInDevWindow(ticket: Ticket, phases: Phase[]): boolean {
   const devPhases = phases.filter(p => p.allowsWork);
-  
-  if (devPhases.length === 0) return true; // No phases = all tickets valid
-  
+  if (devPhases.length === 0) return true;
+
   const ticketStart = new Date(ticket.startDate);
   ticketStart.setHours(0, 0, 0, 0);
   const ticketEnd = new Date(ticket.endDate);
   ticketEnd.setHours(0, 0, 0, 0);
-  
-  // Check if ticket falls entirely within any Dev Window
-  return devPhases.some(phase => {
-    const phaseStart = new Date(phase.startDate);
-    phaseStart.setHours(0, 0, 0, 0);
-    const phaseEnd = new Date(phase.endDate);
-    phaseEnd.setHours(0, 0, 0, 0);
-    
-    return ticketStart >= phaseStart && ticketEnd <= phaseEnd;
-  });
+
+  // The planner treats the ENTIRE dev zone as one schedulable range and can
+  // place tickets that span internal phase boundaries (e.g. Development → QA).
+  // Check against the UNION of all allowsWork phases, not a single phase.
+  const allMs = devPhases.flatMap(p => [new Date(p.startDate).getTime(), new Date(p.endDate).getTime()]);
+  const devStart = new Date(Math.min(...allMs));
+  devStart.setHours(0, 0, 0, 0);
+  const devEnd = new Date(Math.max(...allMs));
+  devEnd.setHours(0, 0, 0, 0);
+
+  return ticketStart >= devStart && ticketEnd <= devEnd;
 }
 
 // Helper: Get ticket color scheme based on spillover status
@@ -327,7 +327,7 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   const [collapsedFeatures, setCollapsedFeatures] = useState<Set<string>>(new Set());
   const [selectedDeveloperId, setSelectedDeveloperId] = useState<'all' | 'unassigned' | string>('all');
   const [milestones, setMilestones] = useState<Milestone[]>([]);
-  const [phases, setPhases] = useState<Phase[]>([]);
+  const [phases, setPhases] = useState<Phase[]>(() => loadPhases(release.id));
   
   // Refs for scroll synchronization
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -348,16 +348,30 @@ export function TimelinePanel({ release, holidays, teamMembers, onMoveTicket, on
   // Load phases for this release (auto-create mock phases if none exist)
   useEffect(() => {
     let loaded = loadPhases(release.id);
-    
-    // If no phases exist, create mock phases for immediate visualization
+
+    // Fallback 1: phases embedded on the release object (set by PRD wizard / phase editor).
+    // This covers cases where savePhases wasn't called separately but release.phases is populated.
+    if (loaded.length === 0 && release.phases && release.phases.length > 0) {
+      loaded = release.phases.map(p => ({
+        ...p,
+        startDate: p.startDate instanceof Date ? p.startDate : new Date(p.startDate as string),
+        endDate:   p.endDate   instanceof Date ? p.endDate   : new Date(p.endDate   as string),
+      }));
+      savePhases(release.id, loaded); // persist so future loads hit localStorage directly
+    }
+
+    // Fallback 2: generate mock phases for immediate visualization
     if (loaded.length === 0) {
       const mockPhases = getMockPhasesForRelease(release);
       savePhases(release.id, mockPhases);
       loaded = mockPhases;
     }
-    
+
     setPhases(loaded);
-  }, [release.id]);
+  // Re-run when the release ID changes (navigating to a different release) OR when the
+  // phases on the release object are updated (e.g., after phase-editor saves new phases).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [release.id, release.phases]);
   
   // Handler to save new milestone
   const handleSaveMilestone = (milestone: Milestone) => {

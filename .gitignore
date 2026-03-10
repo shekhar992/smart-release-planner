@@ -54,3 +54,11 @@ MOCK_DATA_SUMMARY.md
 *Context.md
 *Tilldate*.md
 .env*.local
+
+# AI Playground - DO NOT COMMIT TEST DATA
+playground/test-documents/*
+!playground/test-documents/.gitkeep
+playground/outputs/
+playground/**/*.local.*
+playground/**/*-temp.*
+playground/**/*-test-output.*

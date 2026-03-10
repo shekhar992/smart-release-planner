@@ -25,8 +25,8 @@ const DEFAULT_FEATURES: UpcomingFeature[] = [
   {
     id: 'prd-splitter',
     title: 'PRD to Ticket Splitter',
-    status: 'Coming soon',
-    description: 'Upload PRD documents and auto-generate structured tickets with AI-powered parsing and smart breakdown.'
+    status: 'Now Available',
+    description: 'Now available! Upload your PRD and auto-generate structured epics and tickets with AI-powered parsing. Try it from any product card — click "Plan from PRD".'
   }
 ];
 

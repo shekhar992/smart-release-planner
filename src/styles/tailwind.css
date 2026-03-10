@@ -2,3 +2,127 @@
 @source '../**/*.{js,ts,jsx,tsx}';
 
 @import 'tw-animate-css';
+
+/* ── Google Material Design 3 — remap Tailwind blue to Google Blue scale ──── */
+@theme {
+  --color-blue-50:  #E8F0FE;
+  --color-blue-100: #D2E3FC;
+  --color-blue-200: #AECBFA;
+  --color-blue-400: #669DF6;
+  --color-blue-500: #4285F4;
+  --color-blue-600: #1A73E8;
+  --color-blue-700: #1765CC;
+  --color-blue-800: #1558B0;
+}
+
+/* ── Base layer: Roboto font ─────────────────────────────────────────────── */
+@layer base {
+  body {
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DESIGN SYSTEM — Component utilities
+   Phase A: button hierarchy + text scale
+   Rules:
+     • These are the source of truth for interactive element sizing/color.
+     • Utility classes in JSX (px-*, text-*, gap-*) override these via the
+       Tailwind layer cascade (utilities > components). Use that for one-off
+       sizing overrides rather than creating new variants.
+     • NEVER touch TimelinePanel.tsx with these utilities.
+───────────────────────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Button hierarchy ─────────────────────────────────────────────────── */
+
+  /* Primary — one per section. Blue fill. Main action (New Ticket, Approve). */
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white
+           rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800
+           transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* AI — violet tint. All AI-triggered actions (Risk Brief, Auto-Resolve). */
+  .btn-ai {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-xl
+           border transition-all duration-150
+           text-violet-700 dark:text-violet-300
+           bg-violet-50 dark:bg-violet-950/30
+           border-violet-200 dark:border-violet-800
+           hover:bg-violet-100 dark:hover:bg-violet-900/40
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Secondary — outlined neutral. Supporting actions (Actions menu, Cancel modal). */
+  .btn-secondary {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-xl
+           border shadow-sm transition-all duration-150
+           text-slate-700 dark:text-slate-300
+           bg-white dark:bg-slate-900
+           border-slate-300 dark:border-slate-600
+           hover:bg-slate-50 dark:hover:bg-slate-800
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Ghost — no background until hover. Low-priority text actions. */
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-xl
+           transition-all duration-150
+           text-slate-600 dark:text-slate-400
+           hover:text-slate-900 dark:hover:text-white
+           hover:bg-slate-100 dark:hover:bg-slate-800
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Danger — red fill. Destructive-only (Delete, Remove). */
+  .btn-danger {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold text-white
+           rounded-xl bg-red-500 hover:bg-red-600 active:bg-red-700
+           shadow-sm transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Icon — square, no label. Must have title/aria-label. */
+  .btn-icon {
+    @apply inline-flex items-center justify-center p-1.5 rounded-lg
+           transition-all duration-150
+           text-slate-400 dark:text-slate-500
+           hover:bg-slate-100 dark:hover:bg-slate-800;
+  }
+
+  /* ── Text scale ───────────────────────────────────────────────────────── */
+  /* Replaces ad-hoc text-[10px] / text-[11px] / text-[13px] values.
+     Use these instead; text-xs (12px), text-sm (14px), text-base (16px)
+     continue to come from Tailwind directly.                               */
+
+  .text-label {
+    @apply text-[10px] leading-[14px];     /* micro labels, release row meta */
+  }
+
+  .text-caption {
+    @apply text-[11px] leading-4;          /* badges, meta, timestamps     */
+  }
+
+  .text-body-sm {
+    @apply text-[13px] leading-5;          /* dense secondary body text     */
+  }
+
+  /* ── Animation utilities (D.3) ───────────────────────────────────────── */
+
+  /* All slide-over / side panels (conflict, ticket detail, etc.) */
+  .panel-slide-in {
+    @apply animate-in slide-in-from-right-4 fade-in-0 duration-200 ease-out;
+  }
+
+  /* All centred modal dialogs */
+  .modal-pop-in {
+    @apply animate-in zoom-in-95 fade-in-0 duration-150 ease-out;
+  }
+
+  /* Overlay backdrops */
+  .overlay-fade-in {
+    @apply animate-in fade-in-0 duration-200;
+  }
+}

@@ -1169,22 +1169,23 @@ export interface DevWindowFix {
  */
 function isTicketInDevWindow(ticket: Ticket, phases: Phase[]): boolean {
   const devPhases = phases.filter(p => p.allowsWork);
-  
   if (devPhases.length === 0) return true;
-  
+
   const ticketStart = new Date(ticket.startDate);
   ticketStart.setHours(0, 0, 0, 0);
   const ticketEnd = new Date(ticket.endDate);
   ticketEnd.setHours(0, 0, 0, 0);
-  
-  return devPhases.some(phase => {
-    const phaseStart = new Date(phase.startDate);
-    phaseStart.setHours(0, 0, 0, 0);
-    const phaseEnd = new Date(phase.endDate);
-    phaseEnd.setHours(0, 0, 0, 0);
-    
-    return ticketStart >= phaseStart && ticketEnd <= phaseEnd;
-  });
+
+  // The planner treats the ENTIRE dev zone as one schedulable range and can
+  // place tickets that span internal phase boundaries (e.g. Development → QA).
+  // Check against the UNION of all allowsWork phases, not a single phase.
+  const allMs = devPhases.flatMap(p => [new Date(p.startDate).getTime(), new Date(p.endDate).getTime()]);
+  const devStart = new Date(Math.min(...allMs));
+  devStart.setHours(0, 0, 0, 0);
+  const devEnd = new Date(Math.max(...allMs));
+  devEnd.setHours(0, 0, 0, 0);
+
+  return ticketStart >= devStart && ticketEnd <= devEnd;
 }
 
 /**

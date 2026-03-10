@@ -140,8 +140,13 @@ export function mapReleasePlanToAppRelease(
 
         epicMap.get(ticket.epic)!.tickets.push(mappedTicket);
         
-        // Next ticket for this developer starts after this one ends
-        currentStartDate = ticketEndDate;
+        // Advance to the next working day so the next ticket does NOT share
+        // the same start/end date with this one. The conflict detector uses an
+        // inclusive boundary check (s1 <= e2 && s2 <= e1), so same-day
+        // start/end between consecutive tickets would be detected as a conflict.
+        let nextStart = addDays(startOfDay(ticketEndDate), 1);
+        while (isWeekend(nextStart)) nextStart = addDays(nextStart, 1);
+        currentStartDate = nextStart;
       }
     }
   });
