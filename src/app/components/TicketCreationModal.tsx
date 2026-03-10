@@ -86,6 +86,12 @@ export function TicketCreationModal({
     }
   }, [step]);
 
+  // Keep endDate in sync with startDate + effortDays (effort is the source of truth)
+  useEffect(() => {
+    const derived = calculateEndDateFromEffort(new Date(startDate), effortDays, holidays);
+    setEndDate(toLocalDateString(derived));
+  }, [effortDays, startDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Focus feature input when creating
   useEffect(() => {
     if (isCreatingFeature && featureInputRef.current) {

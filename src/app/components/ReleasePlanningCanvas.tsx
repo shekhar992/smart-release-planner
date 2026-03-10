@@ -713,13 +713,13 @@ export function ReleasePlanningCanvas() {
                     
                     const velocity = assignedDev?.velocityMultiplier ?? 1;
                     
-                    const durationDays = calculateDurationDays(
-                      updatedTicket.effortDays ?? 1,
-                      velocity
+                    const adjustedDuration = Math.max(
+                      1,
+                      Math.round((updatedTicket.effortDays ?? updatedTicket.storyPoints ?? 1) / velocity)
                     );
                     
                     const start = new Date(updatedTicket.startDate);
-                    const recalculatedEndDate = addDays(start, durationDays - 1);
+                    const recalculatedEndDate = calculateEndDateFromEffort(start, adjustedDuration, holidays);
                     
                     updatedTicket.endDate = recalculatedEndDate;
                   }

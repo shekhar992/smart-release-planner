@@ -481,6 +481,9 @@ export function savePhases(releaseId: string, phases: Phase[]): void {
     endDate: toLocalDateString(p.endDate),
   }));
   localStorage.setItem(key, JSON.stringify(serialized));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('phasesUpdated'));
+  }
 }
 
 /**

@@ -1,0 +1,59 @@
+flowchart TD
+    subgraph ADMIN["Content Admin"]
+        U1([Open Dashboard])
+        U2[Enter content creation prompt]
+        U3{Confirm or edit parameters?}
+        U4[Edit parameters]
+        U6[Review generated draft]
+        U7[Send edit request via chat]
+        U8{Satisfied with content?}
+        U10{Apply AI suggestions?}
+        U11[Apply suggested improvements]
+        U12[Save asset]
+        U14{Request localization?}
+    end
+
+    subgraph AIASSIST["AI Conversational Assistant"]
+        A1["Interpret prompt - Extract: Brand, Channel, Audience, Market, Language"]
+        A2[Confirm parameters with user]
+        A5[Update asset in real time]
+        A9[Present compliance score and suggestions]
+        A13["Generate localized draft - Translation, Terminology, Regulatory language"]
+    end
+
+    subgraph PLATFORM["Platform and Backend"]
+        S1["Fetch brand guidelines - Approved claims, Clinical evidence, Market requirements"]
+        S2["Generate draft asset - Headline, Key Message, Evidence, Safety, CTA, References"]
+        S3["Run automated compliance review - Claims, Safety info, Language clarity, References"]
+        S4{Compliance score >= 80%?}
+        S5["Store in Content Library - Brand, Market, Channel, Language, Version history"]
+        S6[Create new localized asset version]
+    end
+
+    U1 --> U2
+    U2 --> A1
+    A1 --> A2
+    A2 --> U3
+    U3 -->|Proceed| S1
+    U3 -->|Edit| U4
+    U4 --> A2
+    S1 --> S2
+    S2 --> U6
+    U6 --> U7
+    U7 --> A5
+    A5 --> U8
+    U8 -->|No - keep editing| U7
+    U8 -->|Yes| S3
+    S3 --> A9
+    A9 --> S4
+    S4 -->|Below threshold - must fix| U11
+    S4 -->|Pass| U10
+    U10 -->|Apply| U11
+    U11 --> S3
+    U10 -->|Skip| U12
+    U12 --> S5
+    S5 --> U14
+    U14 -->|Yes| A13
+    A13 --> S6
+    U14 -->|No| DONE([Asset ready for MLR review or distribution])
+    S6 --> DONE
