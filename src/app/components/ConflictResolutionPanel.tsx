@@ -427,12 +427,6 @@ export function ConflictResolutionPanel({
                   <p className="text-xs font-semibold text-slate-900 dark:text-white">Manual resolution needed</p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">No automatic fix found — use the options below or skip.</p>
                 </div>
-                <button
-                  onClick={() => setShowMoreOptions(true)}
-                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline flex-shrink-0"
-                >
-                  Options
-                </button>
               </div>
             )}
 

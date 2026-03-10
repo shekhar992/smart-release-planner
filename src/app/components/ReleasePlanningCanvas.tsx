@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Users, ArrowLeft, Calendar, Database, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, ChevronDown, MoreHorizontal, AlertTriangle, Sparkles, Zap, WifiOff } from 'lucide-react';
+import { Users, ArrowLeft, Calendar, RotateCcw, Plus, Pencil, Trash2, Upload, Beaker, X, FileDown, MoreHorizontal, AlertTriangle, Sparkles, Zap, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { useParams, useNavigate } from 'react-router';
 import { TimelinePanel } from './TimelinePanel';
@@ -25,8 +25,6 @@ import { exportReleaseTimelinePptx } from '../lib/exporters/exportReleaseTimelin
 import { autoAllocateRelease } from '../lib/planningBridge';
 import { AICommandBar } from './AICommandBar';
 import { generateRiskNarrative, type RiskNarrative } from '../lib/aiCommandProcessor';
-import { AutoResolvePreviewModal } from './AutoResolvePreviewModal';
-import { runAutoResolve, type AutoResolveResult, type TicketResolution } from '../lib/autoResolver';
 // COMMENTED OUT: Toast notifications - Removed per user request
 // import { toastSuccess, toastError, toastPromise, toastInfo } from '../lib/toastHelpers';
 // COMMENTED OUT: Release Health Header - Removed to free up UI real estate
@@ -309,7 +307,7 @@ export function ReleasePlanningCanvas() {
   const [autoResolving, setAutoResolving] = useState(false);
   const [autoResolveResult, setAutoResolveResult] = useState<AutoResolveResult | null>(null);
   const [showAutoResolveModal, setShowAutoResolveModal] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
+  const [_lastSaved, setLastSaved] = useState<Date | null>(getLastUpdated());
   const [editingRelease, setEditingRelease] = useState(false);
   const [confirmDeleteRelease, setConfirmDeleteRelease] = useState(false);
   const [draftReleaseName, setDraftReleaseName] = useState('');
@@ -327,139 +325,12 @@ export function ReleasePlanningCanvas() {
   const [riskNarrative, setRiskNarrative] = useState<RiskNarrative | null>(null);
   const [riskLoading, setRiskLoading] = useState(false);
 
-  // ── Auto-Resolver state ──────────────────────────────────────────────────
-  const [autoResolving, setAutoResolving] = useState(false);
-  const [autoResolveResult, setAutoResolveResult] = useState<AutoResolveResult | null>(null);
-  const [showAutoResolveModal, setShowAutoResolveModal] = useState(false);
-
-  const handleAutoResolve = async () => {
-    if (!release || autoResolving) return;
-    setAutoResolving(true);
-    setAutoResolveResult(null);
-    setShowAutoResolveModal(true); // open drawer immediately — shows loading skeleton
-    try {
-      const result = await runAutoResolve(release, derivedTeamMembers, holidays, phases);
-      setAutoResolveResult(result);
-    } catch (e) {
-      console.error('[AutoResolve] Failed:', e);
-      setShowAutoResolveModal(false);
-    } finally {
-      setAutoResolving(false);
-    }
-  };
-
-  const handleApplyResolutions = (resolutions: TicketResolution[]) => {
-    setRelease(prev => {
-      if (!prev) return prev;
-
-      const sortedResolutions = [...resolutions].sort(
-        (a, b) => new Date(a.toStartDate).getTime() - new Date(b.toStartDate).getTime(),
-      );
-      const resMap = new Map(sortedResolutions.map(r => [r.ticketId, r]));
-
-      // ── PASS 1: compute conflict-free start/end per resolved ticket ───────
-      //
-      // Key insight: pre-seed per dev+sprint, NOT globally.
-      // Using a global max end-date caused resolved tickets to be pushed past
-      // ALL of a dev's work (including later sprints), creating new conflicts
-      // in those sprints — which is exactly why 3 runs were needed.
-      //
-      // Approach:
-      //  a) Build a helper that maps a date → which sprint it belongs to.
-      //  b) Pre-seed lastEndByDevSprint (key = "devName::sprintId") from every
-      //     unresolved ticket, bucketed into its sprint.
-      //  c) When computing a resolved ticket's start, only look at the
-      //     target sprint's existing occupancy for that dev.
-
-      // Sprint lookup helper — finds the sprint containing a given date, or
-      // the nearest sprint if the date falls between sprints.
-      const relSprints = (prev.sprints ?? []).slice().sort(
-        (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
-      );
-      function findSprintForDate(d: Date): string | null {
-        const day = d.getTime();
-        for (const s of relSprints) {
-          const ss = new Date(s.startDate).getTime();
-          const se = new Date(s.endDate).getTime();
-          if (day >= ss && day <= se) return s.id;
-        }
-        // Nearest sprint fallback
-        let nearest: string | null = null;
-        let nearestDist = Infinity;
-        for (const s of relSprints) {
-          const ss = new Date(s.startDate).getTime();
-          const se = new Date(s.endDate).getTime();
-          const dist = day < ss ? ss - day : day - se;
-          if (dist < nearestDist) { nearestDist = dist; nearest = s.id; }
-        }
-        return nearest;
-      }
-
-      // Pre-seed: unresolved tickets block only their own sprint for that dev.
-      const lastEndByDevSprint = new Map<string, Date>();
-      for (const feature of prev.features) {
-        for (const ticket of feature.tickets) {
-          if (resMap.has(ticket.id)) continue;
-          if (!ticket.assignedTo || ticket.assignedTo.trim() === '') continue;
-          const sprintId = findSprintForDate(new Date(ticket.startDate));
-          if (!sprintId) continue;
-          const key = `${ticket.assignedTo}::${sprintId}`;
-          const te = new Date(ticket.endDate);
-          const existing = lastEndByDevSprint.get(key);
-          if (!existing || te > existing) lastEndByDevSprint.set(key, te);
-        }
-      }
-
-      const finalDates = new Map<string, { start: Date; end: Date }>();
-      for (const res of sortedResolutions) {
-        const dev = derivedTeamMembers.find(m => m.name === res.toAssignee);
-        const velocity = dev?.velocityMultiplier ?? 1;
-        const origTicket = prev.features.flatMap(f => f.tickets).find(t => t.id === res.ticketId);
-        const effort = origTicket?.effortDays ?? 1;
-        const durationDays = calculateDurationDays(effort, velocity);
-
-        const resolverStart = new Date(res.toStartDate);
-        const key = `${res.toAssignee}::${res.toSprintId}`;
-        const prevEnd = lastEndByDevSprint.get(key);
-
-        let start: Date;
-        if (prevEnd) {
-          let next = addDays(prevEnd, 1);
-          while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1);
-          start = next > resolverStart ? next : resolverStart;
-        } else {
-          start = resolverStart;
-        }
-
-        const end = addDays(start, durationDays - 1);
-        lastEndByDevSprint.set(key, end);
-        finalDates.set(res.ticketId, { start, end });
-      }
-
-      // ── PASS 2: apply computed dates in the ticket tree ───────────────────
-      return {
-        ...prev,
-        features: prev.features.map(feature => ({
-          ...feature,
-          tickets: feature.tickets.map(ticket => {
-            const res = resMap.get(ticket.id);
-            if (!res) return ticket;
-            const dates = finalDates.get(ticket.id)!;
-            return { ...ticket, assignedTo: res.toAssignee, startDate: dates.start, endDate: dates.end };
-          }),
-        })),
-      };
-    });
-    setShowAutoResolveModal(false);
-    setAutoResolveResult(null);
-  };
-
   const handleGenerateRiskBrief = async () => {
     if (riskLoading) return;
     setRiskLoading(true);
     setRiskNarrative(null);
     try {
-      const result = await generateRiskNarrative(release, teamMembers);
+      const result = await generateRiskNarrative(release!, teamMembers);
       setRiskNarrative(result);
     } catch {
       // best-effort
@@ -2036,10 +1907,10 @@ export function ReleasePlanningCanvas() {
               // After tickets are added, auto-allocate to sprints
               // The planning engine will create sprints if they don't exist
               setTimeout(() => {
-                const sprintLengthDays = updatedRelease.sprints.length > 0
+                const sprintLengthDays = (updatedRelease.sprints?.length ?? 0) > 0
                   ? Math.round(
-                      (updatedRelease.sprints[0].endDate.getTime() - 
-                       updatedRelease.sprints[0].startDate.getTime()) / 
+                      ((updatedRelease.sprints?.[0].endDate.getTime() ?? 0) - 
+                       (updatedRelease.sprints?.[0].startDate.getTime() ?? 0)) / 
                       (1000 * 60 * 60 * 24)
                     )
                   : 14; // Default to 2-week sprints
