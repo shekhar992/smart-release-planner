@@ -1170,15 +1170,17 @@ export function ReleasePlanningCanvas() {
             ...f,
             tickets: f.tickets.map(t => {
               if (t.id === ticketId) {
+                // Guard: endDate must never be before startDate — clamp to startDate if dragged too far left
+                const safeEndDate = newEndDate >= t.startDate ? newEndDate : t.startDate;
                 // Recalculate effortDays from new duration (working days, not calendar days)
-                const newEffort = calculateEffortFromDates(t.startDate, newEndDate, holidays);
+                const newEffort = Math.max(1, calculateEffortFromDates(t.startDate, safeEndDate, holidays));
                 
                 // Ticket resized - using console log instead of toast
-                console.log(`[Ticket Resized] ${t.title} duration changed to ${newEffort} days: ${t.startDate.toLocaleDateString()} – ${newEndDate.toLocaleDateString()}`);
+                console.log(`[Ticket Resized] ${t.title} duration changed to ${newEffort} days: ${t.startDate.toLocaleDateString()} – ${safeEndDate.toLocaleDateString()}`);
                 
                 return {
                   ...t,
-                  endDate: newEndDate,
+                  endDate: safeEndDate,
                   effortDays: newEffort,
                   storyPoints: newEffort // Backward compatibility
                 };

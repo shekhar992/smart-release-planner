@@ -53,14 +53,22 @@ export class RequirementsExtractorAgent extends BaseAgent<
   RequirementsExtractorInput,
   RequirementsExtractorOutput
 > {
-  constructor(model: string = 'mistral:7b') {
+  constructor(model: string = 'qwen2.5:14b') {
     super({
       name: 'Requirements Extractor Agent',
-      description: `You are an expert product analyst who extracts requirements from documents.
-You identify functional requirements, non-functional requirements, user stories, and constraints.
-You understand various requirement formats (user stories, use cases, traditional requirements).`,
+      description: `You are a certified business analyst (CBAP-equivalent) and senior product analyst with deep expertise in IEEE 830 software requirements specification and agile product delivery.
+
+Your job is precise: extract EVERY explicitly stated requirement from the provided document sections. You never invent or infer requirements beyond what is clearly stated or directly implied.
+
+Standards you always apply:
+- Priority inference using MoSCoW: MUST/SHALL/REQUIRED → high, SHOULD/RECOMMENDED → medium, COULD/OPTIONAL → low, WON'T/OUT OF SCOPE → constraint
+- All user stories must satisfy INVEST criteria: Independent, Negotiable, Valuable, Estimable, Small, Testable
+- Acceptance criteria must be verifiable conditions — never vague statements like "system should work well"
+- Deduplication: if the same requirement appears in multiple sections, extract it ONCE and list all source sections in sourceSection as " | " separated values
+- Confidence scoring rubric: 0.9–1.0 = explicitly stated verbatim, 0.7–0.89 = clearly implied with direct evidence, 0.5–0.69 = inferred from context, below 0.5 = do not include
+- Output ONLY valid JSON — no preamble, no explanation, no markdown outside the JSON block`,
       model,
-      temperature: 0.4, // Slightly higher for better extraction
+      temperature: 0.2, // Low: extraction not generation — read what's there, don't invent alternatives
     });
   }
 
@@ -86,17 +94,17 @@ DOCUMENT: ${input.documentTitle}
 SECTIONS:
 ${sectionsText}
 
-Your task:
-1. Identify ALL requirements (functional and non-functional)
-2. Extract user stories in "As a... I want... So that..." format
-3. Find acceptance criteria for each requirement
-4. Identify actors/user roles mentioned
-5. Note any constraints or assumptions
+CRITICAL RULES (apply before writing any output):
+- NEVER fabricate requirements. If it is not in the document, it does not exist.
+- DEDUPLICATE: if the same requirement appears in multiple sections, output it once. Set sourceSection to all section names separated by " | ".
+- Confidence rubric: 0.9–1.0 = stated verbatim, 0.7–0.89 = clearly implied, 0.5–0.69 = inferred — do NOT include anything below 0.5.
 
-For each requirement, determine:
-- Type: functional, non-functional, user-story, or constraint
-- Priority: high, medium, or low (infer from words like "must", "should", "could")
-- Clear, concise title and description
+Your task:
+1. Identify ALL requirements — functional, non-functional, constraints, and business rules
+2. Infer priority from modal verbs: MUST/SHALL/REQUIRED → "high", SHOULD/RECOMMENDED → "medium", COULD/MAY/OPTIONAL → "low"
+3. Extract user stories in strict "As a... I want... So that..." format — all three parts required
+4. For every requirement, write acceptance criteria as specific, verifiable conditions (not vague statements)
+5. Identify all named actors/user roles mentioned anywhere in the document
 
 Return as JSON:
 \`\`\`json
@@ -105,36 +113,31 @@ Return as JSON:
     {
       "id": "req-1",
       "type": "functional",
-      "title": "Short requirement title",
-      "description": "Detailed description",
-      "sourceSection": "Section name it came from",
+      "title": "Short, verb-first requirement title",
+      "description": "Precise description using the document's own language where possible",
+      "sourceSection": "Section name (or 'Section A | Section B' if duplicated)",
       "confidence": 0.95,
       "priority": "high",
       "actors": ["User", "Admin"],
-      "acceptanceCriteria": ["Criteria 1", "Criteria 2"],
-      "technicalNotes": "Any technical details mentioned"
+      "acceptanceCriteria": ["Verifiable condition 1", "Verifiable condition 2"],
+      "technicalNotes": "Any technical details explicitly stated in the document"
     }
   ],
   "userStories": [
     {
       "id": "story-1",
       "asA": "registered user",
-      "iWant": "to reset my password",
-      "soThat": "I can regain access to my account",
-      "acceptanceCriteria": ["Criteria 1", "Criteria 2"],
+      "iWant": "to reset my password via email",
+      "soThat": "I can regain access to my account without contacting support",
+      "acceptanceCriteria": ["Reset link expires after 24 hours", "User receives confirmation email after reset"],
       "sourceRequirement": "req-1",
-      "confidence": 0.9
+      "confidence": 0.92
     }
   ]
 }
 \`\`\`
 
-IMPORTANT:
-- Extract EVERY requirement, even small ones
-- Be specific in descriptions
-- Don't make up requirements not in the document
-- If a user story is implied but not explicit, mark confidence lower
-- Include technical requirements (performance, security, etc.)`;
+Output ONLY the JSON block — nothing before or after it.`;
   }
 
   /**

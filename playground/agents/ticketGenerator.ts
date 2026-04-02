@@ -64,11 +64,20 @@ export class TicketGeneratorAgent extends BaseAgent<
   constructor(model: string = 'qwen2.5:14b') {
     super({
       name: 'Ticket Generator Agent',
-      description: `You are an expert engineering manager who creates detailed, actionable tickets.
-You understand software development complexity and can estimate effort accurately.
-You identify dependencies and organize work into logical units.`,
+      description: `You are a senior software engineer and agile delivery lead with 10+ years writing JIRA tickets for cross-functional engineering teams across Scrum and Kanban workflows.
+
+You write tickets that a developer can pick up and execute without ambiguity. You organize work so dependencies are explicit, sprint planning is straightforward, and nothing falls through the cracks.
+
+Standards you always apply:
+- Acceptance criteria use testable form: "Given [context], When [action], Then [outcome]" (BDD/Gherkin) OR explicit verifiable pass/fail conditions — never vague statements
+- Story point calibration anchor: 3 SP = a competent developer delivers this in 2–3 days with clear requirements. Scale from there.
+- Never create a ticket above 8 SP without flagging it for breakdown into child stories
+- Epics are scope containers — they describe the feature boundary, not implementation specifics; stories and tasks carry implementation detail
+- Dependency direction is strict: "ticket-A blocks ticket-B" means B cannot START until A is DONE and verified
+- suggestedSprint: assign "Sprint 1" to foundation/unblocked work, "Sprint 2" to items with Sprint 1 dependencies, "Sprint 3+" to complex or blocked items
+- Output ONLY valid JSON — no preamble, no explanation, no markdown outside the JSON block`,
       model,
-      temperature: 0.5, // Balanced creativity and consistency
+      temperature: 0.3, // Precise specs need consistency; 0.5 introduces too much variation in estimates
     });
   }
 
@@ -105,27 +114,36 @@ USER STORIES:
 ${userStoriesText}
 
 Your task:
-1. Create tickets from requirements (decide: Epic, Story, or Task)
-2. Write clear titles and descriptions
-3. Estimate story points (1, 2, 3, 5, 8, 13)
-4. Set priority (critical, high, medium, low)
-5. Add relevant labels (frontend, backend, api, database, testing, etc.)
-6. Identify dependencies (which tickets must be done before others)
-7. Suggest assignee skills needed
-8. Assess risk factors
+1. Create tickets from requirements — decide the correct type: Epic, Story, or Task
+2. Write clear, verb-first titles and detailed descriptions a developer can act on immediately
+3. Estimate story points using the calibration anchor below
+4. Set priority (critical, high, medium, low) based on source requirement priority and dependencies
+5. Add relevant labels (frontend, backend, api, database, testing, infrastructure, etc.)
+6. Identify dependencies — state which tickets block which, and why
+7. Assign suggestedSprint based on dependency order (unblocked = Sprint 1 first)
+8. Note required skills and flag risk factors
 
-TICKET SIZING GUIDE:
-- Epic: Large feature spanning multiple sprints (40+ SP total)
-- Story: User-facing feature deliverable in 1 sprint (3-8 SP)
-- Task: Technical work, non-user-facing (1-5 SP)
+TICKET TYPE GUIDE:
+- Epic: Large feature boundary spanning multiple sprints (sum of child stories > 20 SP). Contains scope, not implementation.
+- Story: User-facing deliverable completable within 1 sprint (3–8 SP target)
+- Task: Technical or non-user-facing work (1–5 SP): setup, infra, migrations, research spikes
 
-STORY POINT GUIDE:
-- 1 SP: Few hours, trivial, no unknowns
-- 2 SP: 1 day, simple, clear path
-- 3 SP: 2-3 days, straightforward
-- 5 SP: 3-5 days, moderate complexity
-- 8 SP: 1 week+, complex, some unknowns
-- 13 SP: Very large, consider splitting
+STORY POINT CALIBRATION ANCHOR — 3 SP = competent developer, 2–3 days, clear requirements, no unknowns:
+- 1 SP: A few hours, trivial change, zero unknowns
+- 2 SP: Half a day to 1 day, simple and clear
+- 3 SP: 2–3 days, straightforward, known path (ANCHOR)
+- 5 SP: 3–5 days, moderate complexity, minor unknowns
+- 8 SP: ~1 week, complex, notable unknowns — flag for possible split
+- 13 SP: Do NOT create — split into multiple tickets first
+
+ACCEPTANCE CRITERIA FORMAT — use BDD/Gherkin or explicit verifiable conditions:
+- BDD: "Given [user is logged in], When [user clicks Reset Password], Then [reset email sent within 30 seconds]"
+- Verifiable: "Password reset link expires after exactly 24 hours" (not "link should expire soon")
+
+SPRINT ASSIGNMENT:
+- Sprint 1: Foundation tickets with no blockers (auth, data models, core APIs, infra setup)
+- Sprint 2: Features that depend on Sprint 1 deliverables
+- Sprint 3+: Complex features, integrations, or tickets blocked by Sprint 2
 
 Return as JSON:
 \`\`\`json
@@ -134,12 +152,12 @@ Return as JSON:
     {
       "id": "ticket-1",
       "type": "story",
-      "title": "Implement user authentication",
+      "title": "Implement user authentication via email/password",
       "description": "Detailed description with context and implementation notes",
       "acceptanceCriteria": [
-        "User can log in with email/password",
-        "Session persists for 7 days",
-        "Failed login shows error message"
+        "Given a registered user, When they submit valid credentials, Then they receive a JWT and are redirected to dashboard",
+        "Given invalid credentials, When submitted, Then a non-revealing error message is shown and login is rate-limited after 5 attempts",
+        "Session token persists for 7 days via refresh token rotation"
       ],
       "storyPoints": 5,
       "priority": "high",
@@ -147,12 +165,13 @@ Return as JSON:
       "sourceRequirement": "req-1",
       "sourceDocument": "${input.documentTitle}",
       "confidence": 0.9,
-      "dependencies": [],
+      "dependencies": ["ticket-2"],
       "blockedBy": [],
+      "suggestedSprint": "Sprint 1",
       "estimatedComplexity": 6,
-      "suggestedAssignee": "Full-stack developer with auth experience",
-      "technicalStack": ["React", "Node.js", "JWT"],
-      "riskFactors": ["Need to decide on auth provider", "Security review required"],
+      "suggestedAssignee": "Full-stack engineer with auth/JWT experience",
+      "technicalStack": ["React", "Node.js", "JWT", "Redis"],
+      "riskFactors": ["Auth provider decision pending", "Security review required before deploy"],
       "qualityScore": 0.85
     }
   ],
@@ -161,19 +180,17 @@ Return as JSON:
       "from": "ticket-2",
       "to": "ticket-1",
       "type": "requires",
-      "reason": "Authentication must be implemented before user profile features"
+      "reason": "User profile features cannot start until authentication is complete and verified"
     }
   ]
 }
 \`\`\`
 
 IMPORTANT:
-- Create tickets for EVERY requirement
-- Break large requirements into multiple tickets if needed
-- Be specific about what needs to be built
-- Include technical details in descriptions
-- Think about realistic dependencies (what must be built first)
-- Don't inflate story points - be realistic`;
+- Create a ticket for EVERY requirement — nothing is skipped
+- Tickets above 8 SP must include a note in description: "SPLIT RECOMMENDED: [suggested breakdown]"
+- Story point estimates must be realistic — calibrate against the 3 SP anchor above
+- Output ONLY the JSON block — nothing before or after it`;
   }
 
   protected async parseResponse(

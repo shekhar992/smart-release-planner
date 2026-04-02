@@ -51,7 +51,7 @@ Your output (JSON only):`;
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'llama3.2:3b',
+      model: 'qwen2.5:14b',
       messages: [
         { role: 'system', content: systemMessage },
         { role: 'user', content: userMessage }
@@ -159,7 +159,7 @@ Return ONLY valid JSON:
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama3.2:3b',
+        model: 'qwen2.5:14b',
         messages: [{ role: 'user', content: prompt }],
         stream: false,
         options: {
@@ -281,7 +281,7 @@ async function main() {
     console.log('📊 Performance:');
     console.log(`   ⏱️  Total time: ${duration} seconds`);
     console.log(`   💰 Cost: $0.00`);
-    console.log(`   🤖 Model: llama3.2:3b (local)`);
+    console.log(`   🤖 Model: qwen2.5:14b (local)`);
     console.log(`   📦 Tickets: ${tickets.length} created\n`);
 
     console.log('🧪 NOW IT\'S YOUR TURN - Experiments to Try:\n');
@@ -292,8 +292,8 @@ async function main() {
     console.log('   Then run: npm run learn:4\n');
 
     console.log('2️⃣  TRY DIFFERENT MODEL:');
-    console.log('   - Change line 89: model: "mistral:7b"');
-    console.log('   - First run: ollama pull mistral:7b');
+    console.log('   - Change line 89: model: "qwen2.5:14b"');
+    console.log('   - First run: ollama pull qwen2.5:14b');
     console.log('   - Compare quality!\n');
 
     console.log('3️⃣  PROCESS MORE REQUIREMENTS:');

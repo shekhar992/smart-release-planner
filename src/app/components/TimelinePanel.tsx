@@ -2636,26 +2636,30 @@ function TicketTimelineBar({
       {/* Portal-based Tooltip - renders at document.body to avoid positioning context issues */}
       {isHovered && tooltipPos && !isDragging && (() => {
         // Phase 2: Calculate working days breakdown
-        const calendarDaysCount = Math.ceil((ticket.endDate.getTime() - ticket.startDate.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-        const workingDaysCount = countWorkingDays(ticket.startDate, ticket.endDate);
+        // Guard: if dates are inverted (startDate > endDate), use canonical order for display
+        const displayStart = ticket.startDate <= ticket.endDate ? ticket.startDate : ticket.endDate;
+        const displayEnd   = ticket.startDate <= ticket.endDate ? ticket.endDate   : ticket.startDate;
+        const datesInverted = ticket.startDate > ticket.endDate;
+        const calendarDaysCount = Math.ceil((displayEnd.getTime() - displayStart.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+        const workingDaysCount = countWorkingDays(displayStart, displayEnd);
         const weekendDaysCount = calendarDaysCount - workingDaysCount;
         
-        // Count holidays in this range
+        // Count holidays in this range — use canonical displayStart/displayEnd to handle inverted dates
         const ticketHolidays = holidays.filter(h => {
           const hStart = new Date(h.startDate);
           hStart.setHours(0, 0, 0, 0);
           const hEnd = new Date(h.endDate);
           hEnd.setHours(0, 0, 0, 0);
-          const tStart = new Date(ticket.startDate);
+          const tStart = new Date(displayStart);
           tStart.setHours(0, 0, 0, 0);
-          const tEnd = new Date(ticket.endDate);
+          const tEnd = new Date(displayEnd);
           tEnd.setHours(0, 0, 0, 0);
           return hEnd >= tStart && hStart <= tEnd;
         });
         
         const holidayDaysCount = ticketHolidays.reduce((sum, h) => {
-          const hStart = h.startDate < ticket.startDate ? ticket.startDate : h.startDate;
-          const hEnd = h.endDate > ticket.endDate ? ticket.endDate : h.endDate;
+          const hStart = h.startDate < displayStart ? displayStart : h.startDate;
+          const hEnd = h.endDate > displayEnd ? displayEnd : h.endDate;
           return sum + countWorkingDays(hStart, hEnd);
         }, 0);
         
@@ -2692,9 +2696,16 @@ function TicketTimelineBar({
             )}
 
             <div className="space-y-1 text-xs mb-3">
+              {datesInverted && (
+                <div className="flex items-center gap-1 text-[10px] text-red-600 font-medium bg-red-50 border border-red-200 rounded px-2 py-1 mb-1">
+                  ⚠ Inverted dates detected — resize to fix
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-gray-500">Dates:</span>
-                <span className="font-medium">{ticket.startDate.toLocaleDateString()} – {ticket.endDate.toLocaleDateString()}</span>
+                <span className={`font-medium ${datesInverted ? 'text-red-500' : ''}`}>
+                  {displayStart.toLocaleDateString()} – {displayEnd.toLocaleDateString()}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Effort:</span>
