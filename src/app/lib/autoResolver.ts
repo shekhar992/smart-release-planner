@@ -34,6 +34,12 @@ import type {
 } from '../data/mockData';
 import { storyPointsToDays } from '../data/mockData';
 
+// ── Phase 2: AI resolver endpoint ──────────────────────────────────────────
+// In prod this hits /api/ai-resolve (Groq, json_object mode).
+// In dev we fall back to the greedy algorithm because Ollama doesn't support
+// response_format: json_object reliably.
+const AI_RESOLVE_ENDPOINT = import.meta.env.DEV ? null : '/api/ai-resolve';
+
 // ─────────────────────────────── Public types ──────────────────────────────
 
 export type TaggedRole =
@@ -105,6 +111,12 @@ export interface TicketResolution {
   toDevUtilBefore: number;
   /** Destination developer's utilization % AFTER this ticket was placed */
   toDevUtilAfter: number;
+  /** AI-generated plain-English reason for this specific decision (Phase 2) */
+  reasoning?: string;
+  /** AI confidence score 0–100 (Phase 2) */
+  confidence?: number;
+  /** Key tradeoff the AI considered — e.g. "sprint-slip vs dev swap" (Phase 2) */
+  tradeoff?: string;
 }
 
 export interface UnresolvableTicket {
@@ -124,6 +136,8 @@ export interface AutoResolveResult {
   devWindowEnd: Date;
   /** Number of tickets skipped because they were locked by the PM */
   lockedSkipped: number;
+  /** True if Groq AI annotations were successfully applied (Phase 2) */
+  aiAnnotated: boolean;
 }
 
 // ───────────────────────────── Internal helpers ────────────────────────────
@@ -254,6 +268,117 @@ function isRoleCompatible(devRole: string, ticketRole: string | undefined): bool
   return false;
 }
 
+// ─────────────────── Phase 2: AI-assisted resolver ─────────────────────────
+
+interface AIResolutionItem {
+  ticketId: string;
+  toAssignee: string;
+  toSprintName: string;
+  reasoning: string;
+  confidence: number;
+  tradeoff: string;
+}
+
+interface AIResolverContext {
+  tickets: Array<{
+    id: string;
+    title: string;
+    conflictReason: string;
+    effortDays: number;
+    currentAssignee: string;
+    requiredRole?: string;
+  }>;
+  team: Array<{
+    name: string;
+    role: string;
+    remainingCapacityDays: number;
+    currentUtilPct: number;
+  }>;
+  sprints: Array<{
+    name: string;
+    startDate: string;
+    endDate: string;
+  }>;
+  preferences: {
+    minimizeReassignments: boolean;
+    protectCriticalPath: boolean;
+    prioritizeSeniorsOnHighRisk: boolean;
+  };
+  pmIntent?: string;
+}
+
+/**
+ * Calls Groq (via /api/ai-resolve) to get reasoned assignments for each
+ * conflict ticket. Returns null if unavailable or on any error — the caller
+ * falls back to the greedy algorithm in that case.
+ */
+async function callAIResolver(ctx: AIResolverContext): Promise<AIResolutionItem[] | null> {
+  if (!AI_RESOLVE_ENDPOINT) return null; // dev mode — always use greedy
+
+  const systemPrompt = `You are a senior engineering manager allocating software tickets to resolve scheduling conflicts.
+
+For each ticket, assign it to the BEST AVAILABLE developer and sprint from the given team/sprint data.
+Return ONLY a valid JSON object: { "resolutions": [ ...array of items... ] }
+
+Each item must have EXACTLY these fields:
+  "ticketId": string (from input)
+  "toAssignee": string (developer name from team list, verbatim)
+  "toSprintName": string (sprint name from sprint list, verbatim)
+  "reasoning": string (1 concise sentence: why this specific dev+sprint)
+  "confidence": number (0-100, how confident you are this is the right call)
+  "tradeoff": string (one short phrase: the main tradeoff, e.g. "delayed 1 sprint vs overloading senior")
+
+Rules:
+- Only assign to developers whose role matches the ticket's requiredRole (Fullstack covers Frontend+Backend)
+- Only assign to sprints where the chosen developer has remaining capacity > effortDays
+- If minimizeReassignments=true, prefer keeping the same assignee and moving the sprint instead
+- If protectCriticalPath=true, place high-priority tickets (P1/P2 in title) in the earliest valid sprint
+- If prioritizeSeniorsOnHighRisk=true, assign Senior/Lead developers to unassigned tickets first
+${ctx.pmIntent ? `- PM intent: "${ctx.pmIntent}"` : ''}`;
+
+  const userMsg = `Resolve these ${ctx.tickets.length} conflicted tickets:
+
+TICKETS:
+${ctx.tickets.map(t =>
+    `- id: "${t.id}" | title: "${t.title}" | conflict: ${t.conflictReason} | effort: ${t.effortDays}d | currentAssignee: "${t.currentAssignee}"${t.requiredRole ? ` | requiredRole: ${t.requiredRole}` : ''}`
+  ).join('\n')}
+
+TEAM (name | role | remaining capacity | current utilization):
+${ctx.team.map(d =>
+    `- "${d.name}" | ${d.role} | ${d.remainingCapacityDays}d remaining | ${d.currentUtilPct}% loaded`
+  ).join('\n')}
+
+SPRINTS:
+${ctx.sprints.map(s => `- "${s.name}" (${s.startDate} → ${s.endDate})`).join('\n')}
+
+Preferences: minimizeReassignments=${ctx.preferences.minimizeReassignments}, protectCriticalPath=${ctx.preferences.protectCriticalPath}, prioritizeSeniorsOnHighRisk=${ctx.preferences.prioritizeSeniorsOnHighRisk}`;
+
+  try {
+    const res = await fetch(AI_RESOLVE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userMsg },
+        ],
+        max_tokens: 2048,
+      }),
+    });
+
+    if (!res.ok) throw new Error(`AI resolver HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    const items: AIResolutionItem[] = data.resolutions ?? [];
+    if (!Array.isArray(items) || items.length === 0) throw new Error('Empty resolutions array');
+    return items;
+  } catch (e) {
+    console.warn('[autoResolver] AI resolver failed, falling back to greedy:', e);
+    return null;
+  }
+}
+
 /** Single batched Ollama call to tag all tickets needing a role */
 async function tagTicketRoles(
   tickets: Array<{ id: string; title: string; description?: string }>,
@@ -320,9 +445,21 @@ export async function runAutoResolve(
   teamMembers: TeamMember[],
   holidays: Holiday[],
   phases: Phase[],
+  preferences?: {
+    minimizeReassignments?: boolean;
+    protectCriticalPath?: boolean;
+    prioritizeSeniorsOnHighRisk?: boolean;
+    pmIntent?: string;
+  },
 ): Promise<AutoResolveResult> {
 
   const spMapping = release.storyPointMapping;
+  const prefs = {
+    minimizeReassignments: preferences?.minimizeReassignments ?? false,
+    protectCriticalPath: preferences?.protectCriticalPath ?? false,
+    prioritizeSeniorsOnHighRisk: preferences?.prioritizeSeniorsOnHighRisk ?? false,
+  };
+  const pmIntent = preferences?.pmIntent;
 
   // ── 1. Dev window bounds ──────────────────────────────────────────────────
   const devPhases = phases.filter(p => p.allowsWork);
@@ -350,6 +487,7 @@ export async function runAutoResolve(
       devWindowStart,
       devWindowEnd,
       lockedSkipped: 0,
+      aiAnnotated: false,
     };
   }
 
@@ -634,6 +772,55 @@ export async function runAutoResolve(
   const getConflictReason = (id: string): ConflictReason =>
     conflictReasonMap.get(id) ?? 'overloaded';
 
+  // ── 8b. Phase 2: Ask AI for reasoned assignments ──────────────────────────
+  // Build a lean context snapshot (no dates — AI doesn't need them for assignment logic)
+  const aiCtx: AIResolverContext = {
+    tickets: ticketsToResolve.map(t => ({
+      id: t.id,
+      title: t.title,
+      conflictReason: conflictReasonMap.get(t.id) ?? 'overloaded',
+      effortDays: resolveEffort(t, spMapping),
+      currentAssignee: t.assignedTo || 'Unassigned',
+      requiredRole: t.requiredRole,
+    })),
+    team: teamMembers.map(dev => {
+      // Aggregate remaining capacity across all sprints for this dev
+      let totalRemaining = 0;
+      let totalCapacity = 0;
+      let totalAssigned = 0;
+      for (const sprint of sprints) {
+        const cap = getMutableCap(sprint.id, dev.id);
+        if (!cap) continue;
+        totalRemaining += cap.remainingDays;
+        totalCapacity += cap.capacityDays;
+        totalAssigned += cap.assignedDays;
+      }
+      return {
+        name: dev.name,
+        role: dev.role,
+        remainingCapacityDays: Math.round(totalRemaining * 10) / 10,
+        currentUtilPct: totalCapacity > 0 ? Math.round((totalAssigned / totalCapacity) * 100) : 0,
+      };
+    }),
+    sprints: sprints.map(s => ({
+      name: s.name,
+      startDate: startOfDay(new Date(s.startDate)).toISOString().slice(0, 10),
+      endDate: startOfDay(new Date(s.endDate)).toISOString().slice(0, 10),
+    })),
+    preferences: prefs,
+    pmIntent,
+  };
+
+  // Call AI — null means unavailable/failed → greedy will run normally
+  const aiMap = new Map<string, AIResolutionItem>();
+  if (ticketsToResolve.length > 0) {
+    const aiItems = await callAIResolver(aiCtx);
+    if (aiItems) {
+      for (const item of aiItems) aiMap.set(item.ticketId, item);
+      console.info(`[autoResolver] AI resolved ${aiMap.size}/${ticketsToResolve.length} tickets`);
+    }
+  }
+
   // ── 9. Greedy assignment ──────────────────────────────────────────────────
   const resolutions: TicketResolution[] = [];
   const unresolvable: UnresolvableTicket[] = [];
@@ -740,6 +927,9 @@ export async function runAutoResolve(
 
       lastEndDate.set(`${sprint.id}::${bestDev.id}`, toEndDate);
 
+      // Overlay AI reasoning if available for this ticket
+      const aiHint = aiMap.get(ticket.id);
+
       resolutions.push({
         ticketId: ticket.id,
         featureId: ticket.featureId,
@@ -760,6 +950,9 @@ export async function runAutoResolve(
         effortDays: effort,
         toDevUtilBefore: utilBefore,
         toDevUtilAfter: utilAfter,
+        reasoning: aiHint?.reasoning,
+        confidence: aiHint?.confidence,
+        tradeoff: aiHint?.tradeoff,
       });
 
       resolved = true;
@@ -808,5 +1001,61 @@ export async function runAutoResolve(
     devWindowStart,
     devWindowEnd,
     lockedSkipped,
+    aiAnnotated: aiMap.size > 0,
   };
+}
+
+// ─── Phase 3: Single-ticket reconsider ─────────────────────────────────────
+
+/**
+ * Asks the AI to re-examine a single already-resolved ticket and refresh its
+ * reasoning/confidence/tradeoff fields.  The greedy assignment (toAssignee,
+ * sprint, dates) is PRESERVED — the AI is purely advisory here.
+ *
+ * Returns `null` in dev mode (AI_RESOLVE_ENDPOINT is null) or on any error.
+ */
+export async function reconsiderTicket(
+  resolution: TicketResolution,
+  teamSummary: Array<{ name: string; role: string; remainingCapacityDays: number; currentUtilPct: number }>,
+  sprintSummary: Array<{ name: string; startDate: string; endDate: string }>,
+  preferences: {
+    minimizeReassignments?: boolean;
+    protectCriticalPath?: boolean;
+    prioritizeSeniorsOnHighRisk?: boolean;
+    pmIntent?: string;
+  } = {},
+): Promise<Pick<TicketResolution, 'reasoning' | 'confidence' | 'tradeoff'> | null> {
+  if (!AI_RESOLVE_ENDPOINT) return null;
+
+  const ctx: AIResolverContext = {
+    tickets: [{
+      id: resolution.ticketId,
+      title: resolution.ticketTitle,
+      conflictReason: resolution.conflictReason,
+      effortDays: resolution.effortDays,
+      currentAssignee: resolution.fromAssignee,
+      requiredRole: resolution.taggedRole !== 'Any' ? resolution.taggedRole : undefined,
+    }],
+    team: teamSummary,
+    sprints: sprintSummary,
+    preferences: {
+      minimizeReassignments: preferences.minimizeReassignments ?? false,
+      protectCriticalPath: preferences.protectCriticalPath ?? false,
+      prioritizeSeniorsOnHighRisk: preferences.prioritizeSeniorsOnHighRisk ?? false,
+    },
+    pmIntent: preferences.pmIntent,
+  };
+
+  try {
+    const items = await callAIResolver(ctx);
+    if (!items || items.length === 0) return null;
+    const item = items.find(i => i.ticketId === resolution.ticketId) ?? items[0];
+    return {
+      reasoning: item.reasoning,
+      confidence: item.confidence,
+      tradeoff: item.tradeoff,
+    };
+  } catch {
+    return null;
+  }
 }

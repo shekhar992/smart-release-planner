@@ -19,12 +19,15 @@ export interface PreflightPreferences {
   minimizeReassignments: boolean;
   protectCriticalPath: boolean;
   prioritizeSeniorsOnHighRisk: boolean;
+  /** Free-text PM intent — injected into Groq system prompt as a hard constraint */
+  pmIntent: string;
 }
 
 export const DEFAULT_PREFERENCES: PreflightPreferences = {
   minimizeReassignments: false,
   protectCriticalPath: false,
   prioritizeSeniorsOnHighRisk: false,
+  pmIntent: '',
 };
 
 interface PreflightScopeModalProps {
@@ -321,6 +324,20 @@ export function PreflightScopeModal({
               sublabel="Assign senior developers to unassigned P1 tickets first"
               checked={preferences.prioritizeSeniorsOnHighRisk}
               onChange={v => setPreference('prioritizeSeniorsOnHighRisk', v)}
+            />
+          </div>
+
+          {/* PM intent free-text */}
+          <div className="mt-4">
+            <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1.5">
+              PM Intent <span className="font-normal normal-case text-slate-400">(optional — sent to AI)</span>
+            </label>
+            <textarea
+              rows={2}
+              placeholder="e.g. Keep Alice on the auth tickets, don't slip Sprint 3 past March 20th"
+              value={preferences.pmIntent}
+              onChange={e => onPreferencesChange({ ...preferences, pmIntent: e.target.value })}
+              className="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-400 transition"
             />
           </div>
 

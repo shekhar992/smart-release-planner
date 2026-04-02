@@ -9,8 +9,8 @@
  * The user can inspect everything, then Approve or Cancel.
  */
 
-import { useState } from 'react';
-import { X, Zap, CheckCircle, AlertTriangle, ArrowRight, Users, ChevronDown, ChevronRight, Info, Loader2 } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { X, Zap, CheckCircle, AlertTriangle, ArrowRight, Users, ChevronDown, ChevronRight, Info, Loader2, Sparkles, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import type {
   AutoResolveResult,
@@ -75,9 +75,30 @@ function reasonPill(reason: ConflictReason | undefined) {
   );
 }
 
+function confidenceBadge(confidence: number) {
+  const cls =
+    confidence >= 80 ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' :
+    confidence >= 55 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
+                       'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300';
+  return (
+    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${cls}`}>
+      <Sparkles className="w-2.5 h-2.5" />
+      {confidence}% confident
+    </span>
+  );
+}
+
 // ─── Sub-components ────────────────────────────────────────────────────────
 
-function ResolutionRow({ r }: { r: TicketResolution }) {
+function ResolutionRow({
+  r,
+  onReconsider,
+  isReconsidering,
+}: {
+  r: TicketResolution;
+  onReconsider?: (id: string) => void;
+  isReconsidering?: boolean;
+}) {
   return (
     <div className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-b-0">
       {/* Change type badge */}
@@ -120,6 +141,42 @@ function ResolutionRow({ r }: { r: TicketResolution }) {
             <span className="text-slate-400">
               (starts {format(new Date(r.toStartDate), 'MMM d')})
             </span>
+          </div>
+        )}
+
+        {/* AI reasoning block — only shown when Groq annotated this ticket */}
+        {r.reasoning && (
+          <div className="mt-2 px-2.5 py-2 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/40">
+            <div className="flex items-start gap-1.5">
+              <Sparkles className="w-3 h-3 text-violet-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-violet-700 dark:text-violet-300 leading-relaxed">{r.reasoning}</p>
+            </div>
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+              {r.confidence !== undefined && confidenceBadge(r.confidence)}
+              {r.tradeoff && (
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 italic">
+                  Tradeoff: {r.tradeoff}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Reconsider button */}
+        {onReconsider && (
+          <div className="mt-1.5">
+            <button
+              onClick={() => onReconsider(r.ticketId)}
+              disabled={isReconsidering}
+              className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isReconsidering ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <RotateCcw className="w-3 h-3" />
+              )}
+              {isReconsidering ? 'Reconsidering…' : 'Reconsider this ticket'}
+            </button>
           </div>
         )}
       </div>
@@ -299,6 +356,8 @@ interface Props {
   onApprove: (resolutions: TicketResolution[]) => void;
   onCancel: () => void;
   onReviewManually?: () => void;
+  /** Phase 3: called when PM wants AI to re-examine one ticket's reasoning */
+  onReconsider?: (ticketId: string, current: TicketResolution) => Promise<Pick<TicketResolution, 'reasoning' | 'confidence' | 'tradeoff'> | null>;
 }
 
 // ─── How-this-works card (inline in Changes tab) ────────────────────────────
@@ -321,15 +380,44 @@ function HowItWorksCard({ unresolvableCount }: { unresolvableCount: number }) {
   );
 }
 
-export function AutoResolvePreviewModal({ result, isLoading, onApprove, onCancel, onReviewManually }: Props) {
+export function AutoResolvePreviewModal({ result, isLoading, onApprove, onCancel, onReviewManually, onReconsider }: Props) {
   const [tab, setTab] = useState<'changes' | 'impact'>('changes');
+  // Local copy of resolutions — starts empty; synced via effect when result arrives
+  const [localResolutions, setLocalResolutions] = useState<TicketResolution[]>([]);
+  const [reconsideringIds, setReconsideringIds] = useState<Set<string>>(new Set());
+
+  // Sync local resolutions whenever the resolver produces a new result
+  // (result goes null → actual value as loading completes)
+  useEffect(() => {
+    if (result) setLocalResolutions(result.resolutions);
+  }, [result]);
+
+  // Must be declared before the early return — React Rules of Hooks
+  const handleReconsiderRow = useCallback(async (ticketId: string) => {
+    if (!onReconsider) return;
+    const current = localResolutions.find(r => r.ticketId === ticketId);
+    if (!current) return;
+    setReconsideringIds(prev => new Set(prev).add(ticketId));
+    try {
+      const update = await onReconsider(ticketId, current);
+      if (update) {
+        setLocalResolutions(prev =>
+          prev.map(r => r.ticketId === ticketId ? { ...r, ...update } : r),
+        );
+      }
+    } finally {
+      setReconsideringIds(prev => { const n = new Set(prev); n.delete(ticketId); return n; });
+    }
+  }, [onReconsider, localResolutions]);
 
   // Show skeleton while the resolver is running
   if (isLoading || !result) {
     return <LoadingSkeleton onCancel={onCancel} />;
   }
 
-  const { resolutions, unresolvable, sprintSnapshotsBefore, sprintSnapshotsAfter } = result;
+  const { unresolvable, sprintSnapshotsBefore, sprintSnapshotsAfter, aiAnnotated } = result;
+  // Use localResolutions so per-row reconsider updates are reflected immediately
+  const resolutions = localResolutions;
 
   const totalConflicts = resolutions.length + unresolvable.length;
   const resolvedPct = totalConflicts > 0 ? Math.round((resolutions.length / totalConflicts) * 100) : 100;
@@ -373,6 +461,11 @@ export function AutoResolvePreviewModal({ result, isLoading, onApprove, onCancel
               <div className="flex items-center gap-2 mb-1">
                 <Zap className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 <h2 className="text-lg font-bold text-slate-900 dark:text-white">Auto-Resolve Preview</h2>
+                {aiAnnotated && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300">
+                    <Sparkles className="w-2.5 h-2.5" />AI
+                  </span>
+                )}
               </div>
               {totalConflicts > 0 ? (
                 <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -448,11 +541,18 @@ export function AutoResolvePreviewModal({ result, isLoading, onApprove, onCancel
 
             {tab === 'changes' && (
               <div className="pb-4">
-                <HowItWorksCard unresolvableCount={unresolvable.length} />
+                <HowItWorksCard unresolvableCount={unresolvable.length} aiAnnotated={aiAnnotated} />
 
                 {sorted.length > 0 && (
                   <div className="mx-4 mt-3 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    {sorted.map(r => <ResolutionRow key={r.ticketId} r={r} />)}
+                    {sorted.map(r => (
+                  <ResolutionRow
+                    key={r.ticketId}
+                    r={r}
+                    onReconsider={onReconsider ? handleReconsiderRow : undefined}
+                    isReconsidering={reconsideringIds.has(r.ticketId)}
+                  />
+                ))}
                   </div>
                 )}
 

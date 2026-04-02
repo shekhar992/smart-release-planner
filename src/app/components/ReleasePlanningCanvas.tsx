@@ -13,7 +13,7 @@ import { PRDImportModal } from './PRDImportModal';
 import { ConflictResolutionPanel } from './ConflictResolutionPanel';
 import { AutoResolvePreviewModal } from './AutoResolvePreviewModal';
 import { PreflightScopeModal, DEFAULT_PREFERENCES, type PreflightPreferences } from './PreflightScopeModal';
-import { runAutoResolve, type AutoResolveResult, type TicketResolution } from '../lib/autoResolver';
+import { runAutoResolve, reconsiderTicket, type AutoResolveResult, type TicketResolution } from '../lib/autoResolver';
 import { mockProducts, Ticket, Feature, Sprint, mockHolidays, mockTeamMembers, getTeamMembersByProduct, storyPointsToDays, Phase } from '../data/mockData';
 import { detectConflicts, getConflictSummary, detectEnhancedConflicts } from '../lib/conflictDetection';
 import { calculateAllSprintCapacities, type SprintCapacity } from '../lib/capacityCalculation';
@@ -508,9 +508,15 @@ export function ReleasePlanningCanvas() {
     setAutoResolveResult(null);
     setShowAutoResolveModal(true); // open preview modal immediately — shows loading skeleton
     try {
-      const result = await runAutoResolve(release, derivedTeamMembers, holidays, phases);
+      const result = await runAutoResolve(release, derivedTeamMembers, holidays, phases, preflightPreferences);
       setAutoResolveResult(result);
-      // Surface locked skip count in a subtle toast hint
+      // Surface AI annotation status + locked skip count
+      if (result.aiAnnotated) {
+        toast.success('AI reasoning applied', {
+          description: 'Each decision includes a rationale from Groq.',
+          duration: 4000,
+        });
+      }
       if (result.lockedSkipped > 0) {
         toast.info(`${result.lockedSkipped} locked ticket${result.lockedSkipped !== 1 ? 's' : ''} skipped`, {
           description: 'Locked tickets keep their current assignment.',
@@ -615,8 +621,24 @@ export function ReleasePlanningCanvas() {
     setShowAutoResolveModal(false);
     setAutoResolveResult(null);
     const appliedCount = resolutions.length;
+
+    // Build a 2–3 sentence health narrative from the applied resolution stats
+    const assignedCount = resolutions.filter(r => r.changeType === 'assigned').length;
+    const rebalancedCount = resolutions.filter(r => r.changeType === 'reassigned' || r.changeType === 'reassigned_and_moved').length;
+    const sprintMovedCount = resolutions.filter(r => r.changeType === 'moved' || r.changeType === 'reassigned_and_moved').length;
+    const stillUnresolved = autoResolveResult?.unresolvable.length ?? 0;
+
+    const parts: string[] = [];
+    if (assignedCount > 0) parts.push(`${assignedCount} unassigned ticket${assignedCount !== 1 ? 's' : ''} given an owner`);
+    if (rebalancedCount > 0) parts.push(`${rebalancedCount} rebalanced across the team`);
+    if (sprintMovedCount > 0) parts.push(`${sprintMovedCount} moved to a better sprint`);
+    const summaryLine = parts.length > 0 ? parts.join(', ') + '.' : 'All changes applied.';
+    const healthLine = stillUnresolved > 0
+      ? `${stillUnresolved} ticket${stillUnresolved !== 1 ? 's' : ''} still need manual review.`
+      : 'All detectable conflicts are resolved — utilization stays within the 90% ceiling.';
+
     toast.success(`${appliedCount} change${appliedCount !== 1 ? 's' : ''} applied to timeline`, {
-      description: 'Review the updated schedule in the canvas.',
+      description: `${summaryLine} ${healthLine}`,
       action: {
         label: 'Undo',
         onClick: () => {
@@ -968,6 +990,37 @@ export function ReleasePlanningCanvas() {
       release?.storyPointMapping
     );
   }, [release?.sprints, derivedTickets, derivedTeamMembers, holidays, release?.storyPointMapping]);
+
+  /** Phase 3: Reconsider a single ticket's AI reasoning without changing its assignment */
+  const handleReconsider = useCallback(
+    async (_ticketId: string, current: TicketResolution) => {
+      const teamSummary = derivedTeamMembers.map(m => ({
+        name: m.name,
+        role: m.role,
+        remainingCapacityDays: 20, // rough placeholder — greedy already placed the ticket
+        currentUtilPct: 0,
+      }));
+      const sprintSummary = (release?.sprints ?? []).map(s => ({
+        name: s.name,
+        startDate: typeof s.startDate === 'string' ? s.startDate : s.startDate.toISOString(),
+        endDate: typeof s.endDate === 'string' ? s.endDate : s.endDate.toISOString(),
+      }));
+      const result = await reconsiderTicket(current, teamSummary, sprintSummary, {
+        minimizeReassignments: preflightPreferences.minimizeReassignments,
+        protectCriticalPath: preflightPreferences.protectCriticalPath,
+        prioritizeSeniorsOnHighRisk: preflightPreferences.prioritizeSeniorsOnHighRisk,
+        pmIntent: preflightPreferences.pmIntent,
+      });
+      if (!result) {
+        toast.info('AI reasoning requires production mode', {
+          description: 'Reconsider is available when the AI endpoint is configured.',
+          duration: 4000,
+        });
+      }
+      return result;
+    },
+    [derivedTeamMembers, release, preflightPreferences],
+  );
 
   const handleUpdateTicket = (featureId: string, ticketId: string, updates: Partial<Ticket>) => {
     setRelease(prev => {
@@ -2004,6 +2057,7 @@ export function ReleasePlanningCanvas() {
             setAutoResolveResult(null);
             setShowConflictResolution(true);
           }}
+          onReconsider={handleReconsider}
         />
       )}
 

@@ -654,20 +654,25 @@ function SprintsStep({
     if (!startDate || !endDate) return [];
     const start = new Date(startDate + 'T00:00:00');
     const end = new Date(endDate + 'T00:00:00');
-    const totalDays = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000));
-    const count = Math.floor(totalDays / duration);
-    if (count <= 0) return [];
+    if (start > end) return [];
 
+    // Mirror the same logic as generateSprintPeriods: last sprint is always
+    // capped at releaseEnd so all phases (QA, Release, etc.) get sprint coverage.
     const sprints: Sprint[] = [];
-    for (let i = 0; i < count; i++) {
-      const sprintStart = new Date(start.getTime() + i * duration * 24 * 60 * 60 * 1000);
-      const sprintEnd = new Date(sprintStart.getTime() + (duration - 1) * 24 * 60 * 60 * 1000);
+    let currentStart = new Date(start);
+    let index = 0;
+    while (currentStart <= end) {
+      const potentialEnd = new Date(currentStart.getTime() + (duration - 1) * 24 * 60 * 60 * 1000);
+      const actualEnd = potentialEnd > end ? new Date(end) : potentialEnd;
       sprints.push({
-        id: `sprint-${state.releaseData.id}-${i}`,
-        name: `Sprint ${i + 1}`,
-        startDate: sprintStart,
-        endDate: sprintEnd,
+        id: `sprint-${state.releaseData.id}-${index}`,
+        name: `Sprint ${index + 1}`,
+        startDate: new Date(currentStart),
+        endDate: actualEnd,
       });
+      currentStart = new Date(actualEnd.getTime() + 24 * 60 * 60 * 1000);
+      index++;
+      if (index > 100) break; // safety guard
     }
     return sprints;
   }, [startDate, endDate, duration, state.releaseData.id]);

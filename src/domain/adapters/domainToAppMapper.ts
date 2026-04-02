@@ -135,6 +135,7 @@ export function mapReleasePlanToAppRelease(
           endDate: ticketEndDate,
           status: "planned",
           storyPoints: ticket.effortDays, // 1 day = 1 SP
+          effortDays: ticket.effortDays,  // Set explicitly so effort resolver uses this directly
           assignedTo: validateAssignment(ticket.assignedToRaw)
         };
 

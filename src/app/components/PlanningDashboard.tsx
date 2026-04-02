@@ -11,6 +11,7 @@ import { PageShell } from './PageShell';
 import { loadProducts, initializeStorage, saveProducts, saveTeamMembers, loadTeamMembers, savePhases, loadHolidays } from '../lib/localStorage';
 import { ModeSwitch } from './ModeSwitch';
 import { buildReleasePlan } from '../../domain/planningEngine';
+import { generateSprintPeriods } from '../../domain/dateUtils';
 import type { TicketInput, ReleaseConfig } from '../../domain/types';
 import { calculateEndDateFromEffort } from '../lib/dateUtils';
 import { cn } from './ui/utils';
@@ -324,27 +325,26 @@ export function PlanningDashboard({
       }));
     }
     
-    // Generate display sprints for the FULL SDLC range (dev + SIT + UAT)
-    // These populate the timeline canvas — ticket scheduling uses the narrower dev window.
+    // Generate display sprints for the FULL SDLC range (dev + SIT + UAT).
+    // Uses generateSprintPeriods so the last sprint is always capped at releaseEnd
+    // instead of being silently dropped by Math.floor — this ensures QA & Testing
+    // and Release phases always have sprint coverage on the timeline.
     const newReleaseId = `r-${Date.now()}`;
     const fullReleaseSprints: Array<{ id: string; name: string; startDate: Date; endDate: Date }> = [];
     if (data.sprintLengthDays) {
-      const totalDays = Math.round(
-        (new Date(data.endDate).getTime() - new Date(data.startDate).getTime()) / (24 * 60 * 60 * 1000),
+      const periods = generateSprintPeriods(
+        new Date(data.startDate),
+        new Date(data.endDate),
+        data.sprintLengthDays,
       );
-      const count = Math.floor(totalDays / data.sprintLengthDays);
-      for (let i = 0; i < count; i++) {
-        const sprintStart = new Date(
-          new Date(data.startDate).getTime() + i * data.sprintLengthDays * 24 * 60 * 60 * 1000,
-        );
-        const sprintEnd = new Date(sprintStart.getTime() + (data.sprintLengthDays - 1) * 24 * 60 * 60 * 1000);
+      periods.forEach((period, i) => {
         fullReleaseSprints.push({
           id: `sprint-${newReleaseId}-${i}`,
           name: `Sprint ${i + 1}`,
-          startDate: sprintStart,
-          endDate: sprintEnd,
+          startDate: period.startDate,
+          endDate: period.endDate,
         });
-      }
+      });
     }
 
     // Create the release object

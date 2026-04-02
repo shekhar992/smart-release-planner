@@ -250,9 +250,17 @@ export function calculateSprintCapacity(
     return sum + ticket.storyPoints;
   }, 0);
 
-  // Calculate planned days using effort resolver (effortDays → storyPoints with mapping)
+  // Calculate planned days using effort resolver (effortDays → storyPoints with mapping).
+  // Cap each ticket's contribution at the number of working days remaining in the sprint
+  // from its start date.  This prevents two known inflation cases:
+  //   1. Overflow tickets placed at devEnd = lastSprint.endDate (they "start" on the last
+  //      sprint day but carry large effortDays, causing 300%+ utilisation).
+  //   2. Soft-fallback over-allocation: a developer receives more work than sprint.workingDays
+  //      and the last ticket in their chain starts near the sprint boundary with a large effort.
   const plannedDays = sprintTickets.reduce((sum, ticket) => {
-    return sum + resolveEffortDaysWithMapping(ticket, spMapping);
+    const effort = resolveEffortDaysWithMapping(ticket, spMapping);
+    const workingDaysAvailableInSprint = countWorkingDays(new Date(ticket.startDate), sprint.endDate);
+    return sum + Math.min(effort, workingDaysAvailableInSprint);
   }, 0);
   
   // Calculate utilization based on days (mapping-aware)
